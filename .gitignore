@@ -15,7 +15,14 @@ certbot/conf/renewal/
 *.key
 *.crt
 
-# Logs et fichiers temporaires
+# Fichiers de backup
+docker-compose.yml.backup
+docker-compose.yml.save
+docker-compose.yml.bak.*
+
+# Logs / cache
 *.log
-tmp/
+__pycache__/
+node_modules/
+dist/
 .cache/
