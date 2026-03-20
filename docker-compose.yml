@@ -1,0 +1,87 @@
+services:
+  mariadb:
+    image: mariadb:11
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - ./mariadb/data:/var/lib/mysql
+    networks: [internal]
+
+  content-api:
+    build: ./content-api
+    container_name: content-api
+    restart: unless-stopped
+    environment:
+      DB_HOST: mariadb
+      DB_NAME: ${MARIADB_DATABASE}
+      DB_USER: ${MARIADB_USER}
+      DB_PASS: ${MARIADB_PASSWORD}
+      ANIME_API_KEY: ${ANIME_API_KEY}
+      GAMES_API_KEY: ${GAMES_API_KEY}
+      PORT: 3000
+    depends_on: [mariadb]
+    networks: [internal]
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      - N8N_HOST=staging.gamenime.fr
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - N8N_PATH=/n8n/
+      - WEBHOOK_URL=https://staging.gamenime.fr/n8n/
+      - N8N_EDITOR_BASE_URL=https://staging.gamenime.fr/n8n/
+      - N8N_PROXY_HOPS=1
+      - N8N_SECURE_COOKIE=true
+      - N8N_BASIC_AUTH_ACTIVE=false
+#     - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+#     - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Certificats SSL pour résoudre l'erreur UNABLE_TO_GET_ISSUER_CERT_LOCALLY
+      - NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt
+      - SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      - SSL_CERT_DIR=/etc/ssl/certs
+    volumes:
+      - ./n8n/data:/home/node/.n8n
+      - /etc/ssl/certs:/etc/ssl/certs:ro  # Monte les certificats système
+    networks: [internal, public]
+
+  web:
+    image: nginx:alpine
+    container_name: web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
+      - ./nginx/static:/etc/nginx/static:ro
+      - ./site/dist:/usr/share/nginx/html:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    depends_on: [content-api, n8n]
+    networks: [internal, public]
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    entrypoint: sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done"
+    networks: [public]
+
+networks:
+  public:
+  internal:
+    internal: true

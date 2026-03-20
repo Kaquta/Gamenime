@@ -1,0 +1,49 @@
+# HTTP : ACME + redirect staging + maintenance prod
+server {
+  listen 80;
+  server_name gamenime.fr www.gamenime.fr staging.gamenime.fr;
+
+  location /.well-known/acme-challenge/ { root /var/www/certbot; }
+
+  if ($host = staging.gamenime.fr) { return 301 https://$host$request_uri; }
+
+  location / {
+    root /etc/nginx/static;
+    try_files /maintenance.html =503;
+  }
+}
+
+# HTTPS PROD : maintenance
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name gamenime.fr www.gamenime.fr;
+
+  ssl_certificate     /etc/letsencrypt/live/gamenime.fr/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/gamenime.fr/privkey.pem;
+
+  root /etc/nginx/static;
+  location / { try_files /maintenance.html =503; }
+}
+
+# HTTPS STAGING : privé (Basic Auth) + proxy
+server {
+  listen 443 ssl;
+  http2 on;
+  server_name staging.gamenime.fr;
+
+  ssl_certificate     /etc/letsencrypt/live/gamenime.fr/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/gamenime.fr/privkey.pem;
+
+  auth_basic "Staging prive";
+  auth_basic_user_file /etc/nginx/htpasswd/staging.htpasswd;
+
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location / { try_files $uri $uri/ /index.html; }
+
+  location /api/anime/ { proxy_pass http://anime-api:3001/; }
+  location /api/games/ { proxy_pass http://games-api:3002/; }
+  location /n8n/ { proxy_pass http://n8n:5678/; }
+}
