@@ -1,0 +1,25 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import SectionBlock from "../components/SectionBlock.astro";
+import Footer from "../components/Footer.astro";
+import { getAnimeItems, getGameItems } from "../lib/api";
+import { isUpcoming } from "../lib/utils";
+
+const animeItems = await getAnimeItems();
+const gameItems = await getGameItems();
+
+const upcomingMixed = [...animeItems, ...gameItems]
+  .filter((item) => isUpcoming(item.releaseDate))
+  .sort((a, b) => {
+    const aTime = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+    const bTime = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+    return aTime - bTime;
+  });
+---
+
+<BaseLayout title="GameNime — À venir">
+  <HeroHeader activeTab="upcoming" />
+  <SectionBlock title="À venir (animés & jeux)" items={upcomingMixed} />
+  <Footer />
+</BaseLayout>

@@ -1,0 +1,27 @@
+---
+import ItemCard from "./ItemCard.astro";
+import type { ContentItem } from "../lib/types";
+
+interface Props {
+  title: string;
+  items: ContentItem[];
+  href?: string;
+}
+
+const { title, items, href } = Astro.props;
+---
+
+<section class="section-block container">
+  <div class="section-head">
+    <h2>{title}</h2>
+    {href && <a class="see-more" href={href}>Voir plus</a>}
+  </div>
+
+  {items.length > 0 ? (
+    <div class="items-row">
+      {items.map((item) => <ItemCard item={item} />)}
+    </div>
+  ) : (
+    <p class="section-empty">Aucun contenu pour le moment.</p>
+  )}
+</section>
