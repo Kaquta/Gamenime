@@ -57,7 +57,7 @@ body::before {
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: Georgia, serif;
 }
 
 .brand-text {
@@ -89,15 +89,16 @@ body::before {
   height: 3px;
   margin: 10px auto 18px;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent, #d44a2d 18%, #b52f27 50%, #d44a2d 82%, transparent);
+  background: linear-gradient(90deg, transparent, #230202  18%, #220000  50%, #210202  82%, transparent);
   box-shadow: 0 0 22px rgba(210, 75, 39, 0.28);
 }
 
 .brand-subtitle {
   margin: 0 0 24px;
-  color: #e8c8aa;
+  color: #ffe4cc;
   font-size: clamp(1.1rem, 2vw, 1.45rem);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  font-family: verdana, sans-serif;
 }
 
 /* ── Tabs ──────────────────────────────────────────── */
@@ -109,7 +110,7 @@ body::before {
   padding: 8px;
   border-radius: 18px;
   background: linear-gradient(180deg, rgba(67, 24, 14, 0.80), rgba(33, 11, 7, 0.80));
-  border: 1px solid rgba(255, 165, 98, 0.26);
+  border: 1px solid rgb(42, 4, 4);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 220, 190, 0.08);
   backdrop-filter: blur(14px);
 }
@@ -142,7 +143,7 @@ body::before {
   padding: 16px 16px 18px;
   border-radius: 22px;
   background: linear-gradient(180deg, rgba(64, 22, 12, 0.58), rgba(36, 12, 8, 0.54));
-  border: 1px solid var(--line);
+  border: 1px solid rgb(36, 4, 2);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 220, 180, 0.08);
   backdrop-filter: blur(10px);
 }
