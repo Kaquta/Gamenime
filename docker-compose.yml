@@ -29,7 +29,7 @@ services:
     networks: [internal]
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.13.4
     container_name: n8n
     restart: unless-stopped
     environment:
@@ -38,11 +38,20 @@ services:
       - N8N_PROTOCOL=https
       - N8N_PORT=5678
       - N8N_PATH=/n8n/
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - ANIME_API_KEY=${ANIME_API_KEY}
+      - GAMES_API_KEY=${GAMES_API_KEY}
+      - TWITCH_CLIENT_ID=xee4i7Inxamhfir9thj3xdgnrg0b76
+      - TWITCH_CLIENT_SECRET=dync14rbsy85fu4k8rsg4e2hi6xr61
       - WEBHOOK_URL=https://staging.gamenime.fr/n8n/
       - N8N_EDITOR_BASE_URL=https://staging.gamenime.fr/n8n/
       - N8N_PROXY_HOPS=1
       - N8N_SECURE_COOKIE=true
       - N8N_BASIC_AUTH_ACTIVE=false
+      - NODE_FUNCTION_ALLOW_EXTERNAL=axios
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_RUNNERS_MAX_OLD_SPACE_SIZE=8192
+      - NODE_OPTIONS=--max-old-space-size=8192
 #     - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
 #     - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
@@ -69,9 +78,10 @@ services:
       - ./site/dist:/usr/share/nginx/html:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
+      - /opt/stack/nginx/.htpasswd-netdata:/etc/nginx/.htpasswd-netdata:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
     depends_on: [content-api, n8n]
     networks: [internal, public]
-
   certbot:
     image: certbot/certbot
     container_name: certbot
@@ -80,7 +90,6 @@ services:
       - ./certbot/conf:/etc/letsencrypt
     entrypoint: sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew; done"
     networks: [public]
-
 networks:
   public:
   internal:

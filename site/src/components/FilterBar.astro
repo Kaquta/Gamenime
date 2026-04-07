@@ -1,0 +1,138 @@
+---
+interface Props {
+  domain: "anime" | "games" | "both";
+}
+const { domain } = Astro.props;
+
+const months = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
+];
+
+const genres = domain === "games"
+  ? ["Action", "Adventure", "RPG", "Shooter", "Strategy", "Puzzle", "Racing", "Sports", "Simulation", "Platformer", "Fighting", "Horror"]
+  : domain === "anime"
+  ? ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance", "Sci-Fi", "Slice of Life", "Horror", "Mecha", "Sports", "Psychological"]
+  : ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "RPG", "Shooter", "Romance", "Sci-Fi", "Horror", "Strategy", "Sports"];
+---
+
+<div class="filter-bar container" data-domain={domain}>
+  <div class="filter-row">
+    <div class="filter-group">
+      <select class="filter-select" id="filterMonth">
+        <option value="">Mois</option>
+        {months.map((m, i) => (
+          <option value={String(i + 1).padStart(2, "0")}>{m}</option>
+        ))}
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <select class="filter-select" id="filterYear">
+        <option value="">Année</option>
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+      </select>
+    </div>
+
+    <div class="filter-group filter-genres">
+      <button class="filter-select genre-toggle" id="genreToggle">
+        Genres ▾
+      </button>
+      <div class="genre-dropdown" id="genreDropdown">
+        {genres.map((g) => (
+          <label class="genre-option">
+            <input type="checkbox" value={g} class="genre-check" />
+            <span>{g}</span>
+          </label>
+        ))}
+      </div>
+    </div>
+
+    <div class="filter-group filter-search">
+      <input type="text" class="filter-input" id="filterSearch" placeholder="Rechercher..." />
+    </div>
+
+    <button class="filter-apply" id="filterApply">Filtrer</button>
+    <button class="filter-reset" id="filterReset">✕</button>
+  </div>
+</div>
+
+<script>
+  // Genre dropdown toggle
+  const toggle = document.getElementById("genreToggle");
+  const dropdown = document.getElementById("genreDropdown");
+
+  toggle?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    dropdown?.classList.toggle("open");
+  });
+
+  document.addEventListener("click", () => {
+    dropdown?.classList.remove("open");
+  });
+
+  dropdown?.addEventListener("click", (e) => {
+    e.stopPropagation();
+  });
+
+  // Apply filters
+  const applyBtn = document.getElementById("filterApply");
+  const resetBtn = document.getElementById("filterReset");
+
+  function getFilters() {
+    const month = (document.getElementById("filterMonth") as HTMLSelectElement)?.value;
+    const year = (document.getElementById("filterYear") as HTMLSelectElement)?.value;
+    const search = (document.getElementById("filterSearch") as HTMLInputElement)?.value.trim();
+    const genres = Array.from(document.querySelectorAll(".genre-check:checked")).map(
+      (el) => (el as HTMLInputElement).value
+    );
+    return { month, year, search, genres };
+  }
+
+  function buildFilterParams(filters: ReturnType<typeof getFilters>): string {
+    const params: string[] = [];
+    if (filters.search) params.push(`search=${encodeURIComponent(filters.search)}`);
+    if (filters.genres.length) params.push(`genre=${encodeURIComponent(filters.genres.join(","))}`);
+    if (filters.year && filters.month) {
+      const lastDay = new Date(parseInt(filters.year), parseInt(filters.month), 0).getDate();
+      params.push(`releasedAfter=${filters.year}-${filters.month}-01`);
+      params.push(`releasedBefore=${filters.year}-${filters.month}-${lastDay}`);
+    } else if (filters.year) {
+      params.push(`releasedAfter=${filters.year}-01-01`);
+      params.push(`releasedBefore=${filters.year}-12-31`);
+    } else if (filters.month) {
+      params.push(`releasedAfter=2026-${filters.month}-01`);
+      const lastDay = new Date(2026, parseInt(filters.month), 0).getDate();
+      params.push(`releasedBefore=2026-${filters.month}-${lastDay}`);
+    }
+    return params.join("&");
+  }
+
+  function applyFilters() {
+    const filters = getFilters();
+    const extra = buildFilterParams(filters);
+    // Dispatch event pour que SectionBlock recharge avec les filtres
+    document.dispatchEvent(new CustomEvent("applyFilters", { detail: extra }));
+    // Update genre toggle label
+    if (toggle) {
+      toggle.textContent = filters.genres.length
+        ? `Genres (${filters.genres.length}) ▾`
+        : "Genres ▾";
+    }
+  }
+
+  function resetFilters() {
+    (document.getElementById("filterMonth") as HTMLSelectElement).value = "";
+    (document.getElementById("filterYear") as HTMLSelectElement).value = "";
+    (document.getElementById("filterSearch") as HTMLInputElement).value = "";
+    document.querySelectorAll(".genre-check").forEach((el) => {
+      (el as HTMLInputElement).checked = false;
+    });
+    if (toggle) toggle.textContent = "Genres ▾";
+    document.dispatchEvent(new CustomEvent("applyFilters", { detail: "" }));
+  }
+
+  applyBtn?.addEventListener("click", applyFilters);
+  resetBtn?.addEventListener("click", resetFilters);
+</script>

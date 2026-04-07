@@ -1,0 +1,14 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import FilterBar from "../components/FilterBar.astro";
+import SectionBlock from "../components/SectionBlock.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<BaseLayout title="GameNime — Jeux">
+  <HeroHeader activeTab="games" />
+  <FilterBar domain="games" />
+  <SectionBlock title="Derniers jeux vidéo" source="games" />
+  <Footer />
+</BaseLayout>

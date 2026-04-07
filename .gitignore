@@ -1,28 +1,13 @@
-# Données runtime
-mariadb/data/
-n8n/data/
-
-# Certificats et comptes Let's Encrypt
-certbot/conf/accounts/
-certbot/conf/archive/
-certbot/conf/live/
-certbot/conf/renewal/
-
-# Secrets / variables
-.env
-.env.*
-*.pem
-*.key
-*.crt
-
-# Fichiers de backup
-docker-compose.yml.backup
-docker-compose.yml.save
-docker-compose.yml.bak.*
-
-# Logs / cache
-*.log
-__pycache__/
 node_modules/
 dist/
-.cache/
+.env
+*.log
+certbot/
+nginx/.htpasswd*
+netdata/
+mariadb/
+n8n/
+.astro/
+*.bak*
+*.backup
+*.save

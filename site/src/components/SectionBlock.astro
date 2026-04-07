@@ -1,0 +1,455 @@
+---
+interface Props {
+  title: string;
+  source: "anime" | "games" | "upcoming" | "anime-upcoming" | "games-upcoming" | "top-anime" | "top-games";
+  limit?: number;
+  href?: string;
+}
+const { title, source, limit, href } = Astro.props;
+---
+
+<section class="section-block container" data-source={source} data-limit={limit}>
+  <div class="section-head">
+    <h2>{title}</h2>
+    {href && <a class="see-more" href={href}>Voir plus</a>}
+  </div>
+  <div class="items-row">
+    <p class="section-loading">Chargement…</p>
+  </div>
+</section>
+
+<div class="detail-modal" id="detailModal">
+  <div class="detail-backdrop"></div>
+  <div class="detail-content">
+    <button class="detail-close" aria-label="Fermer">✕</button>
+    <div class="detail-inner" id="detailInner"></div>
+  </div>
+</div>
+
+<script>
+import { getAnimeItems, getGameItems, getItemDetail, postVote } from "../lib/api";
+import type { ContentItem } from "../lib/api";
+
+function formatDate(v) {
+  if (!v) return "Date inconnue";
+  var d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+}
+
+function getStatusLabel(item) {
+  if (!item.releaseDate) return "À surveiller";
+  var now = new Date(); now.setHours(0,0,0,0);
+  var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
+  var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
+  if (diff === 0) return "Aujourd'hui";
+  if (diff > 0) return "À venir";
+  if (item.isRecentlyReleased) return "Récent";
+  return "Sorti";
+}
+
+function getCountdownHtml(item) {
+  var dt = item.releaseDatetime || item.releaseDate;
+  if (!dt) return "";
+  var rel = new Date(dt);
+  if (Number.isNaN(rel.getTime())) return "";
+  var ms = rel.getTime() - Date.now();
+  if (ms <= 0 || ms > 20 * 24 * 3600000) return "";
+  var h = Math.floor(ms / 3600000);
+  var m = Math.floor((ms % 3600000) / 60000);
+  var s = Math.floor((ms % 60000) / 1000);
+  var days = Math.floor(ms / 86400000);
+  var label = "Sortie";
+  var desc = item.description || "";
+  var epMatch = desc.match(/\[NEXT_EP:(\d+)\]/);
+  if (epMatch) label = "Épisode " + epMatch[1];
+  else if (desc.toLowerCase().includes("dlc")) label = "DLC";
+  else if (desc.toLowerCase().includes("season") || desc.toLowerCase().includes("saison")) label = "Nouvelle saison";
+  else if (desc.toLowerCase().includes("update") || desc.toLowerCase().includes("mise à jour")) label = "Mise à jour";
+  var timeStr;
+  if (days >= 2) { timeStr = days + "j " + (h % 24) + "h"; }
+  else { timeStr = h + "h " + m + "m " + s + "s"; }
+  return '<div class="item-countdown" data-release="' + rel.toISOString() + '">' +
+    '<span class="countdown-timer">' + timeStr + '</span>' +
+    '<span class="countdown-tooltip">' + label + '</span></div>';
+}
+
+function ytId(url) {
+  if (!url) return null;
+  var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function getSmiley(p) {
+  if (p >= 80) return "😄"; if (p >= 60) return "🙂";
+  if (p >= 40) return "😐"; if (p >= 20) return "😕"; return "😢";
+}
+
+function parseScreenshots(item) {
+  if (!item.screenshots) return [];
+  try { var arr = JSON.parse(item.screenshots); return Array.isArray(arr) ? arr : []; }
+  catch(e) { return []; }
+}
+
+function simplifyPlatform(p) {
+  if (!p) return "";
+  var s = p
+    .replace(/PC \(Microsoft Windows\)/gi, "PC")
+    .replace(/PlayStation 5/gi, "PlayStation")
+    .replace(/PlayStation 4/gi, "PlayStation")
+    .replace(/Xbox Series X\|S/gi, "Xbox")
+    .replace(/Xbox Series S\/X/gi, "Xbox")
+    .replace(/Xbox One/gi, "Xbox")
+    .replace(/Nintendo Switch/gi, "Nintendo")
+    .replace(/Apple Macintosh/gi, "Mac");
+  var parts = s.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+  var seen = {};
+  var unique = [];
+  for (var i = 0; i < parts.length; i++) {
+    if (!seen[parts[i]]) { seen[parts[i]] = true; unique.push(parts[i]); }
+  }
+  return unique.join(", ");
+}
+
+function formatPegi(rating) {
+  if (!rating) return "";
+  if (rating.indexOf("PEGI") === 0) return rating;
+  var map = { "Everyone": "PEGI 3", "Everyone 10+": "PEGI 7", "E": "PEGI 3", "E10+": "PEGI 7", "Teen": "PEGI 12", "T": "PEGI 12", "Mature": "PEGI 16", "M": "PEGI 16", "Adults Only": "PEGI 18", "AO": "PEGI 18", "Rating Pending": "PEGI RP", "RP": "PEGI RP" };
+  return map[rating] || rating;
+}
+
+function getHypeLabel(item) {
+  if (!item.popularity || Number(item.popularity) < 70) return null;
+  if (!item.releaseDate) return null;
+  var now = new Date(); now.setHours(0,0,0,0);
+  var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
+  if (rel > now) return "Très attendu";
+  return "Populaire";
+}
+
+function renderCard(item, domain, rank) {
+  var status = getStatusLabel(item);
+  var media = item.cover
+    ? '<img src="' + item.cover + '" alt="' + item.title + '" loading="lazy" />'
+    : '<div class="item-placeholder">Aucune image</div>';
+  var info = simplifyPlatform(item.platform) || item.genre || "Information à venir";
+  var countdown = getCountdownHtml(item);
+  var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
+  var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
+  var screens = parseScreenshots(item);
+  var rankBadge = rank ? '<div class="rank-badge">#' + rank + '</div>' : '';
+  var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : '';
+  var hype = getHypeLabel(item);
+  var hypeBadge = '';
+  if (hype === "Populaire") hypeBadge = '<span class="item-badge popular">🔥 Populaire</span>';
+  else if (hype === "Très attendu") hypeBadge = '<span class="item-badge anticipated">⭐ Très attendu</span>';
+
+  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
+    ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
+    '<div class="item-media">' + media + '</div>' +
+    '<div class="item-hover-video"></div>' +
+    '<div class="item-hover-slides"></div>' +
+    '<div class="item-overlay"></div>' +
+    rankBadge +
+    '<div class="item-body">' +
+    '<h3>' + item.title + '</h3>' +
+    '<p>' + formatDate(item.releaseDate) + '</p>' +
+    '<p>' + info + '</p>' +
+    countdown +
+    '<div class="item-badges-row">' +
+    '<span class="item-badge">' + status + '</span>' +
+    hypeBadge +
+    '</div></div></article>';
+}
+
+var hoverTimer = null;
+var activeCard = null;
+var slideInterval = null;
+
+function killHover(card) {
+  if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
+  if (slideInterval) { clearInterval(slideInterval); slideInterval = null; }
+  var vid = card.querySelector(".item-hover-video");
+  if (vid) { vid.innerHTML = ""; vid.classList.remove("active"); }
+  var slides = card.querySelector(".item-hover-slides");
+  if (slides) { slides.innerHTML = ""; slides.classList.remove("active"); }
+  if (activeCard === card) activeCard = null;
+}
+
+function setupHoverTrailer() {
+  document.addEventListener("mouseover", function(e) {
+    var card = (e.target as HTMLElement).closest(".item-card");
+    if (!card || card === activeCard) return;
+    if (activeCard) killHover(activeCard);
+    var videoId = (card as HTMLElement).dataset.yt;
+    var screensRaw = (card as HTMLElement).dataset.screens;
+    if (!videoId && !screensRaw) return;
+    activeCard = card;
+    if (videoId) {
+      var box = card.querySelector(".item-hover-video");
+      if (!box) return;
+      hoverTimer = setTimeout(function() {
+        box.innerHTML = '<iframe src="https://www.youtube.com/embed/' + videoId + '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + videoId + '&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1" frameborder="0" allow="autoplay" allowfullscreen></iframe>';
+        box.classList.add("active");
+      }, 500);
+    } else if (screensRaw) {
+      var sbox = card.querySelector(".item-hover-slides");
+      if (!sbox) return;
+      try {
+        var screens = JSON.parse(screensRaw);
+        if (screens.length === 0) return;
+        var idx = 0;
+        sbox.innerHTML = '<img src="' + screens[0] + '" alt="screenshot" />';
+        sbox.classList.add("active");
+        if (screens.length > 1) {
+          slideInterval = setInterval(function() {
+            idx = (idx + 1) % screens.length;
+            sbox.innerHTML = '<img src="' + screens[idx] + '" alt="screenshot" />';
+          }, 2000);
+        }
+      } catch(ex) {}
+    }
+  });
+
+  document.addEventListener("mouseout", function(e) {
+    var card = (e.target as HTMLElement).closest(".item-card");
+    if (!card) return;
+    var related = (e as MouseEvent).relatedTarget;
+    if (related && card.contains(related as Node)) return;
+    killHover(card);
+  });
+}
+
+function setupDetailModal() {
+  var modal = document.getElementById("detailModal");
+  var inner = document.getElementById("detailInner");
+  var backdrop = modal ? modal.querySelector(".detail-backdrop") : null;
+  var closeBtn = modal ? modal.querySelector(".detail-close") : null;
+
+  function close() {
+    if (!modal || !inner) return;
+    inner.innerHTML = "";
+    modal.classList.remove("active");
+    document.body.style.overflow = "";
+  }
+
+  if (backdrop) backdrop.addEventListener("click", close);
+  if (closeBtn) closeBtn.addEventListener("click", close);
+  document.addEventListener("keydown", function(e) { if (e.key === "Escape") close(); });
+
+  document.addEventListener("click", async function(e) {
+    var card = (e.target as HTMLElement).closest(".item-card");
+    if (!card || !modal || !inner) return;
+    var id = (card as HTMLElement).dataset.id;
+    var domain = (card as HTMLElement).dataset.domain;
+    if (!id || !domain) return;
+    if (activeCard) killHover(activeCard);
+    modal.classList.add("active");
+    document.body.style.overflow = "hidden";
+    inner.innerHTML = '<p class="detail-loading">Chargement…</p>';
+
+    try {
+      var item = await getItemDetail(domain as any, id);
+      var videoId = item.trailerUrl ? ytId(item.trailerUrl) : null;
+      var genres = (item.genre || "").split(",").map(function(g) { return g.trim(); }).filter(Boolean);
+      var rawDesc = item.description || "";
+
+      var epMatch = rawDesc.match(/\[EPISODES:(\d+)\]/);
+      var fmtMatch = rawDesc.match(/\[FORMAT:(\w+)\]/);
+      var statMatch = rawDesc.match(/\[STATUS:(\w+)\]/);
+      var seaMatch = rawDesc.match(/\[SEASON:([^\]]+)\]/);
+      var nextMatch = rawDesc.match(/\[NEXT_EP:(\d+)\]/);
+      var desc = rawDesc.replace(/\[(?:EPISODES|FORMAT|STATUS|SEASON|NEXT_EP):[^\]]+\]/g, '').trim() || "Aucune description disponible pour le moment.";
+
+      var formatLabels = { TV: "Série TV", MOVIE: "Film", OVA: "OVA", ONA: "ONA", SPECIAL: "Spécial", TV_SHORT: "Court" };
+      var statusLabels = { RELEASING: "En cours", FINISHED: "Terminé", NOT_YET_RELEASED: "Pas encore sorti", CANCELLED: "Annulé", HIATUS: "En pause" };
+
+      var animeInfoHtml = '';
+      if (fmtMatch || epMatch || statMatch || seaMatch || nextMatch) {
+        var infos = [];
+        if (fmtMatch) infos.push('<span class="info-tag">📺 ' + (formatLabels[fmtMatch[1]] || fmtMatch[1]) + '</span>');
+        if (epMatch) infos.push('<span class="info-tag">🎬 ' + epMatch[1] + ' épisodes</span>');
+        if (statMatch) infos.push('<span class="info-tag">📡 ' + (statusLabels[statMatch[1]] || statMatch[1]) + '</span>');
+        if (seaMatch) infos.push('<span class="info-tag">📅 ' + seaMatch[1] + '</span>');
+        if (nextMatch) infos.push('<span class="info-tag countdown-info">⏳ Prochain : Épisode ' + nextMatch[1] + '</span>');
+        animeInfoHtml = '<div class="detail-anime-info">' + infos.join('') + '</div>';
+      }
+
+      var v = item.votes;
+      var smiley = getSmiley(v.percent);
+      var pegiLabel = formatPegi(item.rating);
+      var ratingHtml = pegiLabel ? '<span class="pegi-tag">🔞 ' + pegiLabel + '</span>' : '';
+      var hype = getHypeLabel(item);
+      var hypeHtml = '';
+      if (hype === "Populaire") hypeHtml = '<span class="popular-tag">🔥 Populaire</span>';
+      else if (hype === "Très attendu") hypeHtml = '<span class="anticipated-tag">⭐ Très attendu</span>';
+      var screens = parseScreenshots(item);
+
+      var mediaHtml = '';
+      if (videoId) {
+        mediaHtml = '<div class="detail-trailer">' +
+          '<iframe src="https://www.youtube.com/embed/' + videoId + '?rel=0" frameborder="0" allowfullscreen ' +
+          'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>';
+      } else if (screens.length) {
+        mediaHtml = '<div class="detail-gallery">' +
+          '<div class="gallery-main"><img src="' + screens[0] + '" alt="screenshot" id="galleryMain" /></div>' +
+          '<div class="gallery-thumbs">' +
+          screens.map(function(s, i) { return '<img src="' + s + '" alt="screenshot ' + (i+1) + '" class="gallery-thumb' + (i===0?' active':'') + '" />'; }).join("") +
+          '</div></div>';
+      }
+
+      inner.innerHTML =
+        '<div class="detail-header">' +
+          '<div class="detail-cover">' + (item.cover ? '<img src="' + item.cover + '" alt="' + item.title + '" />' : '') + '</div>' +
+          '<div class="detail-info">' +
+            '<h2>' + item.title + '</h2>' +
+            '<p class="detail-meta">' + formatDate(item.releaseDate) + ' · ' + (item.platform || '') + '</p>' +
+            '<div class="detail-genres">' +
+              genres.map(function(g) { return '<span class="genre-tag">⭐ ' + g + '</span>'; }).join("") +
+              ratingHtml +
+              hypeHtml +
+            '</div>' +
+            animeInfoHtml +
+          '</div>' +
+        '</div>' +
+        mediaHtml +
+        '<div class="detail-description">' +
+          '<h3>Description</h3>' +
+          '<p>' + desc + '</p>' +
+        '</div>' +
+        '<div class="detail-votes">' +
+          '<button class="vote-btn vote-up" data-vote="1">' +
+            '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83v7.84C7 18.95 8.05 20 9.34 20h8.11c.7 0 1.36-.37 1.72-.97l2.66-6.15z"/></svg>' +
+            '<span>' + v.up + '</span>' +
+          '</button>' +
+          '<button class="vote-btn vote-down" data-vote="-1">' +
+            '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M22 4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h2V4zM2.17 11.12c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97L2.17 11.12z"/></svg>' +
+            '<span>' + v.down + '</span>' +
+          '</button>' +
+          '<div class="vote-smiley">' +
+            '<span class="smiley-emoji">' + smiley + '</span>' +
+            '<span class="smiley-percent">' + v.percent + '%</span>' +
+          '</div>' +
+        '</div>';
+
+      inner.querySelectorAll(".gallery-thumb").forEach(function(thumb) {
+        thumb.addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          var img = inner.querySelector("#galleryMain");
+          if (img) img.src = (thumb as HTMLImageElement).src;
+          inner.querySelectorAll(".gallery-thumb").forEach(function(t) { t.classList.remove("active"); });
+          thumb.classList.add("active");
+        });
+      });
+
+      inner.querySelectorAll(".vote-btn").forEach(function(btn) {
+        btn.addEventListener("click", async function(ev) {
+          ev.stopPropagation();
+          var vote = parseInt((btn as HTMLElement).dataset.vote);
+          try {
+            var res = await postVote(domain as any, id, vote as any);
+            var vd = res.votes;
+            inner.querySelector(".vote-up span").textContent = String(vd.up);
+            inner.querySelector(".vote-down span").textContent = String(vd.down);
+            inner.querySelector(".smiley-emoji").textContent = getSmiley(vd.percent);
+            inner.querySelector(".smiley-percent").textContent = vd.percent + "%";
+          } catch (err) { console.error("Vote error:", err); }
+        });
+      });
+    } catch (err) {
+      inner.innerHTML = '<p class="detail-loading">Erreur de chargement.</p>';
+    }
+  });
+}
+
+function updateCountdowns() {
+  document.querySelectorAll(".item-countdown").forEach(function(el) {
+    var rel = new Date((el as HTMLElement).dataset.release);
+    var ms = rel.getTime() - Date.now();
+    var timer = el.querySelector(".countdown-timer");
+    if (!timer) return;
+    if (ms <= 0) { timer.textContent = "Disponible !"; el.classList.add("countdown-done"); return; }
+    var days = Math.floor(ms / 86400000);
+    var hrs = Math.floor(ms / 3600000);
+    if (days >= 2) { timer.textContent = days + "j " + (hrs % 24) + "h"; }
+    else { timer.textContent = hrs + "h " + Math.floor((ms%3600000)/60000) + "m " + Math.floor((ms%60000)/1000) + "s"; }
+  });
+}
+
+async function loadSection(section) {
+  var source = section.dataset.source;
+  var limit = section.dataset.limit ? parseInt(section.dataset.limit) : undefined;
+  var row = section.querySelector(".items-row");
+  if (!row) return;
+  try {
+    var items;
+    var domain = "anime";
+    var isTop = false;
+    if (source === "anime") {
+      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=100&order=desc"); domain = "anime";
+    } else if (source === "games") {
+      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=100&order=desc"); domain = "games";
+    } else if (source === "anime-upcoming") {
+      items = await getAnimeItems("upcoming=1&limit=100&order=asc"); domain = "anime";
+    } else if (source === "games-upcoming") {
+      items = await getGameItems("upcoming=1&limit=100&order=asc"); domain = "games";
+    } else if (source === "top-anime") {
+      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=7&orderBy=popularity&order=desc"); domain = "anime"; isTop = true;
+    } else if (source === "top-games") {
+      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=7&orderBy=popularity&order=desc"); domain = "games"; isTop = true;
+    } else {
+      var a = await getAnimeItems("upcoming=1&limit=50&order=asc");
+      var g = await getGameItems("upcoming=1&limit=50&order=asc");
+      var all = []
+        .concat(a.map(function(i) { return Object.assign({}, i, { _d: "anime" }); }))
+        .concat(g.map(function(i) { return Object.assign({}, i, { _d: "games" }); }))
+        .sort(function(x, y) {
+          var at = x.releaseDate ? new Date(x.releaseDate).getTime() : 0;
+          var bt = y.releaseDate ? new Date(y.releaseDate).getTime() : 0;
+          return at - bt;
+        });
+      if (limit) all.splice(limit);
+      row.innerHTML = all.length ? all.map(function(i) { return renderCard(i, i._d); }).join("") : '<p class="section-empty">Aucun contenu.</p>';
+      return;
+    }
+    if (limit) items = items.slice(0, limit);
+    row.innerHTML = items.length
+      ? items.map(function(i, idx) { return renderCard(i, domain, isTop ? idx + 1 : undefined); }).join("")
+      : '<p class="section-empty">Aucun contenu pour le moment.</p>';
+  } catch (err) {
+    console.error("Erreur " + source + ":", err);
+    row.innerHTML = '<p class="section-empty">Impossible de charger les données.</p>';
+  }
+}
+
+document.addEventListener("applyFilters", async function(e) {
+  var extra = (e as CustomEvent).detail;
+  var sections = document.querySelectorAll(".section-block[data-source]");
+  for (var i = 0; i < sections.length; i++) {
+    var section = sections[i] as HTMLElement;
+    var source = section.dataset.source;
+    if (source.startsWith("top-")) continue;
+    var row = section.querySelector(".items-row");
+    if (!row) continue;
+    var items;
+    var domain = "anime";
+    var params = extra ? extra + "&limit=100&order=desc" : "limit=100&order=desc";
+    try {
+      if (source === "anime") { items = await getAnimeItems("released=1&releasedAfter=2026-01-01&" + params); domain = "anime"; }
+      else if (source === "games") { items = await getGameItems("released=1&releasedAfter=2026-01-01&" + params); domain = "games"; }
+      else if (source === "anime-upcoming") { items = await getAnimeItems("upcoming=1&" + params); domain = "anime"; }
+      else if (source === "games-upcoming") { items = await getGameItems("upcoming=1&" + params); domain = "games"; }
+      else { continue; }
+      row.innerHTML = items.length
+        ? items.map(function(it) { return renderCard(it, domain); }).join("")
+        : '<p class="section-empty">Aucun résultat pour ces filtres.</p>';
+    } catch (err) { row.innerHTML = '<p class="section-empty">Erreur.</p>'; }
+  }
+});
+
+document.querySelectorAll(".section-block[data-source]").forEach(function(s) { loadSection(s); });
+setInterval(updateCountdowns, 1000);
+setupHoverTrailer();
+setupDetailModal();
+</script>

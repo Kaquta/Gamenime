@@ -1,0 +1,118 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import SectionBlock from "../components/SectionBlock.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<BaseLayout title="GameNime — Accueil">
+  <HeroHeader activeTab="home" />
+
+  <div class="search-bar-home container">
+    <input type="text" id="homeSearch" class="search-input" placeholder="Rechercher un anime ou jeu..." />
+    <button id="homeSearchBtn" class="search-btn">↵</button>
+  </div>
+
+  <div id="homeSearchResults" class="container" style="display:none;">
+    <section class="section-block">
+      <div class="section-head"><h2>Résultats</h2></div>
+      <div class="items-row" id="homeSearchRow"></div>
+    </section>
+  </div>
+
+  <SectionBlock title="Derniers animés" source="anime" limit={7} href="/anime" />
+  <SectionBlock title="Derniers jeux vidéo" source="games" limit={7} href="/games" />
+  <SectionBlock title="Top 7 Animés" source="top-anime" limit={7} />
+  <SectionBlock title="Top 7 Jeux Vidéo" source="top-games" limit={7} />
+  <Footer />
+</BaseLayout>
+
+<script>
+import { getAnimeItems, getGameItems } from "../lib/api";
+import type { ContentItem } from "../lib/api";
+
+function formatDate(v) {
+  if (!v) return "Date inconnue";
+  var d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+}
+
+function getStatusLabel(item) {
+  if (!item.releaseDate) return "À surveiller";
+  var now = new Date(); now.setHours(0,0,0,0);
+  var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
+  var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
+  if (diff === 0) return "Aujourd'hui";
+  if (diff > 0) return "À venir";
+  if (item.isRecentlyReleased) return "Récent";
+  return "Sorti";
+}
+
+function ytId(url) {
+  if (!url) return null;
+  var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
+function parseScreenshots(item) {
+  if (!item.screenshots) return [];
+  try { var arr = JSON.parse(item.screenshots); return Array.isArray(arr) ? arr : []; }
+  catch(e) { return []; }
+}
+
+function renderSearchCard(item, domain) {
+  var status = getStatusLabel(item);
+  var media = item.cover ? '<img src="' + item.cover + '" alt="' + item.title + '" loading="lazy" />' : '<div class="item-placeholder">Aucune image</div>';
+  var info = item.platform || item.genre || '';
+  var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
+  var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
+  var screens = parseScreenshots(item);
+  var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : '';
+  var ratingBadge = item.rating ? '<span class="pegi-badge">' + item.rating + '</span>' : '';
+
+  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
+    ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
+    '<div class="item-media">' + media + '</div>' +
+    '<div class="item-hover-video"></div>' +
+    '<div class="item-hover-slides"></div>' +
+    '<div class="item-overlay"></div>' +
+    '<div class="item-body">' +
+    '<h3>' + item.title + '</h3>' +
+    '<p>' + formatDate(item.releaseDate) + '</p>' +
+    '<p>' + info + '</p>' +
+    '<div class="item-badges">' +
+    '<span class="item-badge">' + status + '</span>' +
+    ratingBadge +
+    '</div></div></article>';
+}
+
+var input = document.getElementById("homeSearch");
+var btn = document.getElementById("homeSearchBtn");
+var resultsDiv = document.getElementById("homeSearchResults");
+var row = document.getElementById("homeSearchRow");
+
+async function doSearch() {
+  var q = input ? input.value.trim() : '';
+  if (!q || !resultsDiv || !row) return;
+  resultsDiv.style.display = "block";
+  row.innerHTML = '<p class="section-loading">Recherche…</p>';
+  try {
+    var anime = await getAnimeItems('search=' + encodeURIComponent(q) + '&limit=20');
+    var games = await getGameItems('search=' + encodeURIComponent(q) + '&limit=20');
+    var all = [].concat(
+      anime.map(function(i) { return Object.assign({}, i, { _d: 'anime' }); }),
+      games.map(function(i) { return Object.assign({}, i, { _d: 'games' }); })
+    );
+    row.innerHTML = all.length ? all.map(function(i) { return renderSearchCard(i, i._d); }).join('') : '<p class="section-empty">Aucun résultat.</p>';
+  } catch(e) { row.innerHTML = '<p class="section-empty">Erreur.</p>'; }
+}
+
+input?.addEventListener("input", function() {
+  if (!input.value.trim() && resultsDiv) resultsDiv.style.display = "none";
+});
+
+btn?.addEventListener("click", doSearch);
+input?.addEventListener("keydown", function(e) { if (e.key === "Enter") doSearch(); });
+</script>
