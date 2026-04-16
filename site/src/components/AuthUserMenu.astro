@@ -1,0 +1,244 @@
+---
+import NotificationDrawer from "./NotificationDrawer.astro";
+const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
+---
+
+<div class="auth-ui" data-api-base={apiBase}>
+  <div id="authGuest" class="auth-ui__guest hidden">
+    <a href="/signin" class="auth-ui__signin">Sign in</a>
+  </div>
+
+  <div id="authUser" class="auth-ui__user hidden">
+    <NotificationDrawer />
+    <div class="auth-user-menu">
+      <button id="authUserButton" class="auth-user-menu__trigger" type="button" aria-label="Menu profil">
+        <span class="auth-user-menu__avatar" id="authAvatar"></span>
+        <span class="auth-user-menu__name" id="authDisplayName"></span>
+      </button>
+      <div id="authUserDropdown" class="auth-user-menu__dropdown">
+        <button class="auth-user-menu__item" id="openFavDrawer" type="button">❤️ Mes favoris</button>
+        <button class="auth-user-menu__item" id="openNotifPage" type="button">🔔 Notifications</button>
+        <button class="auth-user-menu__item" id="openAccountDrawer" type="button">⚙️ Compte</button>
+        <button id="authLogoutBtn" class="auth-user-menu__item auth-user-menu__item--danger" type="button">🚪 Déconnexion</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Favoris Drawer -->
+<div id="favOverlay" class="drawer-overlay"></div>
+<aside id="favDrawer" class="drawer-panel" aria-hidden="true">
+  <div class="drawer-panel__header"><h2>❤️ Mes favoris</h2><button id="favDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div id="favDrawerCount" class="drawer-panel__meta"></div>
+  <div id="favDrawerContent" class="drawer-panel__content"></div>
+</aside>
+
+<!-- Compte Drawer -->
+<div id="accountOverlay" class="drawer-overlay"></div>
+<aside id="accountDrawer" class="drawer-panel" aria-hidden="true">
+  <div class="drawer-panel__header"><h2>⚙️ Mon compte</h2><button id="accountDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div id="accountDrawerContent" class="drawer-panel__content"></div>
+</aside>
+
+<!-- Notifications Drawer -->
+<div id="notifPageOverlay" class="drawer-overlay"></div>
+<aside id="notifPageDrawer" class="drawer-panel" aria-hidden="true">
+  <div class="drawer-panel__header"><h2>🔔 Notifications</h2><button id="notifPageClose" class="drawer-panel__close" type="button">✕</button></div>
+  <button id="notifPReadAll" class="drawer-panel__readall" type="button">Tout marquer comme lu</button>
+  <div id="notifPMeta" class="drawer-panel__meta"></div>
+  <div id="notifPContent" class="drawer-panel__content"></div>
+</aside>
+
+<!-- Reset Password Drawer -->
+<div id="resetOverlay" class="drawer-overlay"></div>
+<aside id="resetDrawer" class="drawer-panel" aria-hidden="true">
+  <div class="drawer-panel__header"><h2>🔑 Mot de passe oublié</h2><button id="resetDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div id="resetDrawerContent" class="drawer-panel__content">
+    <div id="resetError" class="auth-card__error hidden"></div>
+    <div id="resetSuccess" class="account-success hidden"></div>
+    <div class="account-field"><label>Email</label><input type="email" id="resetEmail" placeholder="ton@email.com" class="account-input" /></div>
+    <div class="account-field"><label>Pseudo</label><input type="text" id="resetPseudo" placeholder="Ton pseudo" class="account-input" /></div>
+    <div id="resetNewPwBlock" class="hidden"><div class="account-field"><label>Nouveau mot de passe</label><input type="password" id="resetNewPw" placeholder="8 caractères minimum" class="account-input" /></div></div>
+    <button id="resetBtn" class="account-btn" type="button">Vérifier</button>
+  </div>
+</aside>
+
+<script>
+  var AVATARS = [
+    { id:"luffy", name:"Luffy", color:"#cc2020", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#f4d0a8"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#cc2020"/><rect x="9" y="5" width="22" height="8" rx="4" fill="#333"/><circle cx="16" cy="14" r="1.5" fill="#333"/><circle cx="24" cy="14" r="1.5" fill="#333"/><path d="M15 18 Q20 23 25 18" fill="none" stroke="#333" stroke-width="1.5"/><path d="M9 6 Q12 2 16 5" fill="#333"/><path d="M24 5 Q28 2 31 6" fill="#333"/></svg>' },
+    { id:"zoro", name:"Zoro", color:"#2d8c3c", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#d4b896"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#2d8c3c"/><rect x="10" y="4" width="20" height="6" rx="3" fill="#4a8c3c"/><circle cx="16" cy="14" r="1.5" fill="#333"/><circle cx="24" cy="14" r="1.5" fill="#333"/><line x1="22" y1="12" x2="22" y2="17" stroke="#aa4444" stroke-width="0.8"/><path d="M16 18 L24 18" stroke="#333" stroke-width="1.2"/><rect x="2" y="20" width="3" height="16" rx="1" fill="#888" transform="rotate(-30 5 28)"/></svg>' },
+    { id:"naruto", name:"Naruto", color:"#e87d20", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#f4c888"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#e87d20"/><rect x="8" y="3" width="24" height="7" rx="3" fill="#e8b020"/><rect x="12" y="8" width="16" height="3" rx="1" fill="#4477cc"/><circle cx="16" cy="14" r="1.5" fill="#4488cc"/><circle cx="24" cy="14" r="1.5" fill="#4488cc"/><line x1="9" y1="15" x2="14" y2="14" stroke="#333" stroke-width="0.7"/><line x1="9" y1="17" x2="14" y2="16" stroke="#333" stroke-width="0.7"/><line x1="26" y1="14" x2="31" y2="15" stroke="#333" stroke-width="0.7"/><line x1="26" y1="16" x2="31" y2="17" stroke="#333" stroke-width="0.7"/><path d="M16 19 Q20 22 24 19" fill="none" stroke="#333" stroke-width="1"/></svg>' },
+    { id:"goku", name:"Goku", color:"#e8a020", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="15" r="11" fill="#f4c888"/><ellipse cx="20" cy="31" rx="10" ry="8" fill="#e87020"/><path d="M10 10 L14 1 L17 9 L20 0 L23 9 L26 1 L30 10" fill="#222"/><circle cx="16" cy="15" r="1.5" fill="#333"/><circle cx="24" cy="15" r="1.5" fill="#333"/><path d="M16 20 Q20 23 24 20" fill="none" stroke="#333" stroke-width="1.2"/></svg>' },
+    { id:"rengoku", name:"Rengoku", color:"#d44000", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#f4c888"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#d44000"/><path d="M9 10 L13 2 L17 9 L20 1 L23 9 L27 2 L31 10" fill="#ff6600"/><path d="M9 10 L13 5 L17 10 L20 3 L23 10 L27 5 L31 10" fill="#dd3300" opacity="0.6"/><circle cx="16" cy="14" r="2.2" fill="#ffaa00"/><circle cx="16" cy="14" r="1" fill="#cc3300"/><circle cx="24" cy="14" r="2.2" fill="#ffaa00"/><circle cx="24" cy="14" r="1" fill="#cc3300"/><path d="M15 19 Q20 23 25 19" fill="none" stroke="#333" stroke-width="1.5"/></svg>' },
+    { id:"levi", name:"Levi", color:"#4a5568", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#ddd0c0"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#4a5568"/><path d="M9 10 Q14 4 20 8 Q26 4 31 10" fill="#2d2d2d"/><rect x="9" y="8" width="22" height="4" rx="1" fill="#222" opacity="0.4"/><circle cx="16" cy="14" r="1.2" fill="#333"/><circle cx="24" cy="14" r="1.2" fill="#333"/><path d="M17 18 L23 18" stroke="#333" stroke-width="1"/></svg>' },
+    { id:"itachi", name:"Itachi", color:"#8b0000", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#ddd0c0"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#222"/><path d="M9 8 Q14 3 20 7 Q26 3 31 8" fill="#222"/><line x1="8" y1="10" x2="32" y2="10" stroke="#666" stroke-width="2.5"/><circle cx="16" cy="14" r="2" fill="#cc0000"/><circle cx="16" cy="14" r="0.8" fill="#333"/><circle cx="24" cy="14" r="2" fill="#cc0000"/><circle cx="24" cy="14" r="0.8" fill="#333"/><line x1="13" y1="19" x2="18" y2="22" stroke="#aa6666" stroke-width="0.8"/><line x1="27" y1="19" x2="22" y2="22" stroke="#aa6666" stroke-width="0.8"/></svg>' },
+    { id:"gojo", name:"Gojo", color:"#4488dd", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#eee8dd"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#222"/><path d="M9 8 Q14 3 20 6 Q26 3 31 8" fill="#eee"/><rect x="10" y="11" width="20" height="4" rx="2" fill="#111"/><circle cx="16" cy="13" r="2" fill="#88ccff" opacity="0.7"/><circle cx="24" cy="13" r="2" fill="#88ccff" opacity="0.7"/><path d="M15 20 Q20 24 25 20" fill="none" stroke="#333" stroke-width="1.5"/></svg>' },
+    { id:"vegeta", name:"Vegeta", color:"#3344aa", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="15" r="11" fill="#f4c888"/><ellipse cx="20" cy="31" rx="10" ry="8" fill="#3344aa"/><path d="M12 10 L15 0 L20 7 L25 0 L28 10" fill="#222"/><path d="M14 8 L17 12" stroke="#333" stroke-width="0.8"/><path d="M26 8 L23 12" stroke="#333" stroke-width="0.8"/><circle cx="16" cy="15" r="1.2" fill="#333"/><circle cx="24" cy="15" r="1.2" fill="#333"/><path d="M17 19 L23 19" stroke="#333" stroke-width="1"/></svg>' },
+    { id:"tanjiro", name:"Tanjiro", color:"#228866", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#f4c888"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#228866"/><path d="M9 8 Q14 3 20 7 Q26 3 31 8" fill="#222"/><circle cx="16" cy="14" r="1.5" fill="#882222"/><circle cx="24" cy="14" r="1.5" fill="#882222"/><rect x="17" y="4" width="2" height="5" rx="1" fill="#882222"/><path d="M16 19 Q20 22 24 19" fill="none" stroke="#333" stroke-width="1"/><rect x="4" y="24" width="2" height="12" rx="1" fill="#228866" transform="rotate(-20 5 30)"/></svg>' },
+    { id:"killua", name:"Killua", color:"#6688cc", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#eee8dd"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#6688cc"/><path d="M10 8 Q14 2 20 6 Q26 2 30 8" fill="#ddd" stroke="#ccc" stroke-width="0.5"/><circle cx="16" cy="14" r="2" fill="#4444cc"/><circle cx="16" cy="14" r="0.8" fill="#111"/><circle cx="24" cy="14" r="2" fill="#4444cc"/><circle cx="24" cy="14" r="0.8" fill="#111"/><path d="M16 19 Q20 22 24 19" fill="none" stroke="#333" stroke-width="1"/></svg>' },
+    { id:"mikasa", name:"Mikasa", color:"#cc3355", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#ddd0c0"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#cc3355"/><path d="M8 12 Q12 4 20 8 Q28 4 32 12" fill="#222"/><circle cx="16" cy="14" r="1.3" fill="#333"/><circle cx="24" cy="14" r="1.3" fill="#333"/><rect x="14" y="19" width="12" height="3" rx="1.5" fill="#cc2222" opacity="0.5"/><path d="M17 18 L23 18" stroke="#333" stroke-width="0.8"/></svg>' },
+    { id:"todoroki", name:"Todoroki", color:"#cc4422", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#ddd0c0"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#4a5568"/><path d="M9 8 Q14 3 20 7 Q26 3 31 8" fill="#cc2222"/><rect x="20" y="3" width="11" height="8" rx="3" fill="#ddd" opacity="0.6"/><circle cx="16" cy="14" r="1.8" fill="#44aadd"/><circle cx="24" cy="14" r="1.5" fill="#888"/><rect x="22" y="8" width="4" height="6" fill="#cc4444" opacity="0.3" rx="1"/><path d="M17 19 L23 19" stroke="#333" stroke-width="1"/></svg>' },
+    { id:"saitama", name:"Saitama", color:"#ddaa00", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="12" fill="#f4d0a8"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#ddaa00"/><circle cx="15" cy="13" r="2.5" fill="white"/><circle cx="15" cy="13" r="1.2" fill="#333"/><circle cx="25" cy="13" r="2.5" fill="white"/><circle cx="25" cy="13" r="1.2" fill="#333"/><path d="M15 20 Q20 17 25 20" fill="none" stroke="#333" stroke-width="1.2"/></svg>' },
+    { id:"light", name:"Light", color:"#8b6914", svg:'<svg viewBox="0 0 40 40"><circle cx="20" cy="14" r="11" fill="#ddd0c0"/><ellipse cx="20" cy="30" rx="10" ry="9" fill="#8b6914"/><path d="M10 9 Q14 3 20 7 Q26 3 30 9" fill="#553300"/><circle cx="16" cy="14" r="1.5" fill="#882200"/><circle cx="24" cy="14" r="1.5" fill="#882200"/><path d="M17 18 Q20 20 23 18" fill="none" stroke="#333" stroke-width="0.8"/></svg>' }
+  ];
+
+  var authRoot=document.querySelector(".auth-ui");var authApiBase=authRoot?authRoot.dataset.apiBase||"":"";
+  var authGuest=document.getElementById("authGuest"),authUser=document.getElementById("authUser"),authDisplayName=document.getElementById("authDisplayName"),authAvatar=document.getElementById("authAvatar"),authUserButton=document.getElementById("authUserButton"),authDropdown=document.getElementById("authUserDropdown"),authLogoutBtn=document.getElementById("authLogoutBtn");
+  var currentUser=null;
+  function authEndpoint(p){return authApiBase+p;}
+  function getAv(id){for(var i=0;i<AVATARS.length;i++)if(AVATARS[i].id===id)return AVATARS[i];return AVATARS[0];}
+  function showGuest(){if(authGuest)authGuest.classList.remove("hidden");if(authUser)authUser.classList.add("hidden");}
+  function showUser(name,email,avatar){
+    if(authGuest)authGuest.classList.add("hidden");if(authUser)authUser.classList.remove("hidden");
+    var safeName=name&&String(name).trim()?String(name).trim():email.split("@")[0];
+    if(authDisplayName)authDisplayName.textContent=safeName;
+    var av=getAv(avatar||"luffy");if(authAvatar)authAvatar.innerHTML=av.svg;
+  }
+  async function fetchMe(){
+    try{var res=await fetch(authEndpoint("/auth/me"),{method:"GET",credentials:"include",headers:{Accept:"application/json"}});
+    if(res.status===401){showGuest();return;}if(!res.ok)throw new Error("HTTP "+res.status);
+    var data=await res.json();if(!data.user){showGuest();return;}
+    currentUser=data.user;showUser(data.user.displayName,data.user.email,data.user.avatar);
+    }catch(e){showGuest();}
+  }
+  function toggleDropdown(){if(authDropdown)authDropdown.classList.toggle("is-open");}
+  function closeDropdown(){if(authDropdown)authDropdown.classList.remove("is-open");}
+  async function authLogout(){try{await fetch(authEndpoint("/auth/logout"),{method:"POST",credentials:"include"});closeDropdown();showGuest();window.location.reload();}catch(e){}}
+  if(authUserButton)authUserButton.addEventListener("click",function(e){e.stopPropagation();toggleDropdown();});
+  if(authLogoutBtn)authLogoutBtn.addEventListener("click",function(){authLogout();});
+  document.addEventListener("click",function(e){if(!e.target.closest(".auth-user-menu"))closeDropdown();});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"){closeDropdown();closeFavDrawer();closeAccountDrawer();closeNotifPageDrawer();closeResetDrawer();}});
+
+  function openDrawer(d,o){if(!d||!o)return;d.classList.add("is-open");o.classList.add("is-open");d.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";}
+  function closeDrawerEl(d,o){if(!d||!o)return;d.classList.remove("is-open");o.classList.remove("is-open");d.setAttribute("aria-hidden","true");document.body.style.overflow="";}
+  function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+  function timeAgo(s){if(!s)return"";var d=Math.floor((Date.now()-new Date(s).getTime())/1000);if(d<60)return"À l'instant";if(d<3600)return Math.floor(d/60)+" min";if(d<86400)return Math.floor(d/3600)+"h";if(d<604800)return Math.floor(d/86400)+"j";return new Intl.DateTimeFormat("fr-FR",{day:"2-digit",month:"short"}).format(new Date(s));}
+  function simplifyPlatform(p){if(!p)return"";return p.replace(/PC \(Microsoft Windows\)/gi,"PC").replace(/PlayStation 5/gi,"PlayStation").replace(/PlayStation 4/gi,"PlayStation").replace(/Xbox Series X\|S/gi,"Xbox").replace(/Xbox One/gi,"Xbox").replace(/Nintendo Switch/gi,"Nintendo");}
+
+  // ── FAVORIS ──────────────────────────────────────
+  var favDrawer=document.getElementById("favDrawer"),favOverlay=document.getElementById("favOverlay"),favDrawerClose=document.getElementById("favDrawerClose"),favDrawerContent=document.getElementById("favDrawerContent"),favDrawerCount=document.getElementById("favDrawerCount");
+  function closeFavDrawer(){closeDrawerEl(favDrawer,favOverlay);}
+  async function openFavDrawerFn(){
+    closeDropdown();openDrawer(favDrawer,favOverlay);
+    if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Chargement...</div>';
+    try{var res=await fetch(authEndpoint("/favorites/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];
+    if(favDrawerCount)favDrawerCount.textContent=items.length+" favori"+(items.length>1?"s":"");
+    if(!items.length){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.<br>Ajoute avec le ♡ !</div>';return;}
+    if(favDrawerContent)favDrawerContent.innerHTML=items.map(function(f){var info=simplifyPlatform(f.platform)||f.genre||"";var tb=f.itemType==="anime"?"🎌":"🎮";return'<div class="drawer-card"><div class="drawer-card__thumb">'+(f.cover?'<img src="'+f.cover+'" alt="" />':'')+'</div><div class="drawer-card__body"><div class="drawer-card__title">'+tb+' '+escapeHtml(f.title)+'</div><div class="drawer-card__sub">'+escapeHtml(info)+'</div></div><button class="drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer">✕</button></div>';}).join("");
+    }catch(e){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
+  }
+  if(favDrawerClose)favDrawerClose.addEventListener("click",closeFavDrawer);
+  if(favOverlay)favOverlay.addEventListener("click",closeFavDrawer);
+  document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();});
+  if(favDrawerContent)favDrawerContent.addEventListener("click",async function(e){var btn=e.target.closest(".drawer-card__remove");if(!btn)return;try{var res=await fetch(authEndpoint("/favorites/"+btn.dataset.type+"/"+btn.dataset.id),{method:"DELETE",credentials:"include",headers:{Accept:"application/json"}});if(res.ok){var card=btn.closest(".drawer-card");if(card)card.remove();document.dispatchEvent(new CustomEvent("favChanged",{detail:{type:btn.dataset.type,id:btn.dataset.id,action:"remove"}}));var rem=favDrawerContent.querySelectorAll(".drawer-card").length;if(favDrawerCount)favDrawerCount.textContent=rem+" favori"+(rem>1?"s":"");if(!rem)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.</div>';}}catch(err){}});
+
+  // ── COMPTE ───────────────────────────────────────
+  var accountDrawer=document.getElementById("accountDrawer"),accountOverlay=document.getElementById("accountOverlay"),accountDrawerClose=document.getElementById("accountDrawerClose"),accountDrawerContent=document.getElementById("accountDrawerContent");
+  function closeAccountDrawer(){closeDrawerEl(accountDrawer,accountOverlay);}
+
+  function renderAccountDrawer(){
+    if(!currentUser||!accountDrawerContent)return;
+    var u=currentUser;var av=getAv(u.avatar||"luffy");
+
+    accountDrawerContent.innerHTML=
+      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp">'+av.svg+'</div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div></div></div>'+
+
+      '<button class="account-option" data-toggle="avatarForm" type="button">🎭 Changer d\'avatar</button>'+
+      '<div id="avatarForm" class="account-subform hidden"><div class="avatar-grid">'+AVATARS.map(function(a){var sel=(u.avatar||"luffy")===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'">'+a.svg+'</button>';}).join("")+'</div></div>'+
+
+      '<button class="account-option" data-toggle="pseudoForm" type="button">✏️ Changer le pseudo</button>'+
+      '<div id="pseudoForm" class="account-subform hidden"><div class="account-field-row"><input type="text" id="accountPseudo" value="'+escapeHtml(u.displayName||"")+'" placeholder="Ton pseudo" class="account-input" /><button id="savePseudo" class="account-btn-sm" type="button">Sauver</button></div><div id="pseudoMsg" class="account-msg hidden"></div></div>'+
+
+      '<button class="account-option" data-toggle="pwForm" type="button">🔒 Changer le mot de passe</button>'+
+      '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div></div>'+
+
+      '<button class="account-option" data-toggle="notifOptForm" type="button">🔔 Options notifications</button>'+
+      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label></div>'+
+
+      '<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
+
+      '<button class="auth-user-menu__item auth-user-menu__item--danger" id="accountLogout" type="button" style="margin-top:12px;">🚪 Se déconnecter</button>';
+
+    // Toggle sections
+    accountDrawerContent.querySelectorAll("[data-toggle]").forEach(function(btn){
+      btn.addEventListener("click",function(){var target=document.getElementById(btn.dataset.toggle);if(target)target.classList.toggle("hidden");});
+    });
+
+    // Avatar picker
+    accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(btn){
+      btn.addEventListener("click",async function(){
+        var avId=btn.dataset.avatar;
+        try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({avatar:avId})});
+        if(res.ok){var data=await res.json();currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar);
+        accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(b){b.classList.remove("avatar-pick--selected");});btn.classList.add("avatar-pick--selected");
+        var disp=document.getElementById("accAvDisp");if(disp)disp.innerHTML=getAv(avId).svg;}}catch(e){}
+      });
+    });
+
+    // Save pseudo
+    document.getElementById("savePseudo")?.addEventListener("click",async function(){
+      var input=document.getElementById("accountPseudo"),msg=document.getElementById("pseudoMsg"),name=input?input.value.trim():"";if(!name)return;
+      try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({displayName:name})});var data=await res.json();
+      if(res.ok){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar);var nd=document.getElementById("accNameDisp");if(nd)nd.textContent=name;if(msg){msg.textContent="✅ Pseudo mis à jour";msg.classList.remove("hidden","account-msg--error");}}
+      else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
+    });
+
+    // Change password
+    document.getElementById("savePw")?.addEventListener("click",async function(){
+      var cur=document.getElementById("currentPw"),nw=document.getElementById("newPw"),msg=document.getElementById("pwMsg");
+      if(!cur||!nw||!cur.value||!nw.value)return;if(nw.value.length<8){if(msg){msg.textContent="❌ 8 caractères minimum";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}return;}
+      try{var res=await fetch(authEndpoint("/auth/password"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({currentPassword:cur.value,newPassword:nw.value})});var data=await res.json();
+      if(res.ok){cur.value="";nw.value="";if(msg){msg.textContent="✅ Mot de passe changé";msg.classList.remove("hidden","account-msg--error");}}
+      else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
+    });
+
+    document.getElementById("accountLogout")?.addEventListener("click",function(){closeAccountDrawer();authLogout();});
+    document.getElementById("openResetFromAccount")?.addEventListener("click",function(){closeAccountDrawer();openResetDrawerFn();});
+  }
+
+  function openAccountDrawerFn(){closeDropdown();openDrawer(accountDrawer,accountOverlay);renderAccountDrawer();}
+  if(accountDrawerClose)accountDrawerClose.addEventListener("click",closeAccountDrawer);
+  if(accountOverlay)accountOverlay.addEventListener("click",closeAccountDrawer);
+  document.getElementById("openAccountDrawer")?.addEventListener("click",function(){openAccountDrawerFn();});
+
+  // ── RESET PASSWORD ───────────────────────────────
+  var resetDrawer=document.getElementById("resetDrawer"),resetOverlay=document.getElementById("resetOverlay"),resetDrawerClose=document.getElementById("resetDrawerClose");
+  function closeResetDrawer(){closeDrawerEl(resetDrawer,resetOverlay);}
+  function openResetDrawerFn(){openDrawer(resetDrawer,resetOverlay);}
+  if(resetDrawerClose)resetDrawerClose.addEventListener("click",closeResetDrawer);
+  if(resetOverlay)resetOverlay.addEventListener("click",closeResetDrawer);
+  document.getElementById("resetBtn")?.addEventListener("click",async function(){
+    var email=document.getElementById("resetEmail"),pseudo=document.getElementById("resetPseudo"),newPwBlock=document.getElementById("resetNewPwBlock"),newPw=document.getElementById("resetNewPw"),errDiv=document.getElementById("resetError"),successDiv=document.getElementById("resetSuccess"),btn=document.getElementById("resetBtn");
+    if(!email||!pseudo)return;
+    if(newPwBlock&&!newPwBlock.classList.contains("hidden")){
+      if(!newPw||newPw.value.length<8){if(errDiv){errDiv.textContent="8 caractères minimum";errDiv.classList.remove("hidden");}return;}
+      try{var res=await fetch(authEndpoint("/auth/reset-password"),{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:email.value.trim(),displayName:pseudo.value.trim(),newPassword:newPw.value})});var data=await res.json();
+      if(res.ok){if(errDiv)errDiv.classList.add("hidden");if(successDiv){successDiv.textContent="✅ Mot de passe réinitialisé !";successDiv.classList.remove("hidden");}if(btn)btn.classList.add("hidden");}
+      else{if(errDiv){errDiv.textContent=data.error||"Erreur";errDiv.classList.remove("hidden");}}}catch(e){if(errDiv){errDiv.textContent="Erreur serveur";errDiv.classList.remove("hidden");}}
+      return;
+    }
+    if(!email.value.trim()||!pseudo.value.trim()){if(errDiv){errDiv.textContent="Remplis email et pseudo";errDiv.classList.remove("hidden");}return;}
+    if(errDiv)errDiv.classList.add("hidden");if(newPwBlock)newPwBlock.classList.remove("hidden");if(btn)btn.textContent="Réinitialiser";
+  });
+
+  // ── NOTIFICATIONS ────────────────────────────────
+  var notifPDrawer=document.getElementById("notifPageDrawer"),notifPOverlay=document.getElementById("notifPageOverlay"),notifPClose=document.getElementById("notifPageClose"),notifPContent=document.getElementById("notifPContent"),notifPMeta=document.getElementById("notifPMeta"),notifPReadAll=document.getElementById("notifPReadAll");
+  function closeNotifPageDrawer(){closeDrawerEl(notifPDrawer,notifPOverlay);}
+  function evIcon(t){if(t.includes("platform"))return"🖥️";if(t.includes("trailer"))return"▶️";if(t.includes("release_date"))return"📅";return"🔔";}
+  async function openNotifPageDrawer(){
+    closeDropdown();openDrawer(notifPDrawer,notifPOverlay);
+    if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Chargement...</div>';
+    try{var res=await fetch(authEndpoint("/notifications/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];var unread=Number(data.unreadCount||0);
+    if(notifPMeta)notifPMeta.textContent=unread>0?unread+" non lue"+(unread>1?"s":""):"Tout est lu";
+    if(!items.length){if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Aucune notification.</div>';return;}
+    if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.payload||{};var title=p.title||"Mise à jour";var label=p.label||item.eventType;var detail=p.newValue||"";var icon=evIcon(item.eventType);var uc=item.isRead?"":" notif-card--unread";var dot=item.isRead?"":'<span class="notif-card__dot"></span>';return'<button class="notif-card'+uc+'" data-id="'+item.id+'" type="button"><div class="notif-card__thumb" style="display:flex;align-items:center;justify-content:center;font-size:1.3rem;">'+icon+'</div><div class="notif-card__content"><div class="notif-card__title">'+escapeHtml(label)+' — '+escapeHtml(title)+'</div>'+(detail?'<div class="notif-card__text">'+escapeHtml(detail)+'</div>':'')+'<div class="notif-card__time">'+timeAgo(item.eventAt||item.createdAt)+'</div></div>'+dot+'</button>';}).join("");
+    }catch(e){if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
+  }
+  if(notifPClose)notifPClose.addEventListener("click",closeNotifPageDrawer);
+  if(notifPOverlay)notifPOverlay.addEventListener("click",closeNotifPageDrawer);
+  document.getElementById("openNotifPage")?.addEventListener("click",function(){openNotifPageDrawer();});
+  if(notifPReadAll)notifPReadAll.addEventListener("click",async function(){try{var res=await fetch(authEndpoint("/notifications/read-all"),{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({})});if(res.ok)openNotifPageDrawer();}catch(e){}});
+  if(notifPContent)notifPContent.addEventListener("click",async function(e){var card=e.target.closest(".notif-card");if(!card)return;var id=Number(card.dataset.id||0);if(id<=0)return;try{var res=await fetch(authEndpoint("/notifications/"+id+"/read"),{method:"POST",credentials:"include"});if(res.ok){card.classList.remove("notif-card--unread");var dot=card.querySelector(".notif-card__dot");if(dot)dot.remove();}}catch(e){}});
+
+  fetchMe();
+</script>

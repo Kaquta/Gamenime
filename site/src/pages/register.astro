@@ -1,0 +1,76 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Inscription — GameNime">
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1 class="auth-card__title">Créer un compte</h1>
+      <p class="auth-card__subtitle">Rejoins GameNime pour suivre tes anime et jeux favoris</p>
+
+      <div id="authError" class="auth-card__error hidden"></div>
+
+      <div class="auth-card__field">
+        <label for="regName">Pseudo</label>
+        <input type="text" id="regName" placeholder="Ton pseudo" autocomplete="username" />
+      </div>
+
+      <div class="auth-card__field">
+        <label for="regEmail">Email</label>
+        <input type="email" id="regEmail" placeholder="ton@email.com" autocomplete="email" />
+      </div>
+
+      <div class="auth-card__field">
+        <label for="regPassword">Mot de passe</label>
+        <input type="password" id="regPassword" placeholder="8 caractères minimum" autocomplete="new-password" />
+      </div>
+
+      <button id="registerBtn" class="auth-card__btn" type="button">Créer mon compte</button>
+
+      <p class="auth-card__switch">
+        Déjà un compte ? <a href="/signin">Se connecter</a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  var apiBase = "/api";
+  var nameInput = document.getElementById("regName");
+  var emailInput = document.getElementById("regEmail");
+  var passwordInput = document.getElementById("regPassword");
+  var registerBtn = document.getElementById("registerBtn");
+  var errorDiv = document.getElementById("authError");
+
+  function showError(msg) {
+    if (!errorDiv) return;
+    errorDiv.textContent = msg;
+    errorDiv.classList.remove("hidden");
+  }
+
+  async function doRegister() {
+    var name = nameInput ? nameInput.value.trim() : "";
+    var email = emailInput ? emailInput.value.trim() : "";
+    var password = passwordInput ? passwordInput.value : "";
+    if (!email || !password) { showError("Remplis tous les champs obligatoires."); return; }
+    if (password.length < 8) { showError("Le mot de passe doit faire 8 caractères minimum."); return; }
+
+    try {
+      registerBtn.disabled = true;
+      registerBtn.textContent = "Création...";
+      var res = await fetch(apiBase + "/auth/register", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ email: email, password: password, displayName: name || null })
+      });
+      var data = await res.json();
+      if (!res.ok) { showError(data.error || "Erreur d'inscription"); registerBtn.disabled = false; registerBtn.textContent = "Créer mon compte"; return; }
+      window.location.href = "/";
+    } catch (e) {
+      showError("Impossible de créer le compte."); registerBtn.disabled = false; registerBtn.textContent = "Créer mon compte";
+    }
+  }
+
+  if (registerBtn) registerBtn.addEventListener("click", doRegister);
+  if (passwordInput) passwordInput.addEventListener("keydown", function(e) { if (e.key === "Enter") doRegister(); });
+</script>

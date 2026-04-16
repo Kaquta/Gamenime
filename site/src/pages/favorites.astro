@@ -1,0 +1,137 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<BaseLayout title="Mes favoris — GameNime">
+  <HeroHeader />
+
+  <div class="favorites-page container">
+    <h2 class="favorites-title">❤️ Mes favoris</h2>
+    <p class="favorites-subtitle" id="favCount"></p>
+
+    <div id="favNotLogged" class="favorites-notlogged hidden">
+      <p>Connecte-toi pour voir tes favoris</p>
+      <a href="/signin" class="auth-card__btn" style="display:inline-block;text-align:center;text-decoration:none;max-width:240px;">Se connecter</a>
+    </div>
+
+    <div id="favLoading" class="favorites-loading">
+      <p>Chargement...</p>
+    </div>
+
+    <div id="favEmpty" class="favorites-empty hidden">
+      <p>Tu n'as pas encore de favoris.</p>
+      <p>Ajoute des anime ou jeux en cliquant sur le ♡ sur les cartes !</p>
+    </div>
+
+    <div id="favGrid" class="favorites-grid"></div>
+  </div>
+
+  <Footer />
+</BaseLayout>
+
+<script>
+  var apiBase = "/api";
+  var favGrid = document.getElementById("favGrid");
+  var favLoading = document.getElementById("favLoading");
+  var favEmpty = document.getElementById("favEmpty");
+  var favNotLogged = document.getElementById("favNotLogged");
+  var favCount = document.getElementById("favCount");
+
+  function formatDate(v) {
+    if (!v) return "Date inconnue";
+    var d = new Date(v);
+    if (Number.isNaN(d.getTime())) return v;
+    return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+  }
+
+  function simplifyPlatform(p) {
+    if (!p) return "";
+    var s = p
+      .replace(/PC \(Microsoft Windows\)/gi, "PC")
+      .replace(/PlayStation 5/gi, "PlayStation")
+      .replace(/PlayStation 4/gi, "PlayStation")
+      .replace(/Xbox Series X\|S/gi, "Xbox")
+      .replace(/Xbox Series S\/X/gi, "Xbox")
+      .replace(/Xbox One/gi, "Xbox")
+      .replace(/Nintendo Switch/gi, "Nintendo")
+      .replace(/Apple Macintosh/gi, "Mac");
+    var parts = s.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+    var seen = {};
+    var unique = [];
+    for (var i = 0; i < parts.length; i++) {
+      if (!seen[parts[i]]) { seen[parts[i]] = true; unique.push(parts[i]); }
+    }
+    return unique.join(", ");
+  }
+
+  function renderFavCard(fav) {
+    var info = simplifyPlatform(fav.platform) || fav.genre || "";
+    var cover = fav.cover ? '<img src="' + fav.cover + '" alt="' + fav.title + '" loading="lazy" />' : '<div class="fav-card__placeholder">Aucune image</div>';
+    var typeBadge = fav.itemType === "anime" ? '<span class="fav-card__type fav-card__type--anime">Anime</span>' : '<span class="fav-card__type fav-card__type--game">Jeu</span>';
+
+    return '<article class="fav-card" data-fav-type="' + fav.itemType + '" data-fav-id="' + fav.itemId + '">' +
+      '<div class="fav-card__cover">' + cover + '</div>' +
+      '<button class="fav-card__remove" data-type="' + fav.itemType + '" data-id="' + fav.itemId + '" aria-label="Retirer des favoris" title="Retirer des favoris">✕</button>' +
+      typeBadge +
+      '<div class="fav-card__body">' +
+        '<h3 class="fav-card__title">' + fav.title + '</h3>' +
+        '<p class="fav-card__date">' + formatDate(fav.releaseDate) + '</p>' +
+        '<p class="fav-card__info">' + info + '</p>' +
+      '</div>' +
+    '</article>';
+  }
+
+  async function loadFavorites() {
+    try {
+      var authRes = await fetch(apiBase + "/auth/me", { credentials: "include", headers: { Accept: "application/json" } });
+      if (authRes.status === 401 || !authRes.ok) {
+        if (favLoading) favLoading.classList.add("hidden");
+        if (favNotLogged) favNotLogged.classList.remove("hidden");
+        return;
+      }
+
+      var res = await fetch(apiBase + "/favorites/", { credentials: "include", headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+      var items = data.items || [];
+
+      if (favLoading) favLoading.classList.add("hidden");
+
+      if (items.length === 0) {
+        if (favEmpty) favEmpty.classList.remove("hidden");
+        if (favCount) favCount.textContent = "0 favori";
+        return;
+      }
+
+      if (favCount) favCount.textContent = items.length + " favori" + (items.length > 1 ? "s" : "");
+      if (favGrid) favGrid.innerHTML = items.map(renderFavCard).join("");
+    } catch(e) {
+      console.error("Erreur favoris:", e);
+      if (favLoading) favLoading.classList.add("hidden");
+      if (favGrid) favGrid.innerHTML = '<p class="favorites-empty">Erreur de chargement.</p>';
+    }
+  }
+
+  // Suppression d'un favori
+  if (favGrid) favGrid.addEventListener("click", async function(e) {
+    var btn = e.target.closest(".fav-card__remove");
+    if (!btn) return;
+    e.stopPropagation();
+    var type = btn.dataset.type;
+    var id = btn.dataset.id;
+    try {
+      var res = await fetch(apiBase + "/favorites/" + type + "/" + id, { method: "DELETE", credentials: "include", headers: { Accept: "application/json" } });
+      if (res.ok) {
+        var card = btn.closest(".fav-card");
+        if (card) card.remove();
+        var remaining = favGrid.querySelectorAll(".fav-card").length;
+        if (favCount) favCount.textContent = remaining + " favori" + (remaining > 1 ? "s" : "");
+        if (remaining === 0 && favEmpty) favEmpty.classList.remove("hidden");
+      }
+    } catch(err) { console.error("Erreur suppression:", err); }
+  });
+
+  loadFavorites();
+</script>

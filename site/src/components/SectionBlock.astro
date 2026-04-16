@@ -152,6 +152,7 @@ function renderCard(item, domain, rank) {
     '<div class="item-hover-slides"></div>' +
     '<div class="item-overlay"></div>' +
     rankBadge +
+    '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +
     '<h3>' + item.title + '</h3>' +
     '<p>' + formatDate(item.releaseDate) + '</p>' +
@@ -240,6 +241,7 @@ function setupDetailModal() {
 
   document.addEventListener("click", async function(e) {
     var card = (e.target as HTMLElement).closest(".item-card");
+    if ((e.target as HTMLElement).closest(".fav-heart")) return;
     if (!card || !modal || !inner) return;
     var id = (card as HTMLElement).dataset.id;
     var domain = (card as HTMLElement).dataset.domain;
@@ -395,9 +397,9 @@ async function loadSection(section) {
     } else if (source === "games-upcoming") {
       items = await getGameItems("upcoming=1&limit=100&order=asc"); domain = "games";
     } else if (source === "top-anime") {
-      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=7&orderBy=popularity&order=desc"); domain = "anime"; isTop = true;
+      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=12&orderBy=popularity&order=desc"); domain = "anime"; isTop = true;
     } else if (source === "top-games") {
-      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=7&orderBy=popularity&order=desc"); domain = "games"; isTop = true;
+      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=12&orderBy=popularity&order=desc"); domain = "games"; isTop = true;
     } else {
       var a = await getAnimeItems("upcoming=1&limit=50&order=asc");
       var g = await getGameItems("upcoming=1&limit=50&order=asc");
@@ -452,4 +454,73 @@ document.querySelectorAll(".section-block[data-source]").forEach(function(s) { l
 setInterval(updateCountdowns, 1000);
 setupHoverTrailer();
 setupDetailModal();
+setupFavorites();
+function setupFavorites() {
+  var favApiBase = "/api";
+  var favCache = {};
+  var isLoggedIn = false;
+
+  function hideAllHearts() {
+    document.body.classList.remove("is-authenticated");
+  }
+
+  function showAllHearts() {
+    document.body.classList.add("is-authenticated");
+  }
+
+  async function checkAuthAndLoadFavorites() {
+    hideAllHearts();
+    try {
+      var authRes = await fetch(favApiBase + "/auth/me", { credentials: "include", headers: { Accept: "application/json" } });
+      if (authRes.status === 401 || !authRes.ok) {
+        isLoggedIn = false;
+        hideAllHearts();
+        return;
+      }
+      isLoggedIn = true;
+      var favRes = await fetch(favApiBase + "/favorites/", { credentials: "include", headers: { Accept: "application/json" } });
+      if (favRes.ok) {
+        var data = await favRes.json();
+        if (data.items) {
+          data.items.forEach(function(f) { favCache[f.itemType + ":" + f.itemId] = true; });
+        }
+      }
+      updateAllHearts();
+      showAllHearts();
+    } catch(e) { isLoggedIn = false; hideAllHearts(); }
+  }
+
+  function updateAllHearts() {
+    document.querySelectorAll(".fav-heart").forEach(function(btn) {
+      var key = (btn.dataset.favType === "anime" ? "anime" : "game") + ":" + btn.dataset.favId;
+      if (favCache[key]) { btn.textContent = "\u2665"; btn.classList.add("is-fav"); }
+      else { btn.textContent = "\u2661"; btn.classList.remove("is-fav"); }
+    });
+  }
+
+  document.addEventListener("click", async function(e) {
+    var btn = e.target.closest(".fav-heart");
+    if (!btn) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (!isLoggedIn) { window.location.href = "/signin"; return; }
+    var id = btn.dataset.favId;
+    var type = btn.dataset.favType === "anime" ? "anime" : "game";
+    var key = type + ":" + id;
+    var isFav = !!favCache[key];
+    try {
+      if (isFav) {
+        var res = await fetch(favApiBase + "/favorites/" + type + "/" + id, { method: "DELETE", credentials: "include", headers: { Accept: "application/json" } });
+        if (res.ok) { delete favCache[key]; updateAllHearts(); }
+      } else {
+        var res2 = await fetch(favApiBase + "/favorites/", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ itemType: type, itemId: Number(id) }) });
+        if (res2.ok) { favCache[key] = true; updateAllHearts(); }
+        else if (res2.status === 401) { window.location.href = "/signin"; }
+      }
+    } catch(err) { console.error("Favori error:", err); }
+  });
+
+  checkAuthAndLoadFavorites();
+  document.addEventListener("favChanged", function(e) { var d = e.detail; if (d && d.action === "remove") { var key = (d.type === "anime" ? "anime" : "game") + ":" + d.id; delete favCache[key]; updateAllHearts(); } else { checkAuthAndLoadFavorites(); } });
+}
 </script>

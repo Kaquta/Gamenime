@@ -22,8 +22,8 @@ import Footer from "../components/Footer.astro";
 
   <SectionBlock title="Derniers animés" source="anime" limit={7} href="/anime" />
   <SectionBlock title="Derniers jeux vidéo" source="games" limit={7} href="/games" />
-  <SectionBlock title="Top 7 Animés" source="top-anime" limit={7} />
-  <SectionBlock title="Top 7 Jeux Vidéo" source="top-games" limit={7} />
+  <SectionBlock title="Top 12 Animés" source="top-anime" limit={12} />
+  <SectionBlock title="Top 12 Jeux Vidéo" source="top-games" limit={12} />
   <Footer />
 </BaseLayout>
 
@@ -60,32 +60,52 @@ function parseScreenshots(item) {
   try { var arr = JSON.parse(item.screenshots); return Array.isArray(arr) ? arr : []; }
   catch(e) { return []; }
 }
+function simplifyPlatform(p) {
+  if (!p) return "";
+  var s = p.replace(/PC \(Microsoft Windows\)/gi, "PC").replace(/PlayStation 5/gi, "PlayStation").replace(/PlayStation 4/gi, "PlayStation").replace(/Xbox Series X\|S/gi, "Xbox").replace(/Xbox Series S\/X/gi, "Xbox").replace(/Xbox One/gi, "Xbox").replace(/Nintendo Switch/gi, "Nintendo").replace(/Apple Macintosh/gi, "Mac");
+  var parts = s.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+  var seen = {}; var unique = [];
+  for (var i = 0; i < parts.length; i++) { if (!seen[parts[i]]) { seen[parts[i]] = true; unique.push(parts[i]); } }
+  return unique.join(", ");
+}
+function getHypeLabel(item) {
+  if (!item) return null;
+  var score = Number(item.popularity || 0);
+  if (score < 70) return null;
+  var today = new Date().toISOString().slice(0, 10);
+  if (item.releaseDate && item.releaseDate <= today) return "Populaire";
+  if (item.releaseDate && item.releaseDate > today) return "Très attendu";
+  return null;
+}
 
 function renderSearchCard(item, domain) {
   var status = getStatusLabel(item);
-  var media = item.cover ? '<img src="' + item.cover + '" alt="' + item.title + '" loading="lazy" />' : '<div class="item-placeholder">Aucune image</div>';
-  var info = item.platform || item.genre || '';
+  var media = item.cover ? "<img src=\"" + item.cover + "\" alt=\"" + item.title + "\" loading=\"lazy\" />" : "<div class=\"item-placeholder\">Aucune image</div>";
+  var info = (typeof simplifyPlatform === "function" ? simplifyPlatform(item.platform) : item.platform) || item.genre || "Information à venir";
   var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
   var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
   var screens = parseScreenshots(item);
-  var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : '';
-  var ratingBadge = item.rating ? '<span class="pegi-badge">' + item.rating + '</span>' : '';
-
-  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
-    ' data-id="' + item.id + '" data-domain="' + domain + '"' +
-    (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
-    '<div class="item-media">' + media + '</div>' +
-    '<div class="item-hover-video"></div>' +
-    '<div class="item-hover-slides"></div>' +
-    '<div class="item-overlay"></div>' +
-    '<div class="item-body">' +
-    '<h3>' + item.title + '</h3>' +
-    '<p>' + formatDate(item.releaseDate) + '</p>' +
-    '<p>' + info + '</p>' +
-    '<div class="item-badges">' +
-    '<span class="item-badge">' + status + '</span>' +
-    ratingBadge +
-    '</div></div></article>';
+  var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : "";
+  var hype = typeof getHypeLabel === "function" ? getHypeLabel(item) : null;
+  var hypeBadge = "";
+  if (hype === "Populaire") hypeBadge = "<span class=\"item-badge popular\">🔥 Populaire</span>";
+  else if (hype === "Très attendu") hypeBadge = "<span class=\"item-badge anticipated\">⭐ Très attendu</span>";
+  return "<article class=\"item-card" + (hasTrailer ? " has-trailer" : "") + "\"" +
+    " data-id=\"" + item.id + "\" data-domain=\"" + domain + "\"" +
+    (videoId ? " data-yt=\"" + videoId + "\"" : "") + screensAttr + ">" +
+    "<div class=\"item-media\">" + media + "</div>" +
+    "<div class=\"item-hover-video\"></div>" +
+    "<div class=\"item-hover-slides\"></div>" +
+    "<div class=\"item-overlay\"></div>" +
+    "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
+    "<div class=\"item-body\">" +
+    "<h3>" + item.title + "</h3>" +
+    "<p>" + formatDate(item.releaseDate) + "</p>" +
+    "<p>" + info + "</p>" +
+    "<div class=\"item-badges-row\">" +
+    "<span class=\"item-badge\">" + status + "</span>" +
+    hypeBadge +
+    "</div></div></article>";
 }
 
 var input = document.getElementById("homeSearch");

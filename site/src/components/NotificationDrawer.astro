@@ -1,0 +1,297 @@
+---
+const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
+---
+
+<div class="notif-root" data-api-base={apiBase}>
+  <button id="notifBell" class="notif-bell" aria-label="Notifications" type="button">
+    <span class="notif-bell__icon">🔔</span>
+    <span id="notifBadge" class="notif-bell__badge hidden">0</span>
+  </button>
+
+  <div id="notifOverlay" class="notif-overlay"></div>
+
+  <aside id="notifDrawer" class="notif-drawer" aria-hidden="true">
+    <div class="notif-drawer__header">
+      <h2>Notifications</h2>
+      <button id="notifClose" class="notif-drawer__close" aria-label="Fermer" type="button">✕</button>
+    </div>
+
+    <button id="notifReadAll" class="notif-drawer__readall" type="button">
+      Tout marquer comme lu
+    </button>
+
+    <div id="notifMeta" class="notif-drawer__section-label"></div>
+
+    <div id="notifContent" class="notif-drawer__content">
+      <div class="notif-state">Chargement...</div>
+    </div>
+  </aside>
+</div>
+
+<script is:inline>
+  (function () {
+    var root = document.currentScript && document.currentScript.previousElementSibling;
+    while (root && !root.classList.contains('notif-root')) {
+      root = root.previousElementSibling;
+    }
+    if (!root) return;
+
+    var apiBase = root.dataset.apiBase || "";
+
+    var bell = root.querySelector("#notifBell");
+    var badge = root.querySelector("#notifBadge");
+    var drawer = root.querySelector("#notifDrawer");
+    var overlay = root.querySelector("#notifOverlay");
+    var closeBtn = root.querySelector("#notifClose");
+    var readAllBtn = root.querySelector("#notifReadAll");
+    var meta = root.querySelector("#notifMeta");
+    var content = root.querySelector("#notifContent");
+
+    var isOpen = false;
+    var isLoading = false;
+    var unreadCount = 0;
+    var notifications = [];
+
+    function endpoint(path) {
+      return "" + apiBase + path;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function formatSubtitle(item) {
+      var p = item.payload || {};
+      if (p.newValue) return String(p.newValue);
+      if (p.label) return String(p.label);
+      return item.eventType;
+    }
+
+    function renderBadge() {
+      if (!badge) return;
+
+      if (unreadCount > 0) {
+        badge.textContent = String(unreadCount);
+        badge.classList.remove("hidden");
+      } else {
+        badge.textContent = "0";
+        badge.classList.add("hidden");
+      }
+    }
+
+    function renderMeta() {
+      if (!meta) return;
+
+      if (!notifications.length) {
+        meta.textContent = "";
+        return;
+      }
+
+      meta.textContent =
+        unreadCount > 0
+          ? unreadCount + " notification" + (unreadCount > 1 ? "s" : "") + " non lue" + (unreadCount > 1 ? "s" : "")
+          : "Tout est lu";
+    }
+
+    function renderContent() {
+      if (!content) return;
+
+      if (isLoading) {
+        content.innerHTML = '<div class="notif-state">Chargement...</div>';
+        return;
+      }
+
+      if (!notifications.length) {
+        content.innerHTML = '<div class="notif-state">Aucune notification pour le moment.</div>';
+        return;
+      }
+
+      content.innerHTML = notifications
+        .map(function (item) {
+          var title = escapeHtml((item.payload && item.payload.title) || "Mise à jour");
+          var subtitle = escapeHtml(formatSubtitle(item));
+          var eventType = escapeHtml(item.eventType);
+          var unreadClass = item.isRead ? "" : " notif-card--unread";
+          var dot = item.isRead ? "" : '<span class="notif-card__dot"></span>';
+
+          return (
+            '<button class="notif-card' + unreadClass + '" data-id="' + item.id + '" type="button">' +
+              '<div class="notif-card__thumb"></div>' +
+              '<div class="notif-card__content">' +
+                '<div class="notif-card__title">' + title + '</div>' +
+                '<div class="notif-card__text">' + subtitle + '</div>' +
+                '<div class="notif-card__time">' + eventType + '</div>' +
+              '</div>' +
+              dot +
+            '</button>'
+          );
+        })
+        .join("");
+    }
+
+    async function fetchNotifications() {
+      isLoading = true;
+      renderContent();
+
+      try {
+        var res = await fetch(endpoint("/notifications"), {
+          method: "GET",
+          credentials: "include",
+          headers: { Accept: "application/json" }
+        });
+
+        if (res.status === 401) {
+          notifications = [];
+          unreadCount = 0;
+          renderBadge();
+          renderMeta();
+          if (content) {
+            content.innerHTML = '<div class="notif-state">Connecte-toi pour voir tes notifications.</div>';
+          }
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+
+        var data = await res.json();
+        notifications = Array.isArray(data.items) ? data.items : [];
+        unreadCount = Number(data.unreadCount || 0);
+
+        renderBadge();
+        renderMeta();
+        renderContent();
+      } catch (error) {
+        console.error("Erreur notifications:", error);
+        if (content) {
+          content.innerHTML = '<div class="notif-state">Impossible de charger les notifications.</div>';
+        }
+      } finally {
+        isLoading = false;
+        renderContent();
+      }
+    }
+
+    async function markAllAsRead() {
+      try {
+        var res = await fetch(endpoint("/notifications/read-all"), {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json"
+          },
+          body: JSON.stringify({})
+        });
+
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+
+        notifications = notifications.map(function (item) {
+          return Object.assign({}, item, { isRead: true });
+        });
+        unreadCount = 0;
+
+        renderBadge();
+        renderMeta();
+        renderContent();
+      } catch (error) {
+        console.error("Erreur read-all:", error);
+      }
+    }
+
+    async function markOneAsRead(notificationId) {
+      try {
+        var res = await fetch(endpoint("/notifications/" + notificationId + "/read"), {
+          method: "POST",
+          credentials: "include",
+          headers: { Accept: "application/json" }
+        });
+
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+
+        var wasUnread = false;
+
+        notifications = notifications.map(function (item) {
+          if (item.id !== notificationId) return item;
+          if (!item.isRead) wasUnread = true;
+          return Object.assign({}, item, { isRead: true });
+        });
+
+        if (wasUnread && unreadCount > 0) unreadCount -= 1;
+
+        renderBadge();
+        renderMeta();
+        renderContent();
+      } catch (error) {
+        console.error("Erreur read one:", error);
+      }
+    }
+
+    async function openDrawer() {
+      if (!drawer || !overlay) return;
+
+      isOpen = true;
+      drawer.classList.add("is-open");
+      overlay.classList.add("is-open");
+      drawer.setAttribute("aria-hidden", "false");
+      document.body.style.overflow = "hidden";
+
+      await fetchNotifications();
+    }
+
+    function closeDrawer() {
+      if (!drawer || !overlay) return;
+
+      isOpen = false;
+      drawer.classList.remove("is-open");
+      overlay.classList.remove("is-open");
+      drawer.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    }
+
+    if (bell) {
+      bell.addEventListener("click", function () {
+        if (isOpen) closeDrawer();
+        else void openDrawer();
+      });
+    }
+
+    if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+    if (overlay) overlay.addEventListener("click", closeDrawer);
+
+    if (readAllBtn) {
+      readAllBtn.addEventListener("click", function () {
+        void markAllAsRead();
+      });
+    }
+
+    if (content) {
+      content.addEventListener("click", function (event) {
+        var target = event.target;
+        var card = target && target.closest ? target.closest(".notif-card") : null;
+        if (!card) return;
+
+        var id = Number(card.dataset.id || 0);
+        if (id > 0) {
+          void markOneAsRead(id);
+        }
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeDrawer();
+    });
+
+    void fetchNotifications();
+  })();
+</script>

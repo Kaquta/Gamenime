@@ -1,0 +1,173 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<BaseLayout title="Notifications — GameNime">
+  <HeroHeader />
+
+  <div class="notif-page container">
+    <div class="notif-page__header">
+      <h2 class="notif-page__title">🔔 Notifications</h2>
+      <button id="notifPageReadAll" class="notif-page__readall" type="button">Tout marquer comme lu</button>
+    </div>
+    <p class="notif-page__count" id="notifPageCount"></p>
+
+    <div id="notifPageNotLogged" class="notif-page__empty hidden">
+      <p>Connecte-toi pour voir tes notifications</p>
+      <a href="/signin" class="auth-card__btn" style="display:inline-block;text-align:center;text-decoration:none;max-width:240px;">Se connecter</a>
+    </div>
+
+    <div id="notifPageLoading" class="notif-page__empty">
+      <p>Chargement...</p>
+    </div>
+
+    <div id="notifPageEmpty" class="notif-page__empty hidden">
+      <p>Aucune notification pour le moment.</p>
+      <p>Ajoute des anime ou jeux en favoris pour recevoir des alertes !</p>
+    </div>
+
+    <div id="notifPageList" class="notif-page__list"></div>
+  </div>
+
+  <Footer />
+</BaseLayout>
+
+<script>
+  var apiBase = "/api";
+  var pageList = document.getElementById("notifPageList");
+  var pageLoading = document.getElementById("notifPageLoading");
+  var pageEmpty = document.getElementById("notifPageEmpty");
+  var pageNotLogged = document.getElementById("notifPageNotLogged");
+  var pageCount = document.getElementById("notifPageCount");
+  var pageReadAll = document.getElementById("notifPageReadAll");
+
+  function escapeHtml(v) {
+    return String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function timeAgo(dateStr) {
+    if (!dateStr) return "";
+    var now = new Date();
+    var d = new Date(dateStr);
+    var diff = Math.floor((now.getTime() - d.getTime()) / 1000);
+    if (diff < 60) return "À l'instant";
+    if (diff < 3600) return Math.floor(diff / 60) + " min";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h";
+    if (diff < 604800) return Math.floor(diff / 86400) + "j";
+    return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short", year: "numeric" }).format(d);
+  }
+
+  function eventIcon(eventType) {
+    if (eventType.includes("platform")) return "🖥️";
+    if (eventType.includes("trailer")) return "▶️";
+    if (eventType.includes("release_date")) return "📅";
+    if (eventType.includes("episode")) return "🎬";
+    return "🔔";
+  }
+
+  function eventLabel(item) {
+    var p = item.payload || {};
+    var title = p.title || "Mise à jour";
+    var label = p.label || item.eventType;
+    var detail = p.newValue || "";
+    return { title: title, label: label, detail: detail };
+  }
+
+  function renderNotifCard(item) {
+    var info = eventLabel(item);
+    var icon = eventIcon(item.eventType);
+    var unreadClass = item.isRead ? "" : " notif-page-card--unread";
+    var dot = item.isRead ? "" : '<span class="notif-page-card__dot"></span>';
+    var time = timeAgo(item.eventAt || item.createdAt);
+
+    return '<button class="notif-page-card' + unreadClass + '" data-notif-id="' + item.id + '" type="button">' +
+      '<div class="notif-page-card__icon">' + icon + '</div>' +
+      '<div class="notif-page-card__body">' +
+        '<div class="notif-page-card__title">' + escapeHtml(info.label) + ' pour ' + escapeHtml(info.title) + '</div>' +
+        (info.detail ? '<div class="notif-page-card__detail">' + escapeHtml(info.detail) + '</div>' : '') +
+        '<div class="notif-page-card__time">' + time + '</div>' +
+      '</div>' +
+      dot +
+    '</button>';
+  }
+
+  var notifications = [];
+  var unreadCount = 0;
+
+  async function loadNotifications() {
+    try {
+      var authRes = await fetch(apiBase + "/auth/me", { credentials: "include", headers: { Accept: "application/json" } });
+      if (authRes.status === 401 || !authRes.ok) {
+        if (pageLoading) pageLoading.classList.add("hidden");
+        if (pageNotLogged) pageNotLogged.classList.remove("hidden");
+        return;
+      }
+
+      var res = await fetch(apiBase + "/notifications/", { credentials: "include", headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var data = await res.json();
+      notifications = data.items || [];
+      unreadCount = Number(data.unreadCount || 0);
+
+      if (pageLoading) pageLoading.classList.add("hidden");
+
+      if (notifications.length === 0) {
+        if (pageEmpty) pageEmpty.classList.remove("hidden");
+        if (pageCount) pageCount.textContent = "0 notification";
+        return;
+      }
+
+      if (pageCount) pageCount.textContent = unreadCount > 0
+        ? unreadCount + " non lue" + (unreadCount > 1 ? "s" : "") + " sur " + notifications.length
+        : notifications.length + " notification" + (notifications.length > 1 ? "s" : "") + " — tout lu";
+
+      if (pageList) pageList.innerHTML = notifications.map(renderNotifCard).join("");
+    } catch(e) {
+      console.error("Erreur notifications:", e);
+      if (pageLoading) pageLoading.classList.add("hidden");
+      if (pageList) pageList.innerHTML = '<p class="notif-page__empty">Erreur de chargement.</p>';
+    }
+  }
+
+  // Marquer une notif comme lue
+  if (pageList) pageList.addEventListener("click", async function(e) {
+    var card = e.target.closest(".notif-page-card");
+    if (!card) return;
+    var id = Number(card.dataset.notifId || 0);
+    if (id <= 0) return;
+    try {
+      var res = await fetch(apiBase + "/notifications/" + id + "/read", { method: "POST", credentials: "include", headers: { Accept: "application/json" } });
+      if (res.ok) {
+        card.classList.remove("notif-page-card--unread");
+        var dot = card.querySelector(".notif-page-card__dot");
+        if (dot) dot.remove();
+        var wasUnread = false;
+        notifications = notifications.map(function(n) {
+          if (n.id === id && !n.isRead) { wasUnread = true; return Object.assign({}, n, { isRead: true }); }
+          return n;
+        });
+        if (wasUnread && unreadCount > 0) unreadCount--;
+        if (pageCount) pageCount.textContent = unreadCount > 0
+          ? unreadCount + " non lue" + (unreadCount > 1 ? "s" : "") + " sur " + notifications.length
+          : notifications.length + " notification" + (notifications.length > 1 ? "s" : "") + " — tout lu";
+      }
+    } catch(err) { console.error("Erreur read:", err); }
+  });
+
+  // Tout marquer comme lu
+  if (pageReadAll) pageReadAll.addEventListener("click", async function() {
+    try {
+      var res = await fetch(apiBase + "/notifications/read-all", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({}) });
+      if (res.ok) {
+        notifications = notifications.map(function(n) { return Object.assign({}, n, { isRead: true }); });
+        unreadCount = 0;
+        if (pageList) pageList.innerHTML = notifications.map(renderNotifCard).join("");
+        if (pageCount) pageCount.textContent = notifications.length + " notification" + (notifications.length > 1 ? "s" : "") + " — tout lu";
+      }
+    } catch(err) { console.error("Erreur read-all:", err); }
+  });
+
+  loadNotifications();
+</script>

@@ -1,0 +1,64 @@
+.notif-root { position: relative; }
+
+.notif-bell {
+  position: relative; width: 48px; height: 48px; border-radius: 999px;
+  border: 1px solid rgba(255, 150, 80, 0.22); background: rgba(40, 15, 10, 0.7);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: white; cursor: pointer;
+  transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
+}
+.notif-bell:hover {
+  transform: translateY(-1px); background: rgba(50, 18, 12, 0.82);
+  border-color: rgba(255, 170, 90, 0.35);
+}
+.notif-bell__badge {
+  position: absolute; top: -2px; right: -2px; min-width: 20px; height: 20px;
+  border-radius: 999px; background: #ff5b5b; color: white; font-size: 12px;
+  font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 6px;
+}
+.hidden { display: none !important; }
+
+.notif-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.24); opacity: 0;
+  pointer-events: none; transition: opacity 240ms ease; z-index: 90;
+}
+.notif-overlay.is-open { opacity: 1; pointer-events: auto; }
+
+.notif-drawer {
+  position: fixed; top: 16px; right: 16px; bottom: 16px;
+  width: min(420px, calc(100vw - 24px)); border-radius: 28px;
+  border: 1px solid rgba(255, 170, 90, 0.22);
+  background: linear-gradient(180deg, rgba(42, 18, 14, 0.92), rgba(23, 10, 9, 0.95));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px) saturate(125%); -webkit-backdrop-filter: blur(18px) saturate(125%);
+  padding: 18px; display: flex; flex-direction: column;
+  transform: translateX(110%) scale(0.985); opacity: 0; pointer-events: none;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease; z-index: 100;
+}
+.notif-drawer.is-open { transform: translateX(0) scale(1); opacity: 1; pointer-events: auto; }
+
+.notif-drawer__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+.notif-drawer__header h2 { margin: 0; color: rgba(255, 244, 232, 0.96); font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+.notif-drawer__close { width: 44px; height: 44px; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 244, 232, 0.96); font-size: 1.4rem; cursor: pointer; }
+.notif-drawer__readall { border: 1px solid rgba(255, 173, 97, 0.14); background: rgba(255, 255, 255, 0.04); color: rgba(255, 244, 232, 0.96); border-radius: 18px; min-height: 52px; padding: 0 18px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-bottom: 16px; }
+.notif-drawer__section-label { color: rgba(255, 226, 205, 0.72); font-size: 0.95rem; margin: 4px 4px 12px; }
+.notif-drawer__content { overflow: auto; padding-right: 2px; }
+.notif-state { color: rgba(255, 226, 205, 0.72); padding: 12px 4px; }
+
+.notif-card {
+  position: relative; width: 100%; text-align: left; display: flex; gap: 14px;
+  padding: 14px; border-radius: 22px; background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 171, 93, 0.08); margin-bottom: 14px;
+  color: rgba(255, 244, 232, 0.96); cursor: pointer;
+}
+.notif-card--unread { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 176, 104, 0.2); }
+.notif-card__thumb { width: 54px; height: 54px; border-radius: 16px; background: linear-gradient(180deg, rgba(255, 181, 103, 0.18), rgba(255, 118, 41, 0.08)), rgba(255, 255, 255, 0.04); flex: 0 0 auto; }
+.notif-card__content { min-width: 0; }
+.notif-card__title { font-size: 1.02rem; font-weight: 800; line-height: 1.25; margin-bottom: 4px; }
+.notif-card__text { color: rgba(255, 226, 205, 0.76); font-size: 0.95rem; line-height: 1.4; margin-bottom: 6px; }
+.notif-card__time { color: rgba(255, 226, 205, 0.52); font-size: 0.88rem; }
+.notif-card__dot { position: absolute; top: 14px; right: 14px; width: 10px; height: 10px; border-radius: 999px; background: #f2bc51; box-shadow: 0 0 10px rgba(242, 188, 81, 0.45); }
+
+@media (max-width: 640px) {
+  .notif-drawer { top: 0; right: 0; bottom: 0; width: 100vw; border-radius: 0; padding: 18px 14px calc(20px + env(safe-area-inset-bottom)); transform: translateX(100%); }
+}
