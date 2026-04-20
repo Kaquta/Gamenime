@@ -1,12 +1,10 @@
 ---
 import AuthUserMenu from "./AuthUserMenu.astro";
-
 interface Props {
   activeTab?: "home" | "anime" | "games" | "upcoming";
 }
 const { activeTab = "home" } = Astro.props;
 ---
-
 <header class="hero-header container">
   <div class="hero-topbar">
     <div class="hero-topbar__left"></div>
@@ -20,9 +18,12 @@ const { activeTab = "home" } = Astro.props;
     <span class="brand-kanji">新</span>
   </h1>
   <div class="brand-line"></div>
-  <p class="brand-subtitle">
-    Nouveautés animés et jeux vidéo : trailers, plateformes, dates
-  </p>
+  <p class="brand-subtitle">Nouveautés animés et jeux vidéo</p>
+  <div class="brand-pills">
+    <span class="brand-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polygon points="5 3 19 12 5 21 5 3"/></svg>Trailers</span>
+    <span class="brand-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Plateformes</span>
+    <span class="brand-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Dates de sortie</span>
+  </div>
   <nav class="top-tabs" aria-label="Navigation principale">
     <a class={activeTab === "home" ? "tab active" : "tab"} href="/">Accueil</a>
     <a class={activeTab === "anime" ? "tab active" : "tab"} href="/anime">Anime</a>

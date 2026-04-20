@@ -500,6 +500,25 @@ app.post("/notifications/:id/read", async (req, reply) => {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
   }
+
+app.delete("/notifications/:id", async (req, reply) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return reply.code(401).send({ error: "Non authentifié" });
+    const params = notificationParamsSchema.parse(req.params);
+    const result: any = await pool.query(
+      `DELETE FROM user_notifications WHERE id = ? AND user_id = ?`,
+      [params.id, user.id]
+    );
+    return reply.send({ ok: true, deleted: Number(result.affectedRows) || 0 });
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.code(400).send({ error: "Paramètres invalides", details: err.errors });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
 });
 
 app.post("/notifications/read-all", async (req, reply) => {
@@ -565,33 +584,34 @@ async function createNotificationsForItemChange(
 ) {
   if (!before || !after || !after.id) return;
   const title = after.title || before.title || null;
+  const cover = after.cover || before.cover || null;
 
   if (isBlankNotificationValue(before.platform) && !isBlankNotificationValue(after.platform)) {
     await createNotificationEventAndFanout(db, itemType, Number(after.id),
       `${itemType}_platform_added`,
       `${itemType}:${after.id}:platform_added:${sha256(String(after.platform)).slice(0, 12)}`,
-      { title, label: "Plateforme ajoutée", oldValue: before.platform || null, newValue: after.platform });
+      { title, cover, label: "Plateforme ajoutée", oldValue: before.platform || null, newValue: after.platform });
   }
 
   if (isBlankNotificationValue(before.trailerUrl) && !isBlankNotificationValue(after.trailerUrl)) {
     await createNotificationEventAndFanout(db, itemType, Number(after.id),
       `${itemType}_trailer_added`,
       `${itemType}:${after.id}:trailer_added:${sha256(String(after.trailerUrl)).slice(0, 12)}`,
-      { title, label: "Trailer ajouté", oldValue: before.trailerUrl || null, newValue: after.trailerUrl });
+      { title, cover, label: "Trailer ajouté", oldValue: before.trailerUrl || null, newValue: after.trailerUrl });
   }
 
   if (isBlankNotificationValue(before.releaseDate) && !isBlankNotificationValue(after.releaseDate)) {
     await createNotificationEventAndFanout(db, itemType, Number(after.id),
       `${itemType}_release_date_announced`,
       `${itemType}:${after.id}:release_date:${after.releaseDate}`,
-      { title, label: "Date annoncée", oldValue: before.releaseDate || null, newValue: after.releaseDate });
+      { title, cover, label: "Date annoncée", oldValue: before.releaseDate || null, newValue: after.releaseDate });
   }
 
   if (isBlankNotificationValue(before.cover) && !isBlankNotificationValue(after.cover)) {
     await createNotificationEventAndFanout(db, itemType, Number(after.id),
       `${itemType}_cover_added`,
       `${itemType}:${after.id}:cover_added`,
-      { title, label: "Image ajoutée", newValue: "Nouvelle image disponible" });
+      { title, cover, label: "Image ajoutée", newValue: "Nouvelle image disponible" });
   }
 
   if (itemType === "anime") {
@@ -603,7 +623,7 @@ async function createNotificationsForItemChange(
       await createNotificationEventAndFanout(db, itemType, Number(after.id),
         `${itemType}_episode_added`,
         `${itemType}:${after.id}:episodes:${afterEp}`,
-        { title, label: "Nouvel épisode", oldValue: beforeEp ? String(beforeEp) + " épisodes" : null, newValue: afterEp + " épisodes" });
+        { title, cover, label: "Nouvel épisode", oldValue: beforeEp ? String(beforeEp) + " épisodes" : null, newValue: afterEp + " épisodes" });
     }
 
     const beforeSeason = String(before.description || "").match(/\[SEASON:([^\]]+)\]/);
@@ -612,7 +632,7 @@ async function createNotificationsForItemChange(
       await createNotificationEventAndFanout(db, itemType, Number(after.id),
         `${itemType}_season_added`,
         `${itemType}:${after.id}:season:${sha256(afterSeason[1]).slice(0, 12)}`,
-        { title, label: "Nouvelle saison", oldValue: beforeSeason ? beforeSeason[1] : null, newValue: afterSeason[1] });
+        { title, cover, label: "Nouvelle saison", oldValue: beforeSeason ? beforeSeason[1] : null, newValue: afterSeason[1] });
     }
 
     const beforeNext = String(before.description || "").match(/\[NEXT_EP:(\d+)\]/);
@@ -623,7 +643,7 @@ async function createNotificationsForItemChange(
       await createNotificationEventAndFanout(db, itemType, Number(after.id),
         `${itemType}_next_episode`,
         `${itemType}:${after.id}:next_ep:${afterNextN}`,
-        { title, label: "Épisode " + afterNextN + " à venir", newValue: "Épisode " + afterNextN });
+        { title, cover, label: "Épisode " + afterNextN + " à venir", newValue: "Épisode " + afterNextN });
     }
   }
 }
@@ -647,6 +667,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     if (q.recent === "1") conditions.push("is_recently_released=1");
     if (q.noTrailer === "1") conditions.push("(trailer_url IS NULL OR trailer_url = '')");
     if (q.noDesc === "1") conditions.push("(description IS NULL OR description = '')");
+    if (q.noCover === "1") conditions.push("(cover IS NULL OR cover = '')");
     if (q.releasedAfter) { conditions.push("release_date >= ?"); params.push(q.releasedAfter); }
     if (q.releasedBefore) { conditions.push("release_date <= ?"); params.push(q.releasedBefore); }
     if (q.upcoming === "1") conditions.push("release_date > CURDATE()");

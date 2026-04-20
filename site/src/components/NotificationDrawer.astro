@@ -65,16 +65,29 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         .replaceAll("'", "&#039;");
     }
 
-    function formatSubtitle(item) {
-      var p = item.payload || {};
-      if (p.newValue) return String(p.newValue);
-      if (p.label) return String(p.label);
-      return item.eventType;
+    function timeAgo(s) {
+      if (!s) return "";
+      var d = Math.floor((Date.now() - new Date(s).getTime()) / 1000);
+      if (d < 60) return "À l'instant";
+      if (d < 3600) return Math.floor(d / 60) + " min";
+      if (d < 86400) return Math.floor(d / 3600) + "h";
+      if (d < 604800) return Math.floor(d / 86400) + "j";
+      return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "short" }).format(new Date(s));
+    }
+
+    function evIcon(t) {
+      if (!t) return "🔔";
+      if (t.indexOf("trailer") !== -1) return "▶️";
+      if (t.indexOf("platform") !== -1) return "🖥️";
+      if (t.indexOf("release_date") !== -1) return "📅";
+      if (t.indexOf("cover") !== -1) return "🖼️";
+      if (t.indexOf("episode") !== -1) return "🎬";
+      if (t.indexOf("season") !== -1) return "📺";
+      return "🔔";
     }
 
     function renderBadge() {
       if (!badge) return;
-
       if (unreadCount > 0) {
         badge.textContent = String(unreadCount);
         badge.classList.remove("hidden");
@@ -86,12 +99,10 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 
     function renderMeta() {
       if (!meta) return;
-
       if (!notifications.length) {
         meta.textContent = "";
         return;
       }
-
       meta.textContent =
         unreadCount > 0
           ? unreadCount + " notification" + (unreadCount > 1 ? "s" : "") + " non lue" + (unreadCount > 1 ? "s" : "")
@@ -113,21 +124,24 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 
       content.innerHTML = notifications
         .map(function (item) {
-          var title = escapeHtml((item.payload && item.payload.title) || "Mise à jour");
-          var subtitle = escapeHtml(formatSubtitle(item));
-          var eventType = escapeHtml(item.eventType);
-          var unreadClass = item.isRead ? "" : " notif-card--unread";
-          var dot = item.isRead ? "" : '<span class="notif-card__dot"></span>';
+          var p = item.payload || {};
+          var title = p.title || "Mise à jour";
+          var label = p.label || item.eventType;
+          var detail = p.newValue || "";
+          var icon = evIcon(item.eventType);
+          var uc = item.isRead ? "" : " notif-card--unread";
+          var thumb = p.cover
+            ? '<img src="' + p.cover + '" alt="" />'
+            : '<span style="font-size:1.3rem;display:flex;align-items:center;justify-content:center;height:100%">' + icon + '</span>';
 
           return (
-            '<button class="notif-card' + unreadClass + '" data-id="' + item.id + '" type="button">' +
-              '<div class="notif-card__thumb"></div>' +
+            '<button class="notif-card' + uc + '" data-id="' + item.id + '" type="button">' +
+              '<div class="notif-card__thumb">' + thumb + '</div>' +
               '<div class="notif-card__content">' +
-                '<div class="notif-card__title">' + title + '</div>' +
-                '<div class="notif-card__text">' + subtitle + '</div>' +
-                '<div class="notif-card__time">' + eventType + '</div>' +
+                '<div class="notif-card__title">' + escapeHtml(label) + ' — ' + escapeHtml(title) + '</div>' +
+                (detail ? '<div class="notif-card__text">' + escapeHtml(detail) + '</div>' : '') +
+                '<div class="notif-card__time">' + timeAgo(item.eventAt || item.createdAt) + '</div>' +
               '</div>' +
-              dot +
             '</button>'
           );
         })
@@ -156,9 +170,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
           return;
         }
 
-        if (!res.ok) {
-          throw new Error("HTTP " + res.status);
-        }
+        if (!res.ok) throw new Error("HTTP " + res.status);
 
         var data = await res.json();
         notifications = Array.isArray(data.items) ? data.items : [];
@@ -183,22 +195,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         var res = await fetch(endpoint("/notifications/read-all"), {
           method: "POST",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json"
-          },
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({})
         });
-
-        if (!res.ok) {
-          throw new Error("HTTP " + res.status);
-        }
+        if (!res.ok) throw new Error("HTTP " + res.status);
 
         notifications = notifications.map(function (item) {
           return Object.assign({}, item, { isRead: true });
         });
         unreadCount = 0;
-
         renderBadge();
         renderMeta();
         renderContent();
@@ -214,21 +219,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
           credentials: "include",
           headers: { Accept: "application/json" }
         });
-
-        if (!res.ok) {
-          throw new Error("HTTP " + res.status);
-        }
+        if (!res.ok) throw new Error("HTTP " + res.status);
 
         var wasUnread = false;
-
         notifications = notifications.map(function (item) {
           if (item.id !== notificationId) return item;
           if (!item.isRead) wasUnread = true;
           return Object.assign({}, item, { isRead: true });
         });
-
         if (wasUnread && unreadCount > 0) unreadCount -= 1;
-
         renderBadge();
         renderMeta();
         renderContent();
@@ -239,19 +238,16 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 
     async function openDrawer() {
       if (!drawer || !overlay) return;
-
       isOpen = true;
       drawer.classList.add("is-open");
       overlay.classList.add("is-open");
       drawer.setAttribute("aria-hidden", "false");
       document.body.style.overflow = "hidden";
-
       await fetchNotifications();
     }
 
     function closeDrawer() {
       if (!drawer || !overlay) return;
-
       isOpen = false;
       drawer.classList.remove("is-open");
       overlay.classList.remove("is-open");
@@ -265,26 +261,17 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         else void openDrawer();
       });
     }
-
     if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
     if (overlay) overlay.addEventListener("click", closeDrawer);
-
-    if (readAllBtn) {
-      readAllBtn.addEventListener("click", function () {
-        void markAllAsRead();
-      });
-    }
+    if (readAllBtn) readAllBtn.addEventListener("click", function () { void markAllAsRead(); });
 
     if (content) {
       content.addEventListener("click", function (event) {
         var target = event.target;
         var card = target && target.closest ? target.closest(".notif-card") : null;
         if (!card) return;
-
         var id = Number(card.dataset.id || 0);
-        if (id > 0) {
-          void markOneAsRead(id);
-        }
+        if (id > 0) void markOneAsRead(id);
       });
     }
 
@@ -292,6 +279,19 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       if (e.key === "Escape") closeDrawer();
     });
 
+    async function pollBadge() {
+      try {
+        var res = await fetch(endpoint("/notifications?unreadOnly=1&limit=1"), {
+          credentials: "include", headers: { Accept: "application/json" }
+        });
+        if (!res.ok) return;
+        var data = await res.json();
+        unreadCount = Number(data.unreadCount || 0);
+        renderBadge();
+      } catch(e) {}
+    }
+
     void fetchNotifications();
+    setInterval(pollBadge, 60000);
   })();
 </script>

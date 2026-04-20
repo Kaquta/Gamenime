@@ -4,9 +4,12 @@
 .auth-ui__signin {
   display: inline-flex; align-items: center; justify-content: center;
   min-height: 48px; padding: 0 18px; border-radius: 999px;
-  border: 1px solid rgba(255, 170, 90, 0.22); background: rgba(40, 15, 10, 0.7);
+  border: 2px solid transparent; background: rgba(40, 15, 10, 0.85);
+  background-image: linear-gradient(rgba(40, 15, 10, 0.85), rgba(40, 15, 10, 0.85)), linear-gradient(135deg, #fff3e0, #ffb366, #e85a20);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  color: rgba(255, 244, 232, 0.96); text-decoration: none; font-weight: 700;
+  color: #ffffff; text-decoration: none; font-weight: 700;
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 .auth-ui__signin:hover { transform: translateY(-1px); background: rgba(50, 18, 12, 0.82); border-color: rgba(255, 170, 90, 0.35); }
@@ -15,9 +18,12 @@
 .auth-user-menu__trigger {
   display: inline-flex; align-items: center; gap: 10px;
   min-height: 48px; padding: 0 14px 0 8px; border-radius: 999px;
-  border: 1px solid rgba(255, 170, 90, 0.22); background: rgba(40, 15, 10, 0.7);
+  border: 2px solid transparent; background: rgba(40, 15, 10, 0.85);
+  background-image: linear-gradient(rgba(40, 15, 10, 0.85), rgba(40, 15, 10, 0.85)), linear-gradient(135deg, #fff3e0, #ffb366, #e85a20);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-  color: rgba(255, 244, 232, 0.96); cursor: pointer;
+  color: #ffffff; cursor: pointer;
   transition: transform 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 .auth-user-menu__trigger:hover { transform: translateY(-1px); background: rgba(50, 18, 12, 0.82); border-color: rgba(255, 170, 90, 0.35); }

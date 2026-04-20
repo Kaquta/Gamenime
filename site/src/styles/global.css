@@ -70,6 +70,7 @@ body::before {
     0 4px 28px rgba(255, 200, 140, 0.25);
 }
 
+
 .brand-kanji {
   width: clamp(52px, 6vw, 86px);
   height: clamp(52px, 6vw, 86px);
@@ -79,10 +80,21 @@ body::before {
   background: #c9302d;
   color: #fff5ef;
   font-size: clamp(1.8rem, 3vw, 3.2rem);
+  text-shadow:
+    0 1px 0 #8a1810,
+    0 2px 0 #7a1208,
+    0 3px 0 #6a0d05,
+    0 -1px 2px rgba(255, 220, 200, 0.5);
   font-style: normal;
   line-height: 1;
   box-shadow: 0 0 28px rgba(215, 54, 41, 0.42);
+  text-shadow:
+    0 1px 0 #8a1810,
+    0 2px 0 #7a1208,
+    0 3px 0 #6a0d05,
+    0 -1px 2px rgba(255, 220, 200, 0.5);
 }
+
 
 .brand-line {
   width: min(520px, 72%);
@@ -92,15 +104,35 @@ body::before {
   background: linear-gradient(90deg, transparent, #230202  18%, #220000  50%, #210202  82%, transparent);
   box-shadow: 0 0 22px rgba(210, 75, 39, 0.28);
 }
-
 .brand-subtitle {
-  margin: 0 0 24px;
+  margin: 0 0 20px;
   color: #ffe4cc;
-  font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-size: clamp(1.15rem, 2vw, 1.35rem);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
-  font-family: verdana, sans-serif;
+  font-family: Georgia, serif;
+  font-style: italic;
 }
-
+.brand-pills {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.brand-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.15), rgba(255, 100, 30, 0.08));
+  border: 1px solid rgba(255, 170, 90, 0.35);
+  color: #ffd4a8;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: system-ui, sans-serif;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 210, 150, 0.15);
+}
 /* ── Tabs ──────────────────────────────────────────── */
 
 .top-tabs {
