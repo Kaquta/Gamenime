@@ -291,7 +291,97 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       } catch(e) {}
     }
 
+    // Real-time strategy: SSE for Premium, polling for Free users
+    var sseSource = null;
+    var pollInterval = null;
+    var reconnectTimer = null;
+
+    function startPolling() {
+      if (pollInterval) return;
+      pollInterval = setInterval(pollBadge, 60000);
+    }
+
+    function stopPolling() {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    }
+
+    function startSSE() {
+      if (sseSource) return;
+      try {
+        sseSource = new EventSource(endpoint("/notifications/stream"), { withCredentials: true });
+        sseSource.addEventListener("notification", function(ev) {
+          try {
+            var notif = JSON.parse(ev.data);
+            unreadCount = (unreadCount || 0) + 1;
+            renderBadge();
+            if (isOpen) {
+              void fetchNotifications();
+            }
+          } catch(e) {}
+        });
+        sseSource.onerror = function() {
+          try { sseSource.close(); } catch(e) {}
+          sseSource = null;
+          // Reconnect after 5s
+          if (reconnectTimer) clearTimeout(reconnectTimer);
+          reconnectTimer = setTimeout(function() {
+            void initRealtimeStrategy();
+          }, 5000);
+        };
+      } catch(e) {
+        sseSource = null;
+        startPolling(); // Fallback to polling
+      }
+    }
+
+    function stopSSE() {
+      if (sseSource) {
+        try { sseSource.close(); } catch(e) {}
+        sseSource = null;
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    }
+
+    async function initRealtimeStrategy() {
+      try {
+        var res = await fetch(endpoint("/auth/me"), { credentials: "include" });
+        if (!res.ok) {
+          // Not logged in, no notifications
+          stopPolling();
+          stopSSE();
+          return;
+        }
+        var data = await res.json();
+        var isPremium = !!(data.user && data.user.isPremium);
+
+        if (isPremium) {
+          stopPolling();
+          startSSE();
+        } else {
+          stopSSE();
+          startPolling();
+        }
+      } catch(e) {
+        // Fallback to polling on error
+        stopSSE();
+        startPolling();
+      }
+    }
+
     void fetchNotifications();
-    setInterval(pollBadge, 60000);
+    void initRealtimeStrategy();
+
+    // Re-check strategy if page becomes visible again (handles premium upgrades/downgrades)
+    document.addEventListener("visibilitychange", function() {
+      if (!document.hidden) {
+        void initRealtimeStrategy();
+      }
+    });
   })();
 </script>

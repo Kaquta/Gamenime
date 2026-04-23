@@ -1,0 +1,81 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+---
+
+<BaseLayout title="Premium — GameNime">
+  <HeroHeader />
+
+  <main class="premium container">
+    <h1 class="premium__title">Premium</h1>
+    <p class="premium__sub">Ne rate plus jamais une sortie. Sois le premier informé.</p>
+
+    <div class="premium__plans">
+      <div class="plan">
+        <p class="plan__name">Gratuit</p>
+        <div class="plan__price">
+          <span class="plan__amount">0€</span>
+          <span class="plan__period">/ toujours</span>
+        </div>
+        <p class="plan__yearly">&nbsp;</p>
+        <div class="plan__btn">Plan actuel</div>
+        <ul class="plan__features">
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Favoris illimités</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Notifications basiques</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Nouveautés 2026-2027</li>
+          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Notifications temps réel</li>
+          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Alertes personnalisées</li>
+          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Rappels intelligents</li>
+        </ul>
+      </div>
+
+      <div class="plan plan--premium">
+        <div class="plan__badge">Populaire</div>
+        <p class="plan__name plan__name--premium">Premium</p>
+        <div class="plan__price">
+          <span class="plan__amount plan__amount--premium">2,99€</span>
+          <span class="plan__period">/ mois</span>
+        </div>
+        <p class="plan__yearly">ou 24€/an (2€/mois — 2 mois offerts)</p>
+        <button class="plan__btn plan__btn--premium" type="button">S'abonner</button>
+        <ul class="plan__features">
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Tout</strong> du plan gratuit</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Notifications instantanées</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Alertes personnalisées par genre</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Rappels avant sortie (J-7, J-1)</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Priorité sur les nouveautés</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Tracking complet épisodes/DLC</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="premium__highlight">
+      <p class="premium__hl-title">Pourquoi passer Premium ?</p>
+      <div class="premium__hl-grid">
+        <div class="hl-card">
+          <div class="hl-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <p class="hl-card__title">Temps réel</p>
+          <p class="hl-card__desc">Sois alerté dès qu'un trailer, un épisode ou une date tombe.</p>
+        </div>
+        <div class="hl-card">
+          <div class="hl-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+          </div>
+          <p class="hl-card__title">Rappels avant sortie</p>
+          <p class="hl-card__desc">Plus jamais une première de raté. Rappel J-7, J-1 et jour J.</p>
+        </div>
+        <div class="hl-card">
+          <div class="hl-card__icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
+          </div>
+          <p class="hl-card__title">Alertes personnalisées</p>
+          <p class="hl-card__desc">Filtre par genre et plateforme. Ne reçois que ce qui t'intéresse.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="premium__trust">Sans engagement · Annulable à tout moment · Paiement sécurisé</p>
+  </main>
+</BaseLayout>

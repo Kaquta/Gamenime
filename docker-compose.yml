@@ -24,9 +24,16 @@ services:
       DB_PASS: ${MARIADB_PASSWORD}
       ANIME_API_KEY: ${ANIME_API_KEY}
       GAMES_API_KEY: ${GAMES_API_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SECURE: ${SMTP_SECURE}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       PORT: 3000
     depends_on: [mariadb]
-    networks: [internal]
+    networks: [internal, public]
 
   n8n:
     image: n8nio/n8n:2.13.4

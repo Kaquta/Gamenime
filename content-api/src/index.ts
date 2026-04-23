@@ -2,8 +2,10 @@ import Fastify from "fastify";
 import * as mariadb from "mariadb";
 import { z } from "zod";
 import { createHash, randomBytes } from "crypto";
+import { EventEmitter } from "events";
 import bcrypt from "bcryptjs";
 import cookie from "@fastify/cookie";
+import { sendEmail, verifySmtpConnection } from "./email.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -23,6 +25,15 @@ function sanitizeBigInt(value: any): any {
 
 app.addHook("preSerialization", async (_req, _reply, payload) => sanitizeBigInt(payload));
 await app.register(cookie);
+
+
+// Global event bus for real-time notifications (Premium feature)
+const notifBus = new EventEmitter();
+notifBus.setMaxListeners(1000); // Support jusqu'à 1000 utilisateurs connectés simultanément
+
+function emitNotification(userId: number, notification: any) {
+  notifBus.emit(`user:${userId}`, notification);
+}
 
 const pool = mariadb.createPool({
   host: process.env.DB_HOST!,
@@ -92,7 +103,7 @@ async function getAuthenticatedUser(req: any) {
     `SELECT u.id, u.email, u.display_name AS displayName,
             u.notifications_enabled AS notificationsEnabled,
             u.email_notifications_enabled AS emailNotificationsEnabled,
-            u.avatar,
+            u.avatar, u.is_premium AS isPremium, u.premium_plan AS premiumPlan, u.premium_expires_at AS premiumExpiresAt,
             s.id AS sessionId, s.expires_at AS expiresAt
      FROM user_sessions s INNER JOIN users u ON u.id = s.user_id
      WHERE s.token_hash = ? LIMIT 1`,
@@ -105,6 +116,12 @@ async function getAuthenticatedUser(req: any) {
     return null;
   }
   await pool.query(`UPDATE user_sessions SET last_seen_at = NOW() WHERE id = ?`, [user.sessionId]);
+  // Auto-expire premium if expired
+  const isPremiumActive = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt).getTime() > Date.now());
+  if (user.isPremium && !isPremiumActive) {
+    await pool.query(`UPDATE users SET is_premium = 0 WHERE id = ?`, [user.id]);
+    await pool.query(`INSERT INTO premium_audit_log (user_id, action, old_plan, new_plan, old_expires_at, actor, reason) VALUES (?, ?, ?, NULL, ?, ?, ?)`, [user.id, "expire", user.premiumPlan, user.premiumExpiresAt, "cron", "auto-expire on getUser"]);
+  }
   return {
     id: user.id,
     email: user.email,
@@ -113,9 +130,43 @@ async function getAuthenticatedUser(req: any) {
     emailNotificationsEnabled: !!user.emailNotificationsEnabled,
     avatar: user.avatar || "luffy",
     sessionId: user.sessionId,
+    isPremium: isPremiumActive,
+    premiumPlan: isPremiumActive ? user.premiumPlan : null,
+    premiumExpiresAt: isPremiumActive ? user.premiumExpiresAt : null,
   };
 }
 
+
+// ── Premium helpers ────────────────────────────────
+async function requireAuth(req: any, reply: any) {
+  const user = await getAuthenticatedUser(req);
+  if (!user) {
+    reply.code(401).send({ error: "Non authentifié" });
+    return null;
+  }
+  return user;
+}
+
+async function requirePremium(req: any, reply: any) {
+  const user = await requireAuth(req, reply);
+  if (!user) return null;
+  if (!user.isPremium) {
+    reply.code(403).send({ error: "Accès Premium requis", premiumRequired: true });
+    return null;
+  }
+  return user;
+}
+
+async function logPremiumAction(userId: number, action: string, data: any = {}) {
+  try {
+    await pool.query(
+      `INSERT INTO premium_audit_log (user_id, action, old_plan, new_plan, old_expires_at, new_expires_at, reason, actor, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, action, data.oldPlan || null, data.newPlan || null, data.oldExpiresAt || null, data.newExpiresAt || null, data.reason || null, data.actor || "system", data.metadata ? JSON.stringify(data.metadata) : null]
+    );
+  } catch (e) {
+    console.error("Audit log failed:", e);
+  }
+}
 // ── Zod schemas ────────────────────────────────────
 const Item = z.object({
   title: z.string().min(1),
@@ -130,6 +181,7 @@ const Item = z.object({
   rating: z.string().nullable().optional().default(null),
   popularity: z.number().int().optional().default(0),
   screenshots: z.string().nullable().optional().default(null),
+  dlcs: z.string().nullable().optional().default(null),
 });
 const Bulk = z.object({ items: z.array(Item).min(1).max(200) });
 const registerBodySchema = z.object({
@@ -156,6 +208,21 @@ const notificationQuerySchema = z.object({
 const notificationParamsSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+// Parse JSON safely from DB fields (handles Buffer, null, empty strings)
+function parseJsonSafe<T = any>(value: any, defaultValue: T): T {
+  try {
+    if (value === null || value === undefined) return defaultValue;
+    // MariaDB JSON fields are already parsed to objects/arrays
+    if (typeof value === "object") return value as T;
+    const str = typeof value === "string" ? value : value.toString();
+    if (!str.trim()) return defaultValue;
+    const parsed = JSON.parse(str);
+    return parsed === null ? defaultValue : parsed;
+  } catch {
+    return defaultValue;
+  }
+}
 
 function requireApiKey(expected: string | undefined, provided: unknown) {
   if (!expected) return { ok: false as const, code: 500, msg: "API key not configured" };
@@ -258,6 +325,9 @@ app.get("/auth/me", async (req, reply) => {
         notificationsEnabled: user.notificationsEnabled,
         emailNotificationsEnabled: user.emailNotificationsEnabled,
         avatar: user.avatar,
+        isPremium: user.isPremium,
+        premiumPlan: user.premiumPlan,
+        premiumExpiresAt: user.premiumExpiresAt,
       }
     });
   } catch (err) {
@@ -265,6 +335,292 @@ app.get("/auth/me", async (req, reply) => {
     return reply.code(500).send({ error: "Erreur serveur" });
   }
 });
+
+// ── Premium endpoints ──────────────────────────────
+app.get("/premium/status", async (req, reply) => {
+  const user = await requireAuth(req, reply);
+  if (!user) return;
+  try {
+    const auditRows: any = await pool.query(
+      `SELECT action, old_plan, new_plan, new_expires_at, actor, reason, created_at FROM premium_audit_log WHERE user_id = ? ORDER BY created_at DESC LIMIT 10`,
+      [user.id]
+    );
+    return reply.send({
+      isPremium: user.isPremium,
+      plan: user.premiumPlan,
+      expiresAt: user.premiumExpiresAt,
+      history: auditRows.map((r: any) => ({
+        action: r.action,
+        oldPlan: r.old_plan,
+        newPlan: r.new_plan,
+        newExpiresAt: r.new_expires_at,
+        actor: r.actor,
+        reason: r.reason,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/premium/cancel", async (req, reply) => {
+  const user = await requireAuth(req, reply);
+  if (!user) return;
+  if (!user.isPremium) {
+    return reply.code(400).send({ error: "Aucun abonnement actif" });
+  }
+  try {
+    await pool.query(
+      `UPDATE users SET is_premium = 0, premium_plan = NULL WHERE id = ?`,
+      [user.id]
+    );
+    await logPremiumAction(user.id, "cancel", {
+      oldPlan: user.premiumPlan,
+      oldExpiresAt: user.premiumExpiresAt,
+      actor: "user",
+      reason: "User manual cancel",
+    });
+    return reply.send({ ok: true, message: "Abonnement annulé" });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/premium/generate-reminders", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ error: auth.msg });
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const results = { created: 0, skipped: 0, details: [] as any[] };
+
+    for (const offset of [7, 1, 0]) {
+      const targetDate = new Date(today);
+      targetDate.setDate(targetDate.getDate() + offset);
+      const targetStr = targetDate.toISOString().slice(0, 10);
+
+      for (const itemType of ["anime", "game"] as const) {
+        const table = itemType === "anime" ? "anime_items" : "game_items";
+
+        const rows: any = await pool.query(
+          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.release_date
+           FROM favorites f
+           INNER JOIN ${table} i ON i.id = f.item_id
+           INNER JOIN users u ON u.id = f.user_id
+           WHERE f.item_type = ?
+             AND DATE(i.release_date) = ?
+             AND u.is_premium = 1
+             AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
+             AND NOT EXISTS (
+               SELECT 1 FROM reminder_log r
+               WHERE r.user_id = f.user_id
+                 AND r.item_type = ?
+                 AND r.item_id = i.id
+                 AND r.day_offset = ?
+             )`,
+          [itemType, targetStr, itemType, offset]
+        );
+
+        for (const row of rows) {
+          const label = offset === 0 ? "Sortie aujourd\x27hui !" : (offset === 1 ? "Sortie demain !" : "Sortie dans 7 jours");
+          const eventType = `reminder_j${offset}`;
+          const eventKey = `${itemType}:${row.item_id}:${eventType}:${targetStr}`;
+          const payload = JSON.stringify({ title: row.title, cover: row.cover, label, releaseDate: row.release_date, daysLeft: offset });
+
+          await pool.query(
+            `INSERT INTO notification_events (item_type, item_id, event_type, event_key, payload_json) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE event_at = event_at`,
+            [itemType, row.item_id, eventType, eventKey, payload]
+          );
+          const eventRows: any = await pool.query(`SELECT id FROM notification_events WHERE event_key = ? LIMIT 1`, [eventKey]);
+          const eventId = eventRows[0].id;
+
+          await pool.query(
+            `INSERT INTO user_notifications (user_id, event_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE event_id = event_id`,
+            [row.user_id, eventId]
+          );
+
+          await pool.query(
+            `INSERT INTO reminder_log (user_id, item_type, item_id, day_offset, release_date) VALUES (?, ?, ?, ?, ?)`,
+            [row.user_id, itemType, row.item_id, offset, targetStr]
+          );
+
+          results.created++;
+          results.details.push({ user_id: row.user_id, item_type: itemType, title: row.title, offset, label });
+        }
+      }
+    }
+
+    return reply.send({ ok: true, ...results });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.get("/premium/preferences", async (req, reply) => {
+  const user = await requirePremium(req, reply);
+  if (!user) return;
+  try {
+    const rows: any = await pool.query(
+      `SELECT alert_genres, alert_platforms, reminder_days_before FROM user_alert_preferences WHERE user_id = ?`,
+      [user.id]
+    );
+    if (!rows.length) {
+      return reply.send({ alertGenres: [], alertPlatforms: [], reminderDaysBefore: [7, 1, 0] });
+    }
+    const p = rows[0];
+    return reply.send({
+      alertGenres: parseJsonSafe(p.alert_genres, []),
+      alertPlatforms: parseJsonSafe(p.alert_platforms, []),
+      reminderDaysBefore: parseJsonSafe(p.reminder_days_before, [7, 1, 0]),
+    });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.patch("/premium/preferences", async (req, reply) => {
+  const user = await requirePremium(req, reply);
+  if (!user) return;
+  try {
+    const body = req.body as any;
+    const alertGenres = Array.isArray(body.alertGenres) ? body.alertGenres.slice(0, 30).map(String) : [];
+    const alertPlatforms = Array.isArray(body.alertPlatforms) ? body.alertPlatforms.slice(0, 30).map(String) : [];
+    const reminderDays = Array.isArray(body.reminderDaysBefore) ? body.reminderDaysBefore.filter((d: any) => [0, 1, 3, 7, 14, 30].includes(Number(d))) : [7, 1, 0];
+
+    await pool.query(
+      `INSERT INTO user_alert_preferences (user_id, alert_genres, alert_platforms, reminder_days_before) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE alert_genres = VALUES(alert_genres), alert_platforms = VALUES(alert_platforms), reminder_days_before = VALUES(reminder_days_before)`,
+      [user.id, JSON.stringify(alertGenres), JSON.stringify(alertPlatforms), JSON.stringify(reminderDays)]
+    );
+    return reply.send({ ok: true, alertGenres, alertPlatforms, reminderDaysBefore: reminderDays });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/premium/generate-alerts", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ error: auth.msg });
+
+  try {
+    const hours = Math.max(Math.min(Number((req.query as any)?.hours || 24), 720), 1);
+    const results = { created: 0, scanned: 0, details: [] as any[] };
+
+    const prefsRows: any = await pool.query(
+      `SELECT p.user_id, p.alert_genres, p.alert_platforms
+       FROM user_alert_preferences p
+       INNER JOIN users u ON u.id = p.user_id
+       WHERE u.is_premium = 1
+         AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
+         AND (p.alert_genres IS NOT NULL OR p.alert_platforms IS NOT NULL)`
+    );
+
+    if (!prefsRows.length) {
+      return reply.send({ ok: true, ...results, message: "Aucun user Premium avec prefs" });
+    }
+
+    for (const itemType of ["anime", "game"] as const) {
+      const table = itemType === "anime" ? "anime_items" : "game_items";
+      const items: any = await pool.query(
+        `SELECT id, title, cover, genre, platform, release_date FROM ${table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+        [hours]
+      );
+      results.scanned += items.length;
+
+      for (const item of items) {
+        const itemGenres = (item.genre || "").toLowerCase().split(",").map((g: string) => g.trim()).filter(Boolean);
+        const itemPlatforms = (item.platform || "").toLowerCase().split(",").map((p: string) => p.trim()).filter(Boolean);
+
+        for (const prefRow of prefsRows) {
+          const userGenres = parseJsonSafe(prefRow.alert_genres, []);
+          const userPlatforms = parseJsonSafe(prefRow.alert_platforms, []);
+          let genreMatch: string | null = null;
+          let platformMatch: string | null = null;
+
+          for (const g of userGenres) {
+            const gLower = String(g).toLowerCase();
+            if (itemGenres.some((ig: string) => ig.includes(gLower) || gLower.includes(ig))) {
+              genreMatch = g;
+              break;
+            }
+          }
+
+          for (const p of userPlatforms) {
+            const pLower = String(p).toLowerCase();
+            if (pLower === "mobile") {
+              if (itemPlatforms.some((ip: string) => ip.includes("ios") || ip.includes("android"))) {
+                platformMatch = p;
+                break;
+              }
+            } else if (pLower === "pc") {
+              if (itemPlatforms.some((ip: string) => ip.includes("pc") || ip.includes("web"))) {
+                platformMatch = p;
+                break;
+              }
+            } else if (itemPlatforms.some((ip: string) => ip.includes(pLower))) {
+              platformMatch = p;
+              break;
+            }
+          }
+
+          // Require BOTH genre AND platform match
+          if (!genreMatch || !platformMatch) continue;
+
+          const matchType = "combined";
+          const matchValue = `${genreMatch} sur ${platformMatch}`;
+
+
+          const existingRows: any = await pool.query(
+            `SELECT id FROM alert_log WHERE user_id = ? AND item_type = ? AND item_id = ? LIMIT 1`,
+            [prefRow.user_id, itemType, item.id]
+          );
+          if (existingRows.length) continue;
+
+          const label = `Nouveau ${genreMatch} sur ${platformMatch}`;
+          const eventType = "alert_combined_match";
+          const eventKey = `${itemType}:${item.id}:${eventType}:${prefRow.user_id}`;
+          const payload = JSON.stringify({ title: item.title, cover: item.cover, label, match: matchValue, releaseDate: item.release_date });
+
+          await pool.query(
+            `INSERT INTO notification_events (item_type, item_id, event_type, event_key, payload_json) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE event_at = event_at`,
+            [itemType, item.id, eventType, eventKey, payload]
+          );
+          const eventRows: any = await pool.query(`SELECT id FROM notification_events WHERE event_key = ? LIMIT 1`, [eventKey]);
+          const eventId = eventRows[0].id;
+
+          await pool.query(
+            `INSERT INTO user_notifications (user_id, event_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE event_id = event_id`,
+            [prefRow.user_id, eventId]
+          );
+
+          await pool.query(
+            `INSERT INTO alert_log (user_id, item_type, item_id, match_type, match_value) VALUES (?, ?, ?, ?, ?)`,
+            [prefRow.user_id, itemType, item.id, matchType, matchValue]
+          );
+
+          results.created++;
+          results.details.push({ user_id: prefRow.user_id, item_type: itemType, title: item.title, matchType, matchValue });
+        }
+      }
+    }
+
+    return reply.send({ ok: true, ...results });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
 
 app.post("/auth/cleanup-sessions", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
@@ -415,6 +771,38 @@ function parseNotificationPayload(value: any) {
   return value;
 }
 
+
+app.get("/notifications/stream", async (req, reply) => {
+  const user = await getAuthenticatedUser(req);
+  if (!user) return reply.code(401).send({ error: "Non authentifié" });
+  if (!user.isPremium) return reply.code(403).send({ error: "SSE requires Premium" });
+
+  reply.raw.setHeader("Content-Type", "text/event-stream");
+  reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
+  reply.raw.setHeader("Connection", "keep-alive");
+  reply.raw.setHeader("X-Accel-Buffering", "no");
+  reply.raw.flushHeaders();
+
+  reply.raw.write(`: connected at ${new Date().toISOString()}\n\n`);
+
+  const channel = `user:${user.id}`;
+  const listener = (notification: any) => {
+    try {
+      reply.raw.write(`event: notification\n`);
+      reply.raw.write(`data: ${JSON.stringify(notification)}\n\n`);
+    } catch (e) { /* client disconnected */ }
+  };
+  notifBus.on(channel, listener);
+
+  const keepalive = setInterval(() => {
+    try { reply.raw.write(`: ping\n\n`); } catch (e) {}
+  }, 30000);
+
+  req.raw.on("close", () => {
+    clearInterval(keepalive);
+    notifBus.off(channel, listener);
+  });
+});
 app.get("/notifications", async (req, reply) => {
   try {
     const user = await getAuthenticatedUser(req);
@@ -463,7 +851,8 @@ app.get("/notifications", async (req, reply) => {
     const unreadRows: any = await pool.query(
       `SELECT COUNT(*) AS unreadCount
        FROM user_notifications
-       WHERE user_id = ? AND is_read = 0`,
+       WHERE user_id = ? AND is_read = 0
+         AND (deliver_at IS NULL OR deliver_at <= NOW())`,
       [user.id]
     );
 
@@ -544,6 +933,43 @@ function isBlankNotificationValue(v: any): boolean {
   return v === null || v === undefined || String(v).trim() === "" || String(v).trim() === "Unknown";
 }
 
+
+/**
+ * Creates a user notification + emits via SSE for real-time delivery to Premium users.
+ * Returns true if inserted (new), false if already existed.
+ */
+async function createUserNotificationWithSSE(
+  db: any,
+  userId: number,
+  eventId: number,
+  context: {
+    itemType: "anime" | "game";
+    itemId: number;
+    eventType: string;
+    eventKey: string;
+    payload: any;
+  }
+): Promise<boolean> {
+  const result: any = await db.query(
+    `INSERT INTO user_notifications (user_id, event_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE event_id = event_id`,
+    [userId, eventId]
+  );
+  const isNew = Number(result.affectedRows || 0) === 1;
+  if (isNew) {
+    try {
+      emitNotification(userId, {
+        id: eventId,
+        itemType: context.itemType,
+        itemId: context.itemId,
+        eventType: context.eventType,
+        eventKey: context.eventKey,
+        payload: context.payload,
+        eventAt: new Date().toISOString(),
+      });
+    } catch (e) { console.error("SSE emit failed:", e); }
+  }
+  return isNew;
+}
 async function createNotificationEventAndFanout(
   db: any,
   itemType: "anime" | "game",
@@ -566,14 +992,35 @@ async function createNotificationEventAndFanout(
   const eventId = Number(result.insertId || 0);
   if (!eventId) return;
 
+  // Premium users: immediate delivery (deliver_at = NULL)
+  // Free users: 6h delay (deliver_at = NOW() + 6h)
   await db.query(
-    `INSERT IGNORE INTO user_notifications (user_id, event_id)
-     SELECT f.user_id, ?
+    `INSERT IGNORE INTO user_notifications (user_id, event_id, deliver_at)
+     SELECT f.user_id, ?,
+       CASE
+         WHEN u.is_premium = 1 AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
+         THEN NULL
+         ELSE DATE_ADD(NOW(), INTERVAL 6 HOUR)
+       END AS deliver_at
      FROM favorites f
      INNER JOIN users u ON u.id = f.user_id
      WHERE f.item_type = ? AND f.item_id = ? AND u.notifications_enabled = 1`,
     [eventId, itemType, itemId]
   );
+
+  // Emit real-time to Premium users via SSE
+  try {
+    const targetRows: any = await db.query(
+      `SELECT f.user_id FROM favorites f INNER JOIN users u ON u.id = f.user_id WHERE f.item_type = ? AND f.item_id = ? AND u.notifications_enabled = 1 AND u.is_premium = 1 AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())`,
+      [itemType, itemId]
+    );
+    const sseNotif = { id: eventId, itemType, itemId, eventType, eventKey, payload, eventAt: new Date().toISOString() };
+    for (const row of targetRows) {
+      emitNotification(row.user_id, sseNotif);
+    }
+  } catch (e) {
+    console.error("SSE emit failed:", e);
+  }
 }
 
 async function createNotificationsForItemChange(
@@ -646,6 +1093,31 @@ async function createNotificationsForItemChange(
         { title, cover, label: "Épisode " + afterNextN + " à venir", newValue: "Épisode " + afterNextN });
     }
   }
+
+  // DLC detection for games (Premium feature: detailed tracking)
+  if (itemType === "game") {
+    const beforeDlcs = parseJsonSafe<any[]>(before.dlcs, []);
+    const afterDlcs = parseJsonSafe<any[]>(after.dlcs, []);
+    if (Array.isArray(afterDlcs) && afterDlcs.length > beforeDlcs.length) {
+      const beforeNames = new Set(beforeDlcs.map((d: any) => String(d?.name || "").toLowerCase()).filter(Boolean));
+      for (const dlc of afterDlcs) {
+        const dlcName = String(dlc?.name || "").trim();
+        if (!dlcName) continue;
+        if (beforeNames.has(dlcName.toLowerCase())) continue;
+        const dlcKey = sha256(dlcName.toLowerCase()).slice(0, 12);
+        const hasReleaseDate = dlc?.releaseDate && String(dlc.releaseDate).match(/^\d{4}-\d{2}-\d{2}/);
+        const now = new Date();
+        const dlcDate = hasReleaseDate ? new Date(String(dlc.releaseDate)) : null;
+        const isReleased = dlcDate !== null && dlcDate <= now;
+        const eventType = isReleased ? "game_dlc_released" : "game_dlc_announced";
+        const label = isReleased ? "DLC disponible" : "Nouveau DLC annoncé";
+        await createNotificationEventAndFanout(db, itemType, Number(after.id),
+          eventType,
+          `${itemType}:${after.id}:dlc:${dlcKey}`,
+          { title, cover, label, newValue: dlcName, releaseDate: dlc?.releaseDate || null, description: dlc?.description || null });
+      }
+    }
+  }
 }
 
 
@@ -673,6 +1145,23 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     if (q.upcoming === "1") conditions.push("release_date > CURDATE()");
     if (q.released === "1") conditions.push("release_date <= CURDATE()");
     if (q.genre) { conditions.push("genre LIKE ?"); params.push(`%${q.genre}%`); }
+    if (q.platform) {
+      const plats = String(q.platform).split(",").map((p:string) => p.trim()).filter(Boolean);
+      const platConds: string[] = [];
+      for (const p of plats) {
+        if (p === "Mobile") {
+          platConds.push("(platform LIKE ? OR platform LIKE ?)");
+          params.push("%iOS%", "%Android%");
+        } else if (p === "PC") {
+          platConds.push("(platform LIKE ? OR platform LIKE ?)");
+          params.push("%PC%", "%Web%");
+        } else {
+          platConds.push("platform LIKE ?");
+          params.push(`%${p}%`);
+        }
+      }
+      if (platConds.length) conditions.push("(" + platConds.join(" OR ") + ")");
+    }
     if (q.search) { conditions.push("title LIKE ?"); params.push(`%${q.search}%`); }
 
     const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
@@ -782,16 +1271,25 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
 
       for (const b of cleanedItems) {
         const beforeRows: any = await conn.query(
-          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating
+          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
            FROM ${table} WHERE title = ? LIMIT 1`,
           [b.title]
         );
         const before = beforeRows.length ? beforeRows[0] : null;
 
+        const insertCols = itemType === "game"
+          ? "(title,cover,genre,platform,release_date,release_datetime,is_recently_released,trailer_url,description,rating,popularity,screenshots,dlcs)"
+          : "(title,cover,genre,platform,release_date,release_datetime,is_recently_released,trailer_url,description,rating,popularity,screenshots)";
+        const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?)";
+        const insertVals: any[] = [
+          b.title, b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
+          b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.popularity, b.screenshots
+        ];
+        if (itemType === "game") insertVals.push((b as any).dlcs ?? null);
         await conn.query(
           `INSERT INTO ${table}
-             (title,cover,genre,platform,release_date,release_datetime,is_recently_released,trailer_url,description,rating,popularity,screenshots)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+             ${insertCols}
+           VALUES ${insertPh}
            ON DUPLICATE KEY UPDATE
              cover=IF(VALUES(cover) IS NOT NULL AND VALUES(cover) != '', VALUES(cover), cover),
              genre=IF(VALUES(genre) IS NOT NULL AND VALUES(genre) != '', VALUES(genre), genre),
@@ -803,26 +1301,13 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
              description=IF(VALUES(description) IS NOT NULL AND VALUES(description) != '', VALUES(description), description),
              rating=IF(VALUES(rating) IS NOT NULL AND VALUES(rating) != '', VALUES(rating), rating),
              popularity=IF(VALUES(popularity) > 0, VALUES(popularity), popularity),
-             screenshots=IF(VALUES(screenshots) IS NOT NULL AND VALUES(screenshots) != '', VALUES(screenshots), screenshots),
+             screenshots=IF(VALUES(screenshots) IS NOT NULL AND VALUES(screenshots) != '', VALUES(screenshots), screenshots)${itemType === "game" ? ",\n             dlcs=IF(VALUES(dlcs) IS NOT NULL AND VALUES(dlcs) != '', VALUES(dlcs), dlcs)" : ""},
              updated_at=CURRENT_TIMESTAMP`,
-          [
-            b.title,
-            b.cover,
-            b.genre,
-            b.platform,
-            b.releaseDate,
-            b.releaseDatetime,
-            b.isRecentlyReleased ? 1 : 0,
-            b.trailerUrl,
-            b.description,
-            b.rating,
-            b.popularity,
-            b.screenshots
-          ]
+          insertVals
         );
 
         const afterRows: any = await conn.query(
-          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating
+          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
            FROM ${table} WHERE title = ? LIMIT 1`,
           [b.title]
         );
@@ -876,5 +1361,24 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
 app.get("/health", async () => ({ ok: true, service: "content-api" }));
 registerDomain("/anime", "anime_items", "ANIME_API_KEY");
 registerDomain("/games", "game_items", "GAMES_API_KEY");
+
+
+app.post("/admin/test-email", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ error: auth.msg });
+  const body = req.body as any;
+  const to = String(body?.to || "").trim();
+  if (!to) return reply.code(400).send({ error: "to required" });
+  const ok = await sendEmail({
+    to,
+    subject: "Test GameNime - Email fonctionnel",
+    html: `<p>Bonjour,</p><p>Ceci est un email de test envoy\u00e9 par GameNime.</p><p>Si tu re\u00e7ois ce mail, la configuration SMTP fonctionne parfaitement.</p><p>\u00c0 bient\u00f4t,<br/>GameNime</p>`,
+  });
+  return reply.send({ ok });
+});
+
+void verifySmtpConnection();
 
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });

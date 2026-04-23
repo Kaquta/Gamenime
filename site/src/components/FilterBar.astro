@@ -3,19 +3,21 @@ interface Props {
   domain: "anime" | "games" | "both";
 }
 const { domain } = Astro.props;
-
 const months = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 ];
-
 const genres = domain === "games"
   ? ["Action", "Adventure", "RPG", "Shooter", "Strategy", "Puzzle", "Racing", "Sports", "Simulation", "Platformer", "Fighting", "Horror"]
   : domain === "anime"
   ? ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance", "Sci-Fi", "Slice of Life", "Horror", "Mecha", "Sports", "Psychological"]
   : ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "RPG", "Shooter", "Romance", "Sci-Fi", "Horror", "Strategy", "Sports"];
+const platforms = domain === "games"
+  ? ["PC", "PlayStation", "Xbox", "Nintendo", "Mobile"]
+  : domain === "anime"
+  ? ["Crunchyroll", "Netflix", "Disney Plus", "Hulu", "HIDIVE", "Bilibili", "YouTube", "Tencent Video", "iQIYI"]
+  : ["PC", "PlayStation", "Xbox", "Nintendo", "Crunchyroll", "Netflix", "Disney Plus"];
 ---
-
 <div class="filter-bar container" data-domain={domain}>
   <div class="filter-row">
     <div class="filter-group">
@@ -26,7 +28,6 @@ const genres = domain === "games"
         ))}
       </select>
     </div>
-
     <div class="filter-group">
       <select class="filter-select" id="filterYear">
         <option value="">Année</option>
@@ -34,7 +35,6 @@ const genres = domain === "games"
         <option value="2027">2027</option>
       </select>
     </div>
-
     <div class="filter-group filter-genres">
       <button class="filter-select genre-toggle" id="genreToggle">
         Genres ▾
@@ -48,38 +48,53 @@ const genres = domain === "games"
         ))}
       </div>
     </div>
-
+    <div class="filter-group filter-genres">
+      <button class="filter-select genre-toggle" id="platformToggle">
+        Plateformes ▾
+      </button>
+      <div class="genre-dropdown" id="platformDropdown">
+        {platforms.map((p) => (
+          <label class="genre-option">
+            <input type="checkbox" value={p} class="platform-check" />
+            <span>{p}</span>
+          </label>
+        ))}
+      </div>
+    </div>
     <div class="filter-group filter-search">
       <input type="text" class="filter-input" id="filterSearch" placeholder="Rechercher..." />
     </div>
-
     <button class="filter-apply" id="filterApply">Filtrer</button>
     <button class="filter-reset" id="filterReset">✕</button>
   </div>
 </div>
-
 <script>
   // Genre dropdown toggle
-  const toggle = document.getElementById("genreToggle");
-  const dropdown = document.getElementById("genreDropdown");
+  const genreToggle = document.getElementById("genreToggle");
+  const genreDropdown = document.getElementById("genreDropdown");
+  const platformToggle = document.getElementById("platformToggle");
+  const platformDropdown = document.getElementById("platformDropdown");
 
-  toggle?.addEventListener("click", (e) => {
+  genreToggle?.addEventListener("click", (e) => {
     e.stopPropagation();
-    dropdown?.classList.toggle("open");
+    genreDropdown?.classList.toggle("open");
+    platformDropdown?.classList.remove("open");
   });
-
+  platformToggle?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    platformDropdown?.classList.toggle("open");
+    genreDropdown?.classList.remove("open");
+  });
   document.addEventListener("click", () => {
-    dropdown?.classList.remove("open");
+    genreDropdown?.classList.remove("open");
+    platformDropdown?.classList.remove("open");
   });
-
-  dropdown?.addEventListener("click", (e) => {
-    e.stopPropagation();
-  });
+  genreDropdown?.addEventListener("click", (e) => e.stopPropagation());
+  platformDropdown?.addEventListener("click", (e) => e.stopPropagation());
 
   // Apply filters
   const applyBtn = document.getElementById("filterApply");
   const resetBtn = document.getElementById("filterReset");
-
   function getFilters() {
     const month = (document.getElementById("filterMonth") as HTMLSelectElement)?.value;
     const year = (document.getElementById("filterYear") as HTMLSelectElement)?.value;
@@ -87,13 +102,16 @@ const genres = domain === "games"
     const genres = Array.from(document.querySelectorAll(".genre-check:checked")).map(
       (el) => (el as HTMLInputElement).value
     );
-    return { month, year, search, genres };
+    const platforms = Array.from(document.querySelectorAll(".platform-check:checked")).map(
+      (el) => (el as HTMLInputElement).value
+    );
+    return { month, year, search, genres, platforms };
   }
-
   function buildFilterParams(filters: ReturnType<typeof getFilters>): string {
     const params: string[] = [];
     if (filters.search) params.push(`search=${encodeURIComponent(filters.search)}`);
     if (filters.genres.length) params.push(`genre=${encodeURIComponent(filters.genres.join(","))}`);
+    if (filters.platforms.length) params.push(`platform=${encodeURIComponent(filters.platforms.join(","))}`);
     if (filters.year && filters.month) {
       const lastDay = new Date(parseInt(filters.year), parseInt(filters.month), 0).getDate();
       params.push(`releasedAfter=${filters.year}-${filters.month}-01`);
@@ -108,20 +126,21 @@ const genres = domain === "games"
     }
     return params.join("&");
   }
-
   function applyFilters() {
     const filters = getFilters();
     const extra = buildFilterParams(filters);
-    // Dispatch event pour que SectionBlock recharge avec les filtres
     document.dispatchEvent(new CustomEvent("applyFilters", { detail: extra }));
-    // Update genre toggle label
-    if (toggle) {
-      toggle.textContent = filters.genres.length
+    if (genreToggle) {
+      genreToggle.textContent = filters.genres.length
         ? `Genres (${filters.genres.length}) ▾`
         : "Genres ▾";
     }
+    if (platformToggle) {
+      platformToggle.textContent = filters.platforms.length
+        ? `Plateformes (${filters.platforms.length}) ▾`
+        : "Plateformes ▾";
+    }
   }
-
   function resetFilters() {
     (document.getElementById("filterMonth") as HTMLSelectElement).value = "";
     (document.getElementById("filterYear") as HTMLSelectElement).value = "";
@@ -129,10 +148,13 @@ const genres = domain === "games"
     document.querySelectorAll(".genre-check").forEach((el) => {
       (el as HTMLInputElement).checked = false;
     });
-    if (toggle) toggle.textContent = "Genres ▾";
+    document.querySelectorAll(".platform-check").forEach((el) => {
+      (el as HTMLInputElement).checked = false;
+    });
+    if (genreToggle) genreToggle.textContent = "Genres ▾";
+    if (platformToggle) platformToggle.textContent = "Plateformes ▾";
     document.dispatchEvent(new CustomEvent("applyFilters", { detail: "" }));
   }
-
   applyBtn?.addEventListener("click", applyFilters);
   resetBtn?.addEventListener("click", resetFilters);
 </script>

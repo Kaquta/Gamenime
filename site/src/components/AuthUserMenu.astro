@@ -19,6 +19,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         <button class="auth-user-menu__item" id="openFavDrawer" type="button">❤️ Mes favoris</button>
         <button class="auth-user-menu__item" id="openNotifPage" type="button">🔔 Notifications</button>
         <button class="auth-user-menu__item" id="openAccountDrawer" type="button">⚙️ Compte</button>
+        <a id="premiumMenuBtn" href="/premium" class="auth-user-menu__item auth-user-menu__premium">✨ Passer Premium</a>
         <button id="authLogoutBtn" class="auth-user-menu__item auth-user-menu__item--danger" type="button">🚪 Déconnexion</button>
       </div>
     </div>
@@ -88,17 +89,22 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
   function authEndpoint(p){return authApiBase+p;}
   function getAv(id){for(var i=0;i<AVATARS.length;i++)if(AVATARS[i].id===id)return AVATARS[i];return AVATARS[0];}
   function showGuest(){if(authGuest)authGuest.classList.remove("hidden");if(authUser)authUser.classList.add("hidden");}
-  function showUser(name,email,avatar){
+  function showUser(name,email,avatar,isPremium){
     if(authGuest)authGuest.classList.add("hidden");if(authUser)authUser.classList.remove("hidden");
     var safeName=name&&String(name).trim()?String(name).trim():email.split("@")[0];
     if(authDisplayName)authDisplayName.textContent=safeName;
-    var av=getAv(avatar||"luffy");if(authAvatar)authAvatar.innerHTML=av.svg;
+    var av=getAv(avatar||"luffy");
+    if(authAvatar){authAvatar.innerHTML=av.svg;if(isPremium){authAvatar.classList.add("is-premium");}else{authAvatar.classList.remove("is-premium");}}
+    var oldPill=document.getElementById("premiumPill");if(oldPill)oldPill.remove();
+    if(isPremium&&authDisplayName){var pill=document.createElement("span");pill.id="premiumPill";pill.className="premium-pill";pill.innerHTML="<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><polygon points=\"12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8\"/></svg><span class=\"premium-pill__text\">"+escapeHtml(safeName)+"</span>";authDisplayName.after(pill);authDisplayName.style.display="none";}else if(authDisplayName){authDisplayName.style.display="";}
+    var premBtn=document.getElementById("premiumMenuBtn");
+    if(premBtn){premBtn.style.display=isPremium?"none":"";}
   }
   async function fetchMe(){
     try{var res=await fetch(authEndpoint("/auth/me"),{method:"GET",credentials:"include",headers:{Accept:"application/json"}});
     if(res.status===401){showGuest();return;}if(!res.ok)throw new Error("HTTP "+res.status);
     var data=await res.json();if(!data.user){showGuest();return;}
-    currentUser=data.user;showUser(data.user.displayName,data.user.email,data.user.avatar);
+    currentUser=data.user;showUser(data.user.displayName,data.user.email,data.user.avatar,data.user.isPremium);
     }catch(e){showGuest();}
   }
   function toggleDropdown(){if(authDropdown)authDropdown.classList.toggle("is-open");}
@@ -153,10 +159,11 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div></div>'+
 
       '<button class="account-option" data-toggle="notifOptForm" type="button">🔔 Options notifications</button>'+
-      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label></div>'+
+      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label>'+(u.isPremium?'<a href="/account/preferences" class="account-prefs-link">⚡ Mes préférences →</a>':'')+'</div>'+
 
-      '<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
+      (u.isPremium?'<a href="/account" class="account-option account-option--premium">🤚 Gérer mon abonnement</a>':'')+'<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
 
+      
       '<button class="auth-user-menu__item auth-user-menu__item--danger" id="accountLogout" type="button" style="margin-top:12px;">🚪 Se déconnecter</button>';
 
     // Toggle sections
@@ -169,7 +176,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       btn.addEventListener("click",async function(){
         var avId=btn.dataset.avatar;
         try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({avatar:avId})});
-        if(res.ok){var data=await res.json();currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar);
+        if(res.ok){var data=await res.json();currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);
         accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(b){b.classList.remove("avatar-pick--selected");});btn.classList.add("avatar-pick--selected");
         var disp=document.getElementById("accAvDisp");if(disp)disp.innerHTML=getAv(avId).svg;}}catch(e){}
       });
@@ -179,7 +186,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     document.getElementById("savePseudo")?.addEventListener("click",async function(){
       var input=document.getElementById("accountPseudo"),msg=document.getElementById("pseudoMsg"),name=input?input.value.trim():"";if(!name)return;
       try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({displayName:name})});var data=await res.json();
-      if(res.ok){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar);var nd=document.getElementById("accNameDisp");if(nd)nd.textContent=name;if(msg){msg.textContent="✅ Pseudo mis à jour";msg.classList.remove("hidden","account-msg--error");}}
+      if(res.ok){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);var nd=document.getElementById("accNameDisp");if(nd)nd.textContent=name;if(msg){msg.textContent="✅ Pseudo mis à jour";msg.classList.remove("hidden","account-msg--error");}}
       else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
     });
 

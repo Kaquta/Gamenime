@@ -1,0 +1,141 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import HeroHeader from "../../components/HeroHeader.astro";
+---
+
+<BaseLayout title="Mes préférences — GameNime">
+  <HeroHeader />
+
+  <main class="prefs-page container">
+    <div class="prefs-breadcrumb">
+      <a href="/account">← Mon abonnement</a>
+    </div>
+
+    <h1 class="prefs-page__title">Mes préférences d'alertes</h1>
+    <p class="prefs-page__sub">Tu seras alerté dès qu'une nouveauté correspond à tes préférences.</p>
+
+    <div id="prefsLoading" class="prefs-state">Chargement...</div>
+
+    <div id="prefsNotPremium" class="prefs-state hidden">
+      <p>Cette fonctionnalité est réservée aux membres Premium.</p>
+      <a href="/premium" class="prefs-cta-btn">✨ Découvrir Premium</a>
+    </div>
+
+    <form id="prefsForm" class="hidden">
+      <section class="prefs-section">
+        <h2 class="prefs-section__title">Genres préférés</h2>
+        <p class="prefs-section__desc">Sélectionne les genres qui t'intéressent.</p>
+        <div class="prefs-grid" id="genresGrid"></div>
+      </section>
+
+      <section class="prefs-section">
+        <h2 class="prefs-section__title">Plateformes préférées</h2>
+        <p class="prefs-section__desc">Sélectionne les plateformes où tu consommes.</p>
+        <div class="prefs-grid" id="platformsGrid"></div>
+      </section>
+
+      <section class="prefs-section">
+        <h2 class="prefs-section__title">Rappels avant sortie</h2>
+        <p class="prefs-section__desc">Reçois des rappels X jours avant chaque sortie de tes favoris.</p>
+        <div class="prefs-grid prefs-grid--small" id="reminderGrid"></div>
+      </section>
+
+      <button type="submit" class="prefs-save-btn">Enregistrer mes préférences</button>
+      <div id="prefsMsg" class="prefs-msg hidden"></div>
+    </form>
+  </main>
+
+  <script is:inline>
+    (function(){
+      var apiBase = "";
+      var loadingEl = document.getElementById("prefsLoading");
+      var notPremEl = document.getElementById("prefsNotPremium");
+      var formEl = document.getElementById("prefsForm");
+      var genresGrid = document.getElementById("genresGrid");
+      var platformsGrid = document.getElementById("platformsGrid");
+      var reminderGrid = document.getElementById("reminderGrid");
+      var msgEl = document.getElementById("prefsMsg");
+
+      var GENRES = ["Action", "Adventure", "RPG", "Shooter", "Strategy", "Puzzle", "Racing", "Sports", "Simulation", "Platformer", "Fighting", "Horror", "Comedy", "Drama", "Fantasy", "Romance", "Sci-Fi", "Slice of Life", "Mecha", "Psychological"];
+      var PLATFORMS = ["PC", "PlayStation", "Xbox", "Nintendo", "Mobile", "Crunchyroll", "Netflix", "Disney Plus", "Hulu", "HIDIVE", "Bilibili", "YouTube"];
+      var REMINDERS = [
+        { value: 7, label: "7 jours avant" },
+        
+        { value: 1, label: "La veille" },
+        { value: 0, label: "Le jour même" }
+      ];
+
+      function renderGrid(container, items, selected, isReminder) {
+        container.innerHTML = items.map(function(it) {
+          var val = isReminder ? it.value : it;
+          var label = isReminder ? it.label : it;
+          var checked = selected.indexOf(val) !== -1 ? "checked" : "";
+          return '<label class="prefs-chip"><input type="checkbox" value="' + val + '" ' + checked + ' />' + label + '</label>';
+        }).join("");
+      }
+
+      async function load() {
+        try {
+          var res = await fetch(apiBase + "/api/premium/preferences", { credentials: "include" });
+          if (res.status === 401) {
+            if (loadingEl) loadingEl.textContent = "Connecte-toi pour accéder à tes préférences.";
+            return;
+          }
+          if (res.status === 403) {
+            if (loadingEl) loadingEl.classList.add("hidden");
+            if (notPremEl) notPremEl.classList.remove("hidden");
+            return;
+          }
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var data = await res.json();
+          if (loadingEl) loadingEl.classList.add("hidden");
+          if (formEl) formEl.classList.remove("hidden");
+
+          renderGrid(genresGrid, GENRES, data.alertGenres || [], false);
+          renderGrid(platformsGrid, PLATFORMS, data.alertPlatforms || [], false);
+          renderGrid(reminderGrid, REMINDERS, data.reminderDaysBefore || [7, 1, 0], true);
+        } catch (e) {
+          if (loadingEl) loadingEl.textContent = "Erreur de chargement.";
+        }
+      }
+
+      async function save(e) {
+        e.preventDefault();
+        var alertGenres = Array.from(genresGrid.querySelectorAll("input:checked")).map(function(i){ return i.value; });
+        var alertPlatforms = Array.from(platformsGrid.querySelectorAll("input:checked")).map(function(i){ return i.value; });
+        var reminderDaysBefore = Array.from(reminderGrid.querySelectorAll("input:checked")).map(function(i){ return Number(i.value); });
+
+        try {
+          var res = await fetch(apiBase + "/api/premium/preferences", {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ alertGenres: alertGenres, alertPlatforms: alertPlatforms, reminderDaysBefore: reminderDaysBefore })
+          });
+          var data = await res.json();
+          if (res.ok) {
+            if (msgEl) {
+              msgEl.textContent = "✅ Préférences enregistrées";
+              msgEl.classList.remove("hidden", "prefs-msg--error");
+            }
+          } else {
+            if (msgEl) {
+              msgEl.textContent = "❌ " + (data.error || "Erreur");
+              msgEl.classList.remove("hidden");
+              msgEl.classList.add("prefs-msg--error");
+            }
+          }
+        } catch (err) {
+          if (msgEl) {
+            msgEl.textContent = "❌ Erreur réseau";
+            msgEl.classList.remove("hidden");
+            msgEl.classList.add("prefs-msg--error");
+          }
+        }
+      }
+
+      if (formEl) formEl.addEventListener("submit", save);
+      load();
+    })();
+  </script>
+</BaseLayout>

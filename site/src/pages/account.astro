@@ -1,0 +1,139 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+---
+
+<BaseLayout title="Mon abonnement — GameNime">
+  <HeroHeader />
+
+  <main class="account-page container">
+    <h1 class="account-page__title">Mon abonnement</h1>
+
+    <div id="accountLoading" class="account-state">Chargement...</div>
+    <div id="accountNotPremium" class="account-state hidden">
+      <p>Tu n'as pas d'abonnement Premium actif.</p>
+      <a href="/premium" class="account-cta-btn">✨ Découvrir Premium</a>
+    </div>
+
+    <div id="accountContent" class="hidden">
+      <div class="account-card">
+        <div class="account-card__badge">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16"><polygon points="12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8"/></svg>
+          <span>GameNime Premium</span>
+        </div>
+
+        <div class="account-card__row">
+          <span class="account-card__label">Plan</span>
+          <span class="account-card__value" id="accPlan">—</span>
+        </div>
+        <div class="account-card__row">
+          <span class="account-card__label">Statut</span>
+          <span class="account-card__value account-card__value--ok">Actif</span>
+        </div>
+        <div class="account-card__row">
+          <span class="account-card__label">Expire le</span>
+          <span class="account-card__value" id="accExpires">—</span>
+        </div>
+        <div class="account-card__row">
+          <span class="account-card__label">Temps restant</span>
+          <span class="account-card__value" id="accRemaining">—</span>
+        </div>
+      </div>
+
+      <button id="cancelBtn" class="account-cancel-btn" type="button">Annuler mon abonnement</button>
+      <div id="cancelMsg" class="account-msg hidden"></div>
+    </div>
+  </main>
+
+  <script is:inline>
+    (function(){
+      var apiBase = "";
+      var loadingEl = document.getElementById("accountLoading");
+      var notPremEl = document.getElementById("accountNotPremium");
+      var contentEl = document.getElementById("accountContent");
+      var accPlan = document.getElementById("accPlan");
+      var accExpires = document.getElementById("accExpires");
+      var accRemaining = document.getElementById("accRemaining");
+      var cancelBtn = document.getElementById("cancelBtn");
+      var cancelMsg = document.getElementById("cancelMsg");
+
+      function formatDate(iso) {
+        if (!iso) return "—";
+        var d = new Date(iso);
+        return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+      }
+
+      function remainingDays(iso) {
+        if (!iso) return "—";
+        var diff = new Date(iso).getTime() - Date.now();
+        var days = Math.floor(diff / 86400000);
+        if (days < 0) return "Expiré";
+        if (days === 0) return "Expire aujourd'hui";
+        if (days === 1) return "1 jour";
+        return days + " jours";
+      }
+
+      function planLabel(plan) {
+        if (plan === "monthly") return "Mensuel (2,99€/mois)";
+        if (plan === "yearly") return "Annuel (24€/an)";
+        if (plan === "lifetime") return "À vie";
+        return plan || "—";
+      }
+
+      async function load() {
+        try {
+          var res = await fetch(apiBase + "/api/premium/status", { credentials: "include" });
+          if (res.status === 401) {
+            if (loadingEl) loadingEl.textContent = "Connecte-toi pour voir ton abonnement.";
+            return;
+          }
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var data = await res.json();
+          if (loadingEl) loadingEl.classList.add("hidden");
+          if (!data.isPremium) {
+            if (notPremEl) notPremEl.classList.remove("hidden");
+            return;
+          }
+          if (contentEl) contentEl.classList.remove("hidden");
+          if (accPlan) accPlan.textContent = planLabel(data.plan);
+          if (accExpires) accExpires.textContent = formatDate(data.expiresAt);
+          if (accRemaining) accRemaining.textContent = remainingDays(data.expiresAt);
+        } catch (e) {
+          if (loadingEl) loadingEl.textContent = "Impossible de charger les infos.";
+        }
+      }
+
+      async function cancel() {
+        if (!confirm("Annuler ton abonnement Premium ? Tu perdras l'accès aux fonctionnalités Premium immédiatement.")) return;
+        try {
+          var res = await fetch(apiBase + "/api/premium/cancel", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" }
+          });
+          var data = await res.json();
+          if (res.ok) {
+            if (cancelMsg) {
+              cancelMsg.textContent = "✅ Abonnement annulé";
+              cancelMsg.classList.remove("hidden");
+            }
+            setTimeout(function(){ window.location.href = "/"; }, 1500);
+          } else {
+            if (cancelMsg) {
+              cancelMsg.textContent = "❌ " + (data.error || "Erreur");
+              cancelMsg.classList.remove("hidden");
+            }
+          }
+        } catch (e) {
+          if (cancelMsg) {
+            cancelMsg.textContent = "❌ Erreur réseau";
+            cancelMsg.classList.remove("hidden");
+          }
+        }
+      }
+
+      if (cancelBtn) cancelBtn.addEventListener("click", cancel);
+      load();
+    })();
+  </script>
+</BaseLayout>

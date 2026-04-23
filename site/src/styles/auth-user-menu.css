@@ -63,3 +63,141 @@
   .auth-user-menu__trigger { padding-right: 8px; }
   .auth-user-menu__dropdown { right: 0; min-width: 200px; }
 }
+
+.account-premium-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  padding: 12px 18px;
+  margin: 8px 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ff9246, #d7501e);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 6px 18px rgba(255, 100, 40, 0.35), inset 0 1px 0 rgba(255, 220, 170, 0.2);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  border: 1px solid rgba(255, 220, 170, 0.3);
+}
+.account-premium-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(255, 100, 40, 0.5), inset 0 1px 0 rgba(255, 220, 170, 0.3);
+}
+
+.auth-user-menu__premium {
+  text-align: center !important;
+  text-decoration: none !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #ff9246, #d7501e) !important;
+  color: #fff !important;
+  margin: 6px 8px !important;
+  border-radius: 10px !important;
+  box-shadow: 0 4px 14px rgba(255, 100, 40, 0.35) !important;
+  transition: transform 180ms ease, box-shadow 180ms ease !important;
+}
+.auth-user-menu__premium:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 22px rgba(255, 100, 40, 0.5) !important;
+  background: linear-gradient(135deg, #ffa05c, #e85a20) !important;
+}
+
+/* ── Premium badge (V3: ring + pill) ───────────────── */
+.auth-user-menu__avatar.is-premium {
+  padding: 2px;
+  background: linear-gradient(135deg, #fff3e0, #ffb366, #e85a20);
+  box-shadow: 0 0 14px rgba(255, 140, 60, 0.45);
+}
+.auth-user-menu__avatar.is-premium svg,
+.auth-user-menu__avatar.is-premium img {
+  background: #1a0a07;
+  border-radius: 50%;
+}
+/* ── Premium Pill — étoile + GameNime glow ─────────── */
+.premium-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  margin-left: 8px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(58,22,8,0.95), rgba(40,15,10,0.98));
+  border: 1px solid transparent;
+  background-image:
+    linear-gradient(135deg, rgba(58,22,8,0.95), rgba(40,15,10,0.98)),
+    linear-gradient(135deg, #fff3e0, #ffb366, #e85a20);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow:
+    0 2px 12px rgba(255, 140, 60, 0.4),
+    inset 0 1px 0 rgba(255, 220, 170, 0.1);
+  vertical-align: middle;
+  animation: premiumGlow 2.8s ease-in-out infinite;
+}
+@keyframes premiumGlow {
+  0%, 100% { box-shadow: 0 2px 12px rgba(255, 140, 60, 0.4), inset 0 1px 0 rgba(255, 220, 170, 0.1); }
+  50% { box-shadow: 0 2px 18px rgba(255, 170, 90, 0.7), inset 0 1px 0 rgba(255, 220, 170, 0.2); }
+}
+.premium-pill svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #ffb366;
+  filter: drop-shadow(0 0 4px rgba(255, 170, 90, 0.9));
+  animation: starSpin 4s linear infinite;
+}
+@keyframes starSpin {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.15); }
+}
+.premium-pill__text {
+  font-family: Georgia, serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  background: linear-gradient(135deg, #fff3e0 0%, #ffb366 50%, #e85a20 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 0 4px rgba(255, 170, 90, 0.8),
+    0 0 8px rgba(255, 140, 60, 0.6),
+    0 0 12px rgba(232, 90, 32, 0.4);
+  filter: drop-shadow(0 0 2px rgba(255, 180, 100, 0.5));
+}
+
+.account-option--premium {
+  display: block;
+  text-decoration: none;
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.12), rgba(255, 100, 30, 0.06));
+  border: 1px solid rgba(255, 170, 90, 0.3);
+  color: #ffd4a8 !important;
+  font-weight: 600;
+  position: relative;
+}
+.account-option--premium:hover {
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.2), rgba(255, 100, 30, 0.12));
+  border-color: rgba(255, 170, 90, 0.5);
+}
+
+.account-prefs-link {
+  display: block;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.12), rgba(255, 100, 30, 0.06));
+  border: 1px solid rgba(255, 170, 90, 0.3);
+  color: #ffd4a8;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  transition: all 180ms ease;
+}
+.account-prefs-link:hover {
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.2), rgba(255, 100, 30, 0.12));
+  border-color: rgba(255, 170, 90, 0.5);
+  color: #fff;
+}
