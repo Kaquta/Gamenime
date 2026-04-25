@@ -1,0 +1,130 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import HeroHeader from "../../components/HeroHeader.astro";
+import "../../styles/reset-password.css";
+---
+
+<BaseLayout title="Confirme ton email — GameNime">
+  <HeroHeader />
+
+  <main class="reset-page container">
+    <div class="reset-card">
+      <h1 class="reset-title">Confirmation de l'email</h1>
+
+      <div id="verifyLoading" class="reset-msg">⏳ Vérification en cours…</div>
+
+      <div id="verifySuccess" class="reset-msg hidden">
+        ✅ Email confirmé avec succès !
+      </div>
+
+      <div id="verifyError" class="reset-msg reset-msg--error hidden"></div>
+
+      <div id="verifyActions" class="hidden" style="margin-top:20px;text-align:center;">
+        <a href="/" class="reset-btn" style="display:inline-block;text-decoration:none;padding:12px 28px;width:auto;">
+          Retour à l'accueil
+        </a>
+      </div>
+
+      <div id="verifyResend" class="reset-fallback hidden">
+        <form id="resendForm" style="margin-top:16px;">
+          <label class="reset-label">
+            Ton email
+            <div class="reset-input-wrap">
+              <input type="email" id="resendEmail" required autocomplete="email" />
+            </div>
+          </label>
+          <button type="submit" class="reset-btn" id="resendBtn">Renvoyer le lien</button>
+          <div id="resendMsg" class="reset-msg hidden"></div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    (function(){
+      var params = new URLSearchParams(window.location.search);
+      var token = params.get("token") || "";
+      var loadingEl = document.getElementById("verifyLoading");
+      var successEl = document.getElementById("verifySuccess");
+      var errorEl = document.getElementById("verifyError");
+      var actionsEl = document.getElementById("verifyActions");
+      var resendEl = document.getElementById("verifyResend");
+
+      function showError(msg, showResend) {
+        loadingEl.classList.add("hidden");
+        errorEl.textContent = msg;
+        errorEl.classList.remove("hidden");
+        if (showResend) resendEl.classList.remove("hidden");
+      }
+
+      function showSuccess() {
+        loadingEl.classList.add("hidden");
+        successEl.classList.remove("hidden");
+        actionsEl.classList.remove("hidden");
+      }
+
+      async function verify() {
+        if (!token || token.length < 20) {
+          showError("Lien invalide.", true);
+          return;
+        }
+        try {
+          var res = await fetch("/api/auth/verify-email", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: token })
+          });
+          var data = await res.json();
+          if (res.ok && data.ok) {
+            showSuccess();
+          } else {
+            showError("❌ " + (data.error || "Erreur de vérification."), true);
+          }
+        } catch (err) {
+          showError("❌ Erreur réseau. Réessaie.", true);
+        }
+      }
+
+      // Resend form
+      var resendForm = document.getElementById("resendForm");
+      if (resendForm) {
+        resendForm.addEventListener("submit", async function(e) {
+          e.preventDefault();
+          var emailInput = document.getElementById("resendEmail");
+          var resendBtn = document.getElementById("resendBtn");
+          var resendMsg = document.getElementById("resendMsg");
+          if (!emailInput.value) return;
+
+          resendBtn.disabled = true;
+          resendBtn.textContent = "Envoi…";
+
+          try {
+            var res = await fetch("/api/auth/resend-verification", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email: emailInput.value })
+            });
+            var data = await res.json();
+            resendMsg.classList.remove("hidden", "reset-msg--error");
+            if (res.ok && data.ok) {
+              resendMsg.textContent = "✅ " + data.message;
+            } else {
+              resendMsg.textContent = "❌ " + (data.error || "Erreur");
+              resendMsg.classList.add("reset-msg--error");
+            }
+          } catch (err) {
+            resendMsg.classList.remove("hidden");
+            resendMsg.classList.add("reset-msg--error");
+            resendMsg.textContent = "❌ Erreur réseau.";
+          } finally {
+            resendBtn.disabled = false;
+            resendBtn.textContent = "Renvoyer le lien";
+          }
+        });
+      }
+
+      verify();
+    })();
+  </script>
+</BaseLayout>

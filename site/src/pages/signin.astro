@@ -22,9 +22,23 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
       <button id="loginBtn" class="auth-card__btn" type="button">Se connecter</button>
 
+      <p class="auth-card__forgot">
+        <a href="#" id="forgotPasswordLink">Mot de passe oublié ?</a>
+      </p>
+
       <p class="auth-card__switch">
         Pas encore de compte ? <a href="/register">Créer un compte</a>
       </p>
+
+      <div id="forgotForm" class="auth-card__forgot-form hidden">
+        <p class="auth-card__forgot-intro">Saisis ton email, tu recevras un lien de réinitialisation :</p>
+        <div class="auth-card__field">
+          <label for="forgotEmail">Email</label>
+          <input type="email" id="forgotEmail" placeholder="ton@email.com" autocomplete="email" />
+        </div>
+        <button id="forgotBtn" class="auth-card__btn" type="button">Envoyer le lien</button>
+        <p id="forgotMsg" class="auth-card__forgot-msg hidden"></p>
+      </div>
     </div>
   </div>
 </BaseLayout>
@@ -66,4 +80,67 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 
   if (loginBtn) loginBtn.addEventListener("click", doLogin);
   if (passwordInput) passwordInput.addEventListener("keydown", function(e) { if (e.key === "Enter") doLogin(); });
+
+  // ── Forgot password flow ──
+  var forgotLink = document.getElementById("forgotPasswordLink");
+  var forgotForm = document.getElementById("forgotForm");
+  var forgotEmail = document.getElementById("forgotEmail");
+  var forgotBtn = document.getElementById("forgotBtn");
+  var forgotMsg = document.getElementById("forgotMsg");
+
+  if (forgotLink && forgotForm) {
+    forgotLink.addEventListener("click", function(e) {
+      e.preventDefault();
+      forgotForm.classList.toggle("hidden");
+      if (!forgotForm.classList.contains("hidden") && forgotEmail) {
+        if (emailInput && emailInput.value && !forgotEmail.value) {
+          forgotEmail.value = emailInput.value;
+        }
+        forgotEmail.focus();
+      }
+    });
+  }
+
+  if (forgotBtn) {
+    forgotBtn.addEventListener("click", async function() {
+      if (!forgotEmail || !forgotEmail.value.trim()) {
+        if (forgotMsg) {
+          forgotMsg.textContent = "Saisis ton email.";
+          forgotMsg.className = "auth-card__forgot-msg auth-card__forgot-msg--error";
+        }
+        return;
+      }
+      forgotBtn.disabled = true;
+      forgotBtn.textContent = "Envoi…";
+      try {
+        var res = await fetch(apiBase + "/auth/request-password-reset", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: forgotEmail.value.trim() })
+        });
+        var data = await res.json();
+        if (forgotMsg) {
+          if (res.ok && data.ok) {
+            forgotMsg.textContent = "✅ Si cet email existe, un lien a été envoyé.";
+            forgotMsg.className = "auth-card__forgot-msg auth-card__forgot-msg--success";
+            forgotEmail.value = "";
+          } else if (res.status === 429) {
+            forgotMsg.textContent = "Trop de demandes. Réessaie dans 15 minutes.";
+            forgotMsg.className = "auth-card__forgot-msg auth-card__forgot-msg--error";
+          } else {
+            forgotMsg.textContent = data.error || "Erreur. Réessaie.";
+            forgotMsg.className = "auth-card__forgot-msg auth-card__forgot-msg--error";
+          }
+        }
+      } catch (err) {
+        if (forgotMsg) {
+          forgotMsg.textContent = "Erreur réseau. Réessaie.";
+          forgotMsg.className = "auth-card__forgot-msg auth-card__forgot-msg--error";
+        }
+      } finally {
+        forgotBtn.disabled = false;
+        forgotBtn.textContent = "Envoyer le lien";
+      }
+    });
+  }
 </script>

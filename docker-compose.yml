@@ -31,6 +31,7 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL}
       PORT: 3000
     depends_on: [mariadb]
     networks: [internal, public]

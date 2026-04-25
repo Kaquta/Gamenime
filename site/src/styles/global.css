@@ -2983,3 +2983,46 @@ body.is-authenticated .fav-heart {
   background: linear-gradient(135deg, rgba(255, 140, 60, 0.25), rgba(255, 100, 30, 0.12));
   transform: translateY(-2px);
 }
+
+/* ── Forgot password section in signin page ──────── */
+.auth-card__forgot {
+  text-align: center;
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+.auth-card__forgot a {
+  color: rgba(255, 200, 150, 0.8);
+  text-decoration: none;
+  border-bottom: 1px dotted rgba(255, 200, 150, 0.4);
+  transition: color 150ms ease;
+}
+.auth-card__forgot a:hover {
+  color: #ffb366;
+}
+.auth-card__forgot-form {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 170, 90, 0.15);
+}
+.auth-card__forgot-intro {
+  font-size: 13px;
+  color: rgba(255, 200, 150, 0.7);
+  margin: 0 0 14px;
+  text-align: center;
+}
+.auth-card__forgot-msg {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  font-weight: 600;
+}
+.auth-card__forgot-msg--success {
+  background: rgba(68, 196, 102, 0.1);
+  color: #44c466;
+}
+.auth-card__forgot-msg--error {
+  background: rgba(255, 100, 100, 0.1);
+  color: #ff6b6b;
+}

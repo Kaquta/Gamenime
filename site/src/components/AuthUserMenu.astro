@@ -147,7 +147,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var u=currentUser;var av=getAv(u.avatar||"luffy");
 
     accountDrawerContent.innerHTML=
-      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp">'+av.svg+'</div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div></div></div>'+
+      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp">'+av.svg+'</div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div>'+(u.emailVerified===false?'<button type="button" id="emailUnverifiedBtn" class="account-email-unverified">Email non vérifié — Renvoyer</button>':'')+'</div></div>'+
 
       '<button class="account-option" data-toggle="avatarForm" type="button">🎭 Changer d\'avatar</button>'+
       '<div id="avatarForm" class="account-subform hidden"><div class="avatar-grid">'+AVATARS.map(function(a){var sel=(u.avatar||"luffy")===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'">'+a.svg+'</button>';}).join("")+'</div></div>'+
@@ -170,6 +170,33 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     accountDrawerContent.querySelectorAll("[data-toggle]").forEach(function(btn){
       btn.addEventListener("click",function(){var target=document.getElementById(btn.dataset.toggle);if(target)target.classList.toggle("hidden");});
     });
+    // Email verification - resend link on click
+    var unverifiedBtn=document.getElementById("emailUnverifiedBtn");
+    if(unverifiedBtn){
+      unverifiedBtn.addEventListener("click",async function(){
+        if(unverifiedBtn.classList.contains("account-email-unverified--sent"))return;
+        var originalText=unverifiedBtn.textContent;
+        unverifiedBtn.textContent="Envoi…";
+        unverifiedBtn.disabled=true;
+        try{
+          var res=await fetch(authEndpoint("/auth/resend-verification"),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:currentUser.email})});
+          var data=await res.json();
+          if(res.ok&&data.ok){
+            unverifiedBtn.textContent="✅ Email envoyé, vérifie ta boîte";
+            unverifiedBtn.classList.add("account-email-unverified--sent");
+          }else if(res.status===429){
+            unverifiedBtn.textContent="Trop de tentatives, réessaie plus tard";
+            setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},5000);
+          }else{
+            unverifiedBtn.textContent="Erreur, réessaie";
+            setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},3000);
+          }
+        }catch(e){
+          unverifiedBtn.textContent="Erreur réseau";
+          setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},3000);
+        }
+      });
+    }
 
     // Avatar picker
     accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(btn){

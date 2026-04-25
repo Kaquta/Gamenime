@@ -6,6 +6,7 @@ import { EventEmitter } from "events";
 import bcrypt from "bcryptjs";
 import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
+import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -103,6 +104,7 @@ async function getAuthenticatedUser(req: any) {
     `SELECT u.id, u.email, u.display_name AS displayName,
             u.notifications_enabled AS notificationsEnabled,
             u.email_notifications_enabled AS emailNotificationsEnabled,
+            u.email_verified AS emailVerified,
             u.avatar, u.is_premium AS isPremium, u.premium_plan AS premiumPlan, u.premium_expires_at AS premiumExpiresAt,
             s.id AS sessionId, s.expires_at AS expiresAt
      FROM user_sessions s INNER JOIN users u ON u.id = s.user_id
@@ -128,6 +130,7 @@ async function getAuthenticatedUser(req: any) {
     displayName: user.displayName,
     notificationsEnabled: !!user.notificationsEnabled,
     emailNotificationsEnabled: !!user.emailNotificationsEnabled,
+    emailVerified: !!user.emailVerified,
     avatar: user.avatar || "luffy",
     sessionId: user.sessionId,
     isPremium: isPremiumActive,
@@ -152,6 +155,16 @@ async function requirePremium(req: any, reply: any) {
   if (!user) return null;
   if (!user.isPremium) {
     reply.code(403).send({ error: "Accès Premium requis", premiumRequired: true });
+    return null;
+  }
+  return user;
+}
+
+async function requireEmailVerified(req: any, reply: any) {
+  const user = await requireAuth(req, reply);
+  if (!user) return null;
+  if (!user.emailVerified) {
+    reply.code(403).send({ error: "Email non vérifié. Confirme ton email avant de continuer.", code: "EMAIL_NOT_VERIFIED" });
     return null;
   }
   return user;
@@ -193,6 +206,19 @@ const loginBodySchema = z.object({
   email: z.string().email().max(190),
   password: z.string().min(8).max(100),
 });
+const requestPasswordResetSchema = z.object({
+  email: z.string().email().max(190),
+});
+const resetPasswordSchema = z.object({
+  token: z.string().min(20).max(200),
+  newPassword: z.string().min(8).max(100),
+});
+const verifyEmailSchema = z.object({
+  token: z.string().min(20).max(200),
+});
+const resendVerificationSchema = z.object({
+  email: z.string().email().max(190),
+});
 const favoriteBodySchema = z.object({
   itemType: z.enum(["anime", "game"]),
   itemId: z.coerce.number().int().positive(),
@@ -224,6 +250,30 @@ function parseJsonSafe<T = any>(value: any, defaultValue: T): T {
   }
 }
 
+// Simple in-memory rate limiter for sensitive endpoints
+// Maintains a sliding window of timestamps per key
+const rateLimitStore = new Map<string, number[]>();
+
+function checkRateLimit(key: string, maxAttempts: number, windowMs: number): boolean {
+  const now = Date.now();
+  const cutoff = now - windowMs;
+  const attempts = (rateLimitStore.get(key) || []).filter(ts => ts > cutoff);
+  if (attempts.length >= maxAttempts) return false;
+  attempts.push(now);
+  rateLimitStore.set(key, attempts);
+  return true;
+}
+
+// Periodic cleanup to prevent memory growth
+setInterval(() => {
+  const cutoff = Date.now() - 60 * 60 * 1000; // keep last hour max
+  for (const [key, attempts] of rateLimitStore.entries()) {
+    const filtered = attempts.filter(ts => ts > cutoff);
+    if (filtered.length === 0) rateLimitStore.delete(key);
+    else rateLimitStore.set(key, filtered);
+  }
+}, 5 * 60 * 1000);
+
 function requireApiKey(expected: string | undefined, provided: unknown) {
   if (!expected) return { ok: false as const, code: 500, msg: "API key not configured" };
   if (typeof provided !== "string" || provided !== expected) return { ok: false as const, code: 401, msg: "Unauthorized" };
@@ -254,7 +304,15 @@ app.post("/auth/register", async (req, reply) => {
     );
 
     setAuthCookie(reply, sessionToken);
-    return reply.code(201).send({ ok: true, user: { id: userId, email, displayName } });
+
+    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const userAgent = String(req.headers["user-agent"] || "");
+
+    // Fire-and-forget: welcome + verification emails must never block registration
+    void sendWelcomeEmail({ email, displayName }).catch(() => {});
+    void sendVerificationEmail({ db: pool, userId, email, displayName, ip, userAgent }).catch(() => {});
+
+    return reply.code(201).send({ ok: true, user: { id: userId, email, displayName, emailVerified: false } });
   } catch (err: any) {
     if (err?.name === "ZodError") {
       return reply.code(400).send({ error: "Données invalides", details: err.errors });
@@ -299,6 +357,183 @@ app.post("/auth/login", async (req, reply) => {
   }
 });
 
+// ============================================================
+// Password reset flow (ETAT CLEAN)
+// - Step 1: user requests a reset link (rate limited per IP+email)
+// - Step 2: user clicks link, submits new password (token verified)
+// ============================================================
+
+app.post("/auth/request-password-reset", async (req, reply) => {
+  try {
+    const body = requestPasswordResetSchema.parse(req.body);
+    const email = normalizeEmail(body.email);
+    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+
+    // Rate limit: max 3 requests per 15 minutes per IP+email
+    const rlKey = `pwreset:${ip}:${email}`;
+    if (!checkRateLimit(rlKey, 3, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: "Trop de demandes. Réessaie dans 15 minutes." });
+    }
+
+    // Lookup user (silently succeed even if user doesn't exist - prevents email enumeration)
+    const rows: any = await pool.query(
+      `SELECT id, email, display_name FROM users WHERE email = ? LIMIT 1`,
+      [email]
+    );
+
+    if (rows.length) {
+      const u = rows[0];
+      const userAgent = String(req.headers["user-agent"] || "");
+      // Fire-and-forget: never let email failure leak user existence
+      void sendPasswordResetEmail({
+        db: pool,
+        userId: Number(u.id),
+        email: u.email,
+        displayName: u.display_name,
+        ip,
+        userAgent,
+      }).catch((e) => req.log.error(e, "sendPasswordResetEmail failed"));
+    }
+
+    // Always return same response to prevent email enumeration attack
+    return reply.send({ ok: true, message: "Si cet email existe, un lien a été envoyé." });
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.code(400).send({ error: "Email invalide", details: err.errors });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/auth/reset-password", async (req, reply) => {
+  try {
+    const body = resetPasswordSchema.parse(req.body);
+    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+
+    // Rate limit: max 5 attempts per 15 minutes per IP (defense against token brute force)
+    const rlKey = `pwconsume:${ip}`;
+    if (!checkRateLimit(rlKey, 5, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: "Trop de tentatives. Réessaie dans 15 minutes." });
+    }
+
+    // Verify and consume token (atomic)
+    const result = await consumePasswordResetToken(pool, body.token);
+    if (!result.ok) {
+      const msg = result.reason === "expired"
+        ? "Lien expiré, demande un nouveau lien."
+        : result.reason === "already_used"
+        ? "Lien déjà utilisé, demande un nouveau lien."
+        : "Lien invalide.";
+      return reply.code(400).send({ error: msg });
+    }
+
+    // Update password
+    const passwordHash = await bcrypt.hash(body.newPassword, 12);
+    await pool.query(
+      `UPDATE users SET password_hash = ? WHERE id = ?`,
+      [passwordHash, result.userId]
+    );
+
+    // Invalidate all existing sessions for this user (security best practice)
+    await pool.query(
+      `DELETE FROM user_sessions WHERE user_id = ?`,
+      [result.userId]
+    );
+
+    return reply.send({ ok: true, message: "Mot de passe mis à jour. Reconnecte-toi." });
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.code(400).send({ error: "Données invalides", details: err.errors });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+// ============================================================
+// Email verification flow (ETAT CLEAN)
+// ============================================================
+
+app.post("/auth/verify-email", async (req, reply) => {
+  try {
+    const body = verifyEmailSchema.parse(req.body);
+    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+
+    // Rate limit: max 5 attempts per 15 minutes per IP
+    const rlKey = `verifyemail:${ip}`;
+    if (!checkRateLimit(rlKey, 5, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: "Trop de tentatives. Réessaie dans 15 minutes." });
+    }
+
+    const result = await consumeVerificationToken(pool, body.token);
+    if (!result.ok) {
+      const msg = result.reason === "expired"
+        ? "Lien expiré, demande un nouveau lien."
+        : result.reason === "already_used"
+        ? "Email déjà confirmé."
+        : "Lien invalide.";
+      return reply.code(400).send({ error: msg });
+    }
+
+    return reply.send({ ok: true, message: "Email confirmé avec succès." });
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.code(400).send({ error: "Données invalides", details: err.errors });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/auth/resend-verification", async (req, reply) => {
+  try {
+    const body = resendVerificationSchema.parse(req.body);
+    const email = normalizeEmail(body.email);
+    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+
+    // Rate limit: max 2 resends per 15 minutes per IP+email
+    const rlKey = `resendverify:${ip}:${email}`;
+    if (!checkRateLimit(rlKey, 2, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: "Trop de demandes. Réessaie dans 15 minutes." });
+    }
+
+    const rows: any = await pool.query(
+      `SELECT id, email, display_name, email_verified FROM users WHERE email = ? LIMIT 1`,
+      [email]
+    );
+
+    if (rows.length && !rows[0].email_verified) {
+      const u = rows[0];
+      const userAgent = String(req.headers["user-agent"] || "");
+      void (async () => {
+        try {
+          const result = await sendVerificationEmail({
+            db: pool,
+            userId: Number(u.id),
+            email: u.email,
+            displayName: u.display_name,
+            ip,
+            userAgent,
+          });
+          console.log("[resend-verification] Result:", JSON.stringify(result));
+        } catch (e: any) {
+          console.error("[resend-verification] EXCEPTION:", e?.message, e?.stack);
+        }
+      })();
+    }
+
+    // Always return same response (anti-enumeration)
+    return reply.send({ ok: true, message: "Si cet email existe et n'est pas confirmé, un lien a été envoyé." });
+  } catch (err: any) {
+    if (err?.name === "ZodError") {
+      return reply.code(400).send({ error: "Email invalide", details: err.errors });
+    }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
 app.post("/auth/logout", async (req, reply) => {
   try {
     const token = getAuthToken(req);
@@ -324,6 +559,7 @@ app.get("/auth/me", async (req, reply) => {
         displayName: user.displayName,
         notificationsEnabled: user.notificationsEnabled,
         emailNotificationsEnabled: user.emailNotificationsEnabled,
+        emailVerified: user.emailVerified,
         avatar: user.avatar,
         isPremium: user.isPremium,
         premiumPlan: user.premiumPlan,
@@ -409,7 +645,10 @@ app.post("/premium/generate-reminders", async (req, reply) => {
         const table = itemType === "anime" ? "anime_items" : "game_items";
 
         const rows: any = await pool.query(
-          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.release_date
+          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.release_date,
+                  u.email AS user_email, u.display_name AS user_display_name,
+                  u.email_notifications_enabled AS user_email_enabled,
+                  u.email_verified AS user_email_verified
            FROM favorites f
            INNER JOIN ${table} i ON i.id = f.item_id
            INNER JOIN users u ON u.id = f.user_id
@@ -450,8 +689,32 @@ app.post("/premium/generate-reminders", async (req, reply) => {
             [row.user_id, itemType, row.item_id, offset, targetStr]
           );
 
+          const reminderEmailEligible = !!(Number(row.user_email_enabled) === 1 && Number(row.user_email_verified) === 1);
+          if (reminderEmailEligible) {
+            void (async () => {
+              try {
+                const emailResult = await sendReminderEmail({
+                  email: row.user_email,
+                  displayName: row.user_display_name,
+                  itemTitle: row.title,
+                  itemCover: row.cover,
+                  itemType,
+                  itemId: row.item_id,
+                  daysLeft: offset,
+                  releaseDate: row.release_date ? String(row.release_date).slice(0, 10) : null,
+                });
+                if (emailResult.ok) {
+                  await pool.query(
+                    `UPDATE reminder_log SET email_sent_at = NOW() WHERE user_id = ? AND item_type = ? AND item_id = ? AND day_offset = ?`,
+                    [row.user_id, itemType, row.item_id, offset]
+                  );
+                }
+              } catch (e) { /* fire-and-forget */ }
+            })();
+          }
+
           results.created++;
-          results.details.push({ user_id: row.user_id, item_type: itemType, title: row.title, offset, label });
+          results.details.push({ user_id: row.user_id, item_type: itemType, title: row.title, offset, label, email_eligible: reminderEmailEligible });
         }
       }
     }
@@ -517,7 +780,10 @@ app.post("/premium/generate-alerts", async (req, reply) => {
     const results = { created: 0, scanned: 0, details: [] as any[] };
 
     const prefsRows: any = await pool.query(
-      `SELECT p.user_id, p.alert_genres, p.alert_platforms
+      `SELECT p.user_id, p.alert_genres, p.alert_platforms,
+              u.email AS user_email, u.display_name AS user_display_name,
+              u.email_notifications_enabled AS user_email_enabled,
+              u.email_verified AS user_email_verified
        FROM user_alert_preferences p
        INNER JOIN users u ON u.id = p.user_id
        WHERE u.is_premium = 1
@@ -608,8 +874,31 @@ app.post("/premium/generate-alerts", async (req, reply) => {
             [prefRow.user_id, itemType, item.id, matchType, matchValue]
           );
 
+          const alertEmailEligible = !!(Number(prefRow.user_email_enabled) === 1 && Number(prefRow.user_email_verified) === 1);
+          if (alertEmailEligible) {
+            void (async () => {
+              try {
+                const emailResult = await sendAlertEmail({
+                  email: prefRow.user_email,
+                  displayName: prefRow.user_display_name,
+                  itemTitle: item.title,
+                  itemCover: item.cover,
+                  itemType,
+                  itemId: item.id,
+                  matchValue,
+                });
+                if (emailResult.ok) {
+                  await pool.query(
+                    `UPDATE alert_log SET email_sent_at = NOW() WHERE user_id = ? AND item_type = ? AND item_id = ?`,
+                    [prefRow.user_id, itemType, item.id]
+                  );
+                }
+              } catch (e) { /* fire-and-forget */ }
+            })();
+          }
+
           results.created++;
-          results.details.push({ user_id: prefRow.user_id, item_type: itemType, title: item.title, matchType, matchValue });
+          results.details.push({ user_id: prefRow.user_id, item_type: itemType, title: item.title, matchType, matchValue, email_eligible: alertEmailEligible });
         }
       }
     }
@@ -663,7 +952,7 @@ app.patch("/auth/password", async (req, reply) => {
   } catch (err) { req.log.error(err); return reply.code(500).send({ error: "Erreur serveur" }); }
 });
 
-app.post("/auth/reset-password", async (req, reply) => {
+app.post("/auth/reset-password-legacy", async (req, reply) => {
   try {
     const body = req.body as any;
     if (!body.email || !body.displayName || !body.newPassword) return reply.code(400).send({ error: "Tous les champs sont requis" });
