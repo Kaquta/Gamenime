@@ -50,3 +50,57 @@ export async function postVote(domain: "anime" | "games", id: number | string, v
   if (!r.ok) throw new Error(`Vote failed ${r.status}`);
   return r.json();
 }
+
+// ─────────────────────────────────────────────────────────
+// GameNime feed endpoints (scoring intelligent)
+// ─────────────────────────────────────────────────────────
+
+export interface FeedItem extends ContentItem {
+  type: "anime" | "game";
+  gameNimeScore: number;
+}
+
+export interface FeedHomeResponse {
+  window: { start: string; end: string };
+  generatedAt: string;
+  counts: { anime: number; games: number; home: number };
+  home: FeedItem[];
+  anime: FeedItem[];
+  games: FeedItem[];
+}
+
+export async function getFeedHome(): Promise<FeedHomeResponse> {
+  return fetchJson<FeedHomeResponse>("/api/feed/home");
+}
+
+export type FeedStatus = "released" | "upcoming" | "all";
+
+export type FeedOrderBy = "score" | "date";
+
+export async function getFeedAnime(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy } = {}): Promise<FeedItem[]> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.orderBy) params.set("orderBy", opts.orderBy);
+  const qs = params.toString();
+  const url = qs ? `/api/feed/anime?${qs}` : "/api/feed/anime";
+  const data = await fetchJson<{ items: FeedItem[] }>(url);
+  return data.items;
+}
+
+export async function getFeedGames(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy } = {}): Promise<FeedItem[]> {
+  const params = new URLSearchParams();
+  if (opts.status) params.set("status", opts.status);
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.orderBy) params.set("orderBy", opts.orderBy);
+  const qs = params.toString();
+  const url = qs ? `/api/feed/games?${qs}` : "/api/feed/games";
+  const data = await fetchJson<{ items: FeedItem[] }>(url);
+  return data.items;
+}
+
+export async function searchFeed(query: string, type: "anime" | "game" | "all" = "all"): Promise<FeedItem[]> {
+  const url = `/api/feed/search?q=${encodeURIComponent(query)}&type=${type}`;
+  const data = await fetchJson<{ items: FeedItem[] }>(url);
+  return data.items;
+}

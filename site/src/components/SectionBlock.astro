@@ -27,7 +27,7 @@ const { title, source, limit, href } = Astro.props;
 </div>
 
 <script>
-import { getAnimeItems, getGameItems, getItemDetail, postVote } from "../lib/api";
+import { getAnimeItems, getGameItems, getFeedAnime, getFeedGames, getItemDetail, postVote } from "../lib/api";
 import type { ContentItem } from "../lib/api";
 
 function formatDate(v) {
@@ -389,20 +389,20 @@ async function loadSection(section) {
     var domain = "anime";
     var isTop = false;
     if (source === "anime") {
-      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=100&order=desc"); domain = "anime";
+      items = await getFeedAnime({ status: "released", limit: 100, orderBy: "date" }); domain = "anime";
     } else if (source === "games") {
-      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=100&order=desc"); domain = "games";
+      items = await getFeedGames({ status: "released", limit: 100, orderBy: "date" }); domain = "games";
     } else if (source === "anime-upcoming") {
-      items = await getAnimeItems("upcoming=1&limit=100&order=asc"); domain = "anime";
+      items = await getFeedAnime({ status: "upcoming", limit: 100, orderBy: "date" }); domain = "anime";
     } else if (source === "games-upcoming") {
-      items = await getGameItems("upcoming=1&limit=100&order=asc"); domain = "games";
+      items = await getFeedGames({ status: "upcoming", limit: 100, orderBy: "date" }); domain = "games";
     } else if (source === "top-anime") {
-      items = await getAnimeItems("released=1&releasedAfter=2026-01-01&limit=12&orderBy=popularity&order=desc"); domain = "anime"; isTop = true;
+      items = await getFeedAnime({ status: "released", limit: 12 }); domain = "anime"; isTop = true;
     } else if (source === "top-games") {
-      items = await getGameItems("released=1&releasedAfter=2026-01-01&limit=12&orderBy=popularity&order=desc"); domain = "games"; isTop = true;
+      items = await getFeedGames({ status: "released", limit: 12 }); domain = "games"; isTop = true;
     } else {
-      var a = await getAnimeItems("upcoming=1&limit=50&order=asc");
-      var g = await getGameItems("upcoming=1&limit=50&order=asc");
+      var a = await getFeedAnime({ status: "upcoming", limit: 50, orderBy: "date" });
+      var g = await getFeedGames({ status: "upcoming", limit: 50, orderBy: "date" });
       var all = []
         .concat(a.map(function(i) { return Object.assign({}, i, { _d: "anime" }); }))
         .concat(g.map(function(i) { return Object.assign({}, i, { _d: "games" }); }))

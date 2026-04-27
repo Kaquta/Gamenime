@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
 import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
+import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
+import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform } from "./gamenime/core.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -1546,7 +1548,14 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       return reply.code(400).send({ error: parsed.error.issues });
     }
 
-    const cleanedItems = parsed.data.items.filter(b => !isAdultContent(b.title, b.genre, b.rating));
+    const cleanedItems = parsed.data.items
+      .filter(b => !isAdultContent(b.title, b.genre, b.rating))
+      .map(b => ({
+        ...b,
+        // ETAT CLEAN: sanitize platform against whitelist
+        // Garbage values (Unknown, studio names) become null
+        platform: gnSanitizePlatform(b.platform),
+      }));
     const filtered = parsed.data.items.length - cleanedItems.length;
 
     if (filtered > 0) req.log.info(`Filtered ${filtered} adult items`);
@@ -1559,10 +1568,39 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       await conn.beginTransaction();
 
       for (const b of cleanedItems) {
+        // ETAT CLEAN: 3-key duplicate lookup
+        //   1. exact title match
+        //   2. normalized title + release_date (catches transliterations: Hasunosora vs Hasu no Sora)
+        //   3. cover URL + release_date (catches different language titles: Smoking Behind / Yani Suu Futari)
+        // Generic covers (default.jpg, placeholder, etc.) are excluded from the cover match
+        // because dozens of items share them when no real image is available.
+        const normalizedIncoming = gnNormalizeTitle(b.title);
+        const coverIsGeneric = !b.cover ||
+          /\/(default|placeholder|noimage|no-image|missing)\.(jpg|png)/i.test(b.cover) ||
+          /cover\/(medium|large)\/default/i.test(b.cover);
+        const lookupCover = coverIsGeneric ? null : b.cover;
+
         const beforeRows: any = await conn.query(
           `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
-           FROM ${table} WHERE title = ? LIMIT 1`,
-          [b.title]
+           FROM ${table}
+           WHERE (
+             title = ?
+             OR (
+               release_date = ?
+               AND LOWER(REGEXP_REPLACE(title, '[^[:alnum:]]', '')) = ?
+             )
+             OR (
+               ? IS NOT NULL
+               AND release_date = ?
+               AND cover = ?
+             )
+           )
+           LIMIT 1`,
+          [
+            b.title,
+            b.releaseDate || null, normalizedIncoming,
+            lookupCover, b.releaseDate || null, lookupCover,
+          ]
         );
         const before = beforeRows.length ? beforeRows[0] : null;
 
@@ -1575,25 +1613,71 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.popularity, b.screenshots
         ];
         if (itemType === "game") insertVals.push((b as any).dlcs ?? null);
-        await conn.query(
-          `INSERT INTO ${table}
-             ${insertCols}
-           VALUES ${insertPh}
-           ON DUPLICATE KEY UPDATE
-             cover=IF(VALUES(cover) IS NOT NULL AND VALUES(cover) != '', VALUES(cover), cover),
-             genre=IF(VALUES(genre) IS NOT NULL AND VALUES(genre) != '', VALUES(genre), genre),
-             platform=IF(VALUES(platform) IS NOT NULL AND VALUES(platform) != '' AND VALUES(platform) != 'Unknown', VALUES(platform), platform),
-             release_date=IF(VALUES(release_date) IS NOT NULL, VALUES(release_date), release_date),
-             release_datetime=IF(VALUES(release_datetime) IS NOT NULL, VALUES(release_datetime), release_datetime),
-             is_recently_released=VALUES(is_recently_released),
-             trailer_url=IF(VALUES(trailer_url) IS NOT NULL AND VALUES(trailer_url) != '', VALUES(trailer_url), trailer_url),
-             description=IF(VALUES(description) IS NOT NULL AND VALUES(description) != '', VALUES(description), description),
-             rating=IF(VALUES(rating) IS NOT NULL AND VALUES(rating) != '', VALUES(rating), rating),
-             popularity=IF(VALUES(popularity) > 0, VALUES(popularity), popularity),
-             screenshots=IF(VALUES(screenshots) IS NOT NULL AND VALUES(screenshots) != '', VALUES(screenshots), screenshots)${itemType === "game" ? ",\n             dlcs=IF(VALUES(dlcs) IS NOT NULL AND VALUES(dlcs) != '', VALUES(dlcs), dlcs)" : ""},
-             updated_at=CURRENT_TIMESTAMP`,
-          insertVals
-        );
+
+        if (before) {
+          // ETAT CLEAN: existing item found via normalized title — UPDATE BY ID
+          // (avoids creating a new row even if the title string differs)
+          const dlcsClause = itemType === "game"
+            ? ", dlcs = IF(? IS NOT NULL AND ? != '', ?, dlcs)"
+            : "";
+          const dlcsParams = itemType === "game"
+            ? [(b as any).dlcs ?? null, (b as any).dlcs ?? null, (b as any).dlcs ?? null]
+            : [];
+
+          await conn.query(
+            `UPDATE ${table} SET
+               cover = IF(? IS NOT NULL AND ? != '', ?, cover),
+               genre = IF(? IS NOT NULL AND ? != '', ?, genre),
+               platform = IF(? IS NOT NULL AND ? != '' AND ? != 'Unknown', ?, platform),
+               release_date = IF(? IS NOT NULL, ?, release_date),
+               release_datetime = IF(? IS NOT NULL, ?, release_datetime),
+               is_recently_released = ?,
+               trailer_url = IF(? IS NOT NULL AND ? != '', ?, trailer_url),
+               description = IF(? IS NOT NULL AND ? != '', ?, description),
+               rating = IF(? IS NOT NULL AND ? != '', ?, rating),
+               popularity = IF(? > 0, ?, popularity),
+               screenshots = IF(? IS NOT NULL AND ? != '', ?, screenshots)${dlcsClause},
+               updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [
+              b.cover, b.cover, b.cover,
+              b.genre, b.genre, b.genre,
+              b.platform, b.platform, b.platform, b.platform,
+              b.releaseDate, b.releaseDate,
+              b.releaseDatetime, b.releaseDatetime,
+              b.isRecentlyReleased ? 1 : 0,
+              b.trailerUrl, b.trailerUrl, b.trailerUrl,
+              b.description, b.description, b.description,
+              b.rating, b.rating, b.rating,
+              b.popularity, b.popularity,
+              b.screenshots, b.screenshots, b.screenshots,
+              ...dlcsParams,
+              before.id,
+            ]
+          );
+        } else {
+          // No existing item — INSERT new row
+          // ON DUPLICATE KEY UPDATE remains as a safety net for unique title collisions
+          await conn.query(
+            `INSERT INTO ${table}
+               ${insertCols}
+             VALUES ${insertPh}
+             ON DUPLICATE KEY UPDATE
+               cover=IF(VALUES(cover) IS NOT NULL AND VALUES(cover) != '', VALUES(cover), cover),
+               genre=IF(VALUES(genre) IS NOT NULL AND VALUES(genre) != '', VALUES(genre), genre),
+               platform=IF(VALUES(platform) IS NOT NULL AND VALUES(platform) != '' AND VALUES(platform) != 'Unknown', VALUES(platform), platform),
+               release_date=IF(VALUES(release_date) IS NOT NULL, VALUES(release_date), release_date),
+               release_datetime=IF(VALUES(release_datetime) IS NOT NULL, VALUES(release_datetime), release_datetime),
+               is_recently_released=VALUES(is_recently_released),
+               trailer_url=IF(VALUES(trailer_url) IS NOT NULL AND VALUES(trailer_url) != '', VALUES(trailer_url), trailer_url),
+               description=IF(VALUES(description) IS NOT NULL AND VALUES(description) != '', VALUES(description), description),
+               rating=IF(VALUES(rating) IS NOT NULL AND VALUES(rating) != '', VALUES(rating), rating),
+               popularity=IF(VALUES(popularity) > 0, VALUES(popularity), popularity),
+               screenshots=IF(VALUES(screenshots) IS NOT NULL AND VALUES(screenshots) != '', VALUES(screenshots), screenshots)${itemType === "game" ? ",\n               dlcs=IF(VALUES(dlcs) IS NOT NULL AND VALUES(dlcs) != '', VALUES(dlcs), dlcs)" : ""},
+               updated_at=CURRENT_TIMESTAMP`,
+            insertVals
+          );
+        }
 
         const afterRows: any = await conn.query(
           `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
@@ -1608,6 +1692,10 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       }
 
       await conn.commit();
+
+      // Invalidate GameNime feed cache after bulk insert
+      // (new items may have changed the top scores)
+      clearFeedCache();
     } catch (e) {
       await conn.rollback();
       req.log.error(e);
@@ -1623,23 +1711,6 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       await pool.query(`DELETE FROM ${table} WHERE ${blockedLike}`);
     } catch (cleanErr) {
       req.log.warn(cleanErr, "adult cleanup failed");
-    }
-    try {
-      await pool.query(
-        `DELETE FROM ${table}
-         WHERE id NOT IN (
-           SELECT id FROM (
-             SELECT id FROM ${table}
-             ORDER BY
-               CASE WHEN release_date >= "2026-01-01" AND release_date <= "2027-12-31" THEN 0 ELSE 1 END,
-               release_date DESC,
-               popularity DESC
-             LIMIT 150
-           ) AS keep_items
-         )`
-      );
-    } catch (cleanErr) {
-      req.log.warn(cleanErr, "cleanup failed");
     }
 
     return reply.code(200).send({ ok: true, total: cleanedItems.length, filtered });
@@ -1669,5 +1740,10 @@ app.post("/admin/test-email", async (req, reply) => {
 });
 
 void verifySmtpConnection();
+
+// Register GameNime API routes (feed/scoring engine)
+await registerGameNimeRoutes(app, pool, {
+  adminApiKey: process.env.ANIME_API_KEY,
+});
 
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
