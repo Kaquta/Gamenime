@@ -21,6 +21,42 @@ import HeroHeader from "../../components/HeroHeader.astro";
       <a href="/premium" class="prefs-cta-btn">✨ Découvrir Premium</a>
     </div>
 
+    <!-- Section Canaux de notification : toujours visible (Free + Premium) -->
+    <section id="channelsSection" class="prefs-section prefs-channels">
+      <h2 class="prefs-section__title">Canaux de notification</h2>
+      <p class="prefs-section__desc">Comment veux-tu recevoir tes notifications ?</p>
+      <div id="channelsLoading" class="prefs-state">Chargement...</div>
+      <div id="channelsControls" class="prefs-channels-grid hidden">
+        <label class="prefs-channel-row">
+          <div class="prefs-channel-info">
+            <span class="prefs-channel-icon">🔔</span>
+            <div>
+              <strong>Notifications in-app</strong>
+              <small>Cloche en haut à droite + page Notifications</small>
+            </div>
+          </div>
+          <label class="prefs-switch">
+            <input type="checkbox" id="toggleInApp" />
+            <span class="prefs-switch-slider"></span>
+          </label>
+        </label>
+        <label class="prefs-channel-row" id="emailChannelRow">
+          <div class="prefs-channel-info">
+            <span class="prefs-channel-icon">📧</span>
+            <div>
+              <strong>Notifications par email</strong>
+              <small id="emailSubLabel">Reminders + alertes envoyés sur ton email</small>
+            </div>
+          </div>
+          <label class="prefs-switch">
+            <input type="checkbox" id="toggleEmail" />
+            <span class="prefs-switch-slider"></span>
+          </label>
+        </label>
+        <div id="channelsMsg" class="prefs-msg hidden"></div>
+      </div>
+    </section>
+
     <form id="prefsForm" class="hidden">
       <section class="prefs-section">
         <h2 class="prefs-section__title">Genres préférés</h2>
@@ -48,6 +84,83 @@ import HeroHeader from "../../components/HeroHeader.astro";
   <script is:inline>
     (function(){
       var apiBase = "";
+
+      // ═══ SECTION CANAUX DE NOTIFICATION (Free + Premium) ═══
+      var chLoadingEl = document.getElementById("channelsLoading");
+      var chControlsEl = document.getElementById("channelsControls");
+      var toggleInApp = document.getElementById("toggleInApp");
+      var toggleEmail = document.getElementById("toggleEmail");
+      var emailChannelRow = document.getElementById("emailChannelRow");
+      var emailSubLabel = document.getElementById("emailSubLabel");
+      var channelsMsg = document.getElementById("channelsMsg");
+      var userIsPremium = false;
+
+      async function loadChannels() {
+        try {
+          var res = await fetch(apiBase + "/api/auth/me", { credentials: "include" });
+          if (res.status === 401) {
+            if (chLoadingEl) chLoadingEl.textContent = "Connecte-toi pour gérer tes canaux de notification.";
+            return;
+          }
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var data = await res.json();
+          var user = data.user || data;
+          userIsPremium = !!(user.isPremium);
+          if (toggleInApp) toggleInApp.checked = !!user.notificationsEnabled;
+          if (toggleEmail) toggleEmail.checked = !!user.emailNotificationsEnabled;
+          if (!userIsPremium) {
+            // Free user : email disabled + badge
+            if (toggleEmail) {
+              toggleEmail.disabled = true;
+              toggleEmail.checked = false;
+            }
+            if (emailChannelRow) emailChannelRow.classList.add("prefs-channel-disabled");
+            if (emailSubLabel) emailSubLabel.innerHTML = "Disponible uniquement avec Premium — <a href=\"/premium\">découvrir</a>";
+          }
+          if (chLoadingEl) chLoadingEl.classList.add("hidden");
+          if (chControlsEl) chControlsEl.classList.remove("hidden");
+        } catch (e) {
+          if (chLoadingEl) chLoadingEl.textContent = "Erreur de chargement.";
+        }
+      }
+
+      async function saveChannel(field, value) {
+        try {
+          var body = {};
+          body[field] = value;
+          var res = await fetch(apiBase + "/api/me/notification-channels", {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Erreur");
+          if (channelsMsg) {
+            channelsMsg.textContent = "✅ Préférence enregistrée";
+            channelsMsg.classList.remove("hidden", "prefs-msg--error");
+            setTimeout(function(){ if(channelsMsg) channelsMsg.classList.add("hidden"); }, 2500);
+          }
+        } catch (e) {
+          if (channelsMsg) {
+            channelsMsg.textContent = "❌ Erreur : " + (e.message || "réseau");
+            channelsMsg.classList.remove("hidden");
+            channelsMsg.classList.add("prefs-msg--error");
+          }
+        }
+      }
+
+      if (toggleInApp) toggleInApp.addEventListener("change", function(){
+        saveChannel("notificationsEnabled", toggleInApp.checked);
+      });
+      if (toggleEmail) toggleEmail.addEventListener("change", function(){
+        if (toggleEmail.disabled) return;
+        saveChannel("emailNotificationsEnabled", toggleEmail.checked);
+      });
+
+      loadChannels();
+      // ═══ FIN SECTION CANAUX ═══
+
       var loadingEl = document.getElementById("prefsLoading");
       var notPremEl = document.getElementById("prefsNotPremium");
       var formEl = document.getElementById("prefsForm");
@@ -139,3 +252,34 @@ import HeroHeader from "../../components/HeroHeader.astro";
     })();
   </script>
 </BaseLayout>
+
+<style>
+  .prefs-channels { margin-bottom: 32px; }
+  .prefs-channels-grid { display: flex; flex-direction: column; gap: 12px; }
+  .prefs-channel-row { 
+    display: flex; align-items: center; justify-content: space-between; 
+    padding: 16px 18px; background: rgba(255, 255, 255, 0.04); 
+    border: 1px solid rgba(255, 173, 97, 0.14); border-radius: 14px; 
+    cursor: pointer; transition: background 0.15s;
+  }
+  .prefs-channel-row:hover { background: rgba(255, 255, 255, 0.06); }
+  .prefs-channel-row.prefs-channel-disabled { opacity: 0.6; cursor: not-allowed; }
+  .prefs-channel-info { display: flex; align-items: center; gap: 14px; flex: 1; }
+  .prefs-channel-icon { font-size: 1.6rem; }
+  .prefs-channel-info strong { display: block; color: rgba(255, 244, 232, 0.96); font-size: 1.02rem; font-weight: 700; }
+  .prefs-channel-info small { display: block; color: rgba(255, 226, 205, 0.72); font-size: 0.9rem; margin-top: 2px; }
+  .prefs-channel-info small a { color: #ffad61; text-decoration: underline; }
+  .prefs-switch { position: relative; display: inline-block; width: 50px; height: 28px; flex-shrink: 0; }
+  .prefs-switch input { opacity: 0; width: 0; height: 0; }
+  .prefs-switch-slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.12); border-radius: 999px; transition: 0.2s;
+  }
+  .prefs-switch-slider::before {
+    position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px;
+    background: white; border-radius: 999px; transition: 0.2s;
+  }
+  .prefs-switch input:checked + .prefs-switch-slider { background: #ffad61; }
+  .prefs-switch input:checked + .prefs-switch-slider::before { transform: translateX(22px); }
+  .prefs-switch input:disabled + .prefs-switch-slider { cursor: not-allowed; opacity: 0.5; }
+</style>

@@ -49,8 +49,9 @@ services:
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
       - ANIME_API_KEY=${ANIME_API_KEY}
       - GAMES_API_KEY=${GAMES_API_KEY}
-      - TWITCH_CLIENT_ID=xee4i7Inxamhfir9thj3xdgnrg0b76
-      - TWITCH_CLIENT_SECRET=dync14rbsy85fu4k8rsg4e2hi6xr61
+      - ANIMESCHEDULE_TOKEN=${ANIMESCHEDULE_TOKEN}
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
       - WEBHOOK_URL=https://staging.gamenime.fr/n8n/
       - N8N_EDITOR_BASE_URL=https://staging.gamenime.fr/n8n/
       - N8N_PROXY_HOPS=1

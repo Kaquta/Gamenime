@@ -11,3 +11,22 @@ n8n/
 *.bak*
 *.backup
 *.save
+
+# SESSION 13+: ignorer tous les backups locaux
+*.bak
+*-bak
+*.bak-*
+.bak-*
+
+# Backups DB
+backups/
+
+# Test files temporaires
+*.test.ts.session*
+
+# Node
+node_modules/
+*.bak[0-9]
+*-bak*
+*.before-*
+*.session*-bak*

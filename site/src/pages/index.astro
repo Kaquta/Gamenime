@@ -20,15 +20,15 @@ import Footer from "../components/Footer.astro";
     </section>
   </div>
 
-  <SectionBlock title="Derniers animés" source="anime" limit={12} href="/anime" />
-  <SectionBlock title="Derniers jeux vidéo" source="games" limit={12} href="/games" />
-  <SectionBlock title="Top 12 Animés" source="top-anime" limit={12} />
-  <SectionBlock title="Top 12 Jeux Vidéo" source="top-games" limit={12} />
+  <SectionBlock title="Derniers animés" source="anime" limit={25} href="/anime" />
+  <SectionBlock title="Derniers jeux vidéo" source="games" limit={25} href="/games" />
+  <SectionBlock title="Top 25 Animés" source="top-anime" limit={25} />
+  <SectionBlock title="Top 25 Jeux Vidéo" source="top-games" limit={25} />
   <Footer />
 </BaseLayout>
 
 <script>
-import { getAnimeItems, getGameItems } from "../lib/api";
+import { getAnimeItems, getGameItems, displayTitle } from "../lib/api";
 import type { ContentItem } from "../lib/api";
 
 function formatDate(v) {
@@ -80,7 +80,7 @@ function getHypeLabel(item) {
 
 function renderSearchCard(item, domain) {
   var status = getStatusLabel(item);
-  var media = item.cover ? "<img src=\"" + item.cover + "\" alt=\"" + item.title + "\" loading=\"lazy\" />" : "<div class=\"item-placeholder\">Aucune image</div>";
+  var media = item.cover ? "<img src=\"" + item.cover + "\" alt=\"" + displayTitle(item) + "\" loading=\"lazy\" />" : "<div class=\"item-placeholder\">Aucune image</div>";
   var info = (typeof simplifyPlatform === "function" ? simplifyPlatform(item.platform) : item.platform) || item.genre || "Information à venir";
   var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
   var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
@@ -99,7 +99,7 @@ function renderSearchCard(item, domain) {
     "<div class=\"item-overlay\"></div>" +
     "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
     "<div class=\"item-body\">" +
-    "<h3>" + item.title + "</h3>" +
+    "<h3>" + displayTitle(item) + "</h3>" +
     "<p>" + formatDate(item.releaseDate) + "</p>" +
     "<p>" + info + "</p>" +
     "<div class=\"item-badges-row\">" +

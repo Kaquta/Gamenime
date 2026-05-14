@@ -37,7 +37,9 @@ import {
   normalizeTitle,
   computeFieldCount,
   sanitizePlatform,
-} from "./core.js";
+  mergePlatforms,
+  hasYearSuffix,
+  formatReleaseDateLabel, stripDisplayTags} from "./core.js";
 
 // ============================================================
 // Helpers
@@ -113,6 +115,10 @@ function filterByStatus(
   if (status === "released") {
     return items.filter((i) => {
       if (!i.releaseDate) return false;
+      // ETAT CLEAN: items with year-only precision are NEVER in released.
+      // Even if their stored date (YYYY-01-01) is past, we don't really
+      // know when they came out. Keep them in upcoming until precise.
+      if (i.releasePrecision === "year") return false;
       const inWindow = i.releaseDate <= todayISO && i.releaseDate >= windowStart;
       if (!inWindow && i.releaseDate < windowStart) {
         // Older game/anime with a DLC released in the current window
@@ -125,9 +131,17 @@ function filterByStatus(
   if (status === "upcoming") {
     return items.filter((i) => {
       if (!i.releaseDate) return false;
+      // ETAT CLEAN: items with year-only precision belong here regardless
+      // of stored date — we just know it's "Prévu YYYY" within the window.
+      if (i.releasePrecision === "year") {
+        return i.releaseDate >= windowStart && i.releaseDate <= windowEnd;
+      }
       const inWindow = i.releaseDate > todayISO && i.releaseDate <= windowEnd;
-      if (!inWindow && i.releaseDate <= todayISO) {
-        // Older game with an upcoming DLC in the current window
+      // ETAT CLEAN: DLC fallback applies ONLY to games OUTSIDE current window
+      // (i.e. older games released BEFORE windowStart that have a DLC coming).
+      // A game already in the current window stays in 'released' only — its
+      // future Season Pass / DLC doesn't make the game itself 'upcoming'.
+      if (!inWindow && i.releaseDate < windowStart) {
         return hasDlcInWindow(i.dlcs, todayISO, windowEnd);
       }
       return inWindow;
@@ -172,28 +186,36 @@ export function clearFeedCache(): void {
 // ============================================================
 
 const SELECT_ANIME = `
-  SELECT CAST(id AS UNSIGNED) AS id, title, cover, genre, platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
+         CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          screenshots,
          DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+         release_precision AS releasePrecision,
          trailer_url AS trailerUrl,
          'anime' AS type
   FROM anime_items
   WHERE release_date BETWEEN ? AND ?
+    AND cover IS NOT NULL AND cover != ''
+    AND title IS NOT NULL AND title != ''
   ORDER BY popularity DESC, release_date DESC
   LIMIT ?
 `;
 
 const SELECT_GAMES = `
-  SELECT CAST(id AS UNSIGNED) AS id, title, cover, genre, platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
+         CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          screenshots,
          DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+         release_precision AS releasePrecision,
          trailer_url AS trailerUrl,
          dlcs,
          'game' AS type
   FROM game_items
   WHERE release_date BETWEEN ? AND ?
+    AND cover IS NOT NULL AND cover != ''
+    AND title IS NOT NULL AND title != ''
   ORDER BY popularity DESC, release_date DESC
   LIMIT ?
 `;
@@ -257,6 +279,13 @@ function buildDuplicateGroups(
   // Build key→items index for both keys
   const titleIdx = new Map<string, GameNimeItem[]>();
   const coverIdx = new Map<string, GameNimeItem[]>();
+  // SESSION 11 ETAT CLEAN ABSOLU : 5e critere anti-doublon (titleEnglish + date)
+  const englishIdx = new Map<string, GameNimeItem[]>();
+  // SESSION 12.7 ETAT CLEAN ABSOLU : 6e + 7e criteres anti-doublon (IDs externes)
+  // Detecte les doublons cross-source ou eleceec d'un meme anime stocke avec
+  // titres differents (romaji vs english vs translit) mais meme anilist_id ou mal_id.
+  const anilistIdx = new Map<string, GameNimeItem[]>();
+  const malIdx = new Map<string, GameNimeItem[]>();
 
   for (const item of items) {
     const titleKey = `${item.type}:T:${normalizeTitle(item.title)}:${item.releaseDate || "no-date"}`;
@@ -265,6 +294,34 @@ function buildDuplicateGroups(
     if (item.cover && item.releaseDate && !isGenericCover(item.cover)) {
       const coverKey = `${item.type}:C:${item.cover}:${item.releaseDate}`;
       (coverIdx.get(coverKey) || coverIdx.set(coverKey, []).get(coverKey)!).push(item);
+    }
+
+    // SESSION 11 critere 5 : titleEnglish normalise + date.
+    // Detecte les variantes de title (romaji) qui partagent le meme title_english.
+    // Ex: "Boku no Hero Academia No. 170+1: More" et "Boku no Hero Academia: More"
+    //     ont tous deux titleEnglish convergent vers "myheroacademiamore" -> match auto.
+    // Skip si titleEnglish manquant : evite faux positifs sur items obscurs.
+    if (item.titleEnglish && item.releaseDate) {
+      const normEng = normalizeTitle(item.titleEnglish);
+      if (normEng) {
+        const englishKey = `${item.type}:E:${normEng}:${item.releaseDate}`;
+        (englishIdx.get(englishKey) || englishIdx.set(englishKey, []).get(englishKey)!).push(item);
+      }
+    }
+
+    // SESSION 12.7 critere 6 : anilist_id (cle d'identification stable AniList)
+    // Plus fiable que tout titre car indep de la traduction.
+    const aid = (item as any).anilistId;
+    if (aid && aid > 0) {
+      const aidKey = `${item.type}:A:${aid}`;
+      (anilistIdx.get(aidKey) || anilistIdx.set(aidKey, []).get(aidKey)!).push(item);
+    }
+
+    // SESSION 12.7 critere 7 : mal_id (cle d'identification stable MyAnimeList/Jikan)
+    const mid = (item as any).malId;
+    if (mid && mid > 0) {
+      const midKey = `${item.type}:M:${mid}`;
+      (malIdx.get(midKey) || malIdx.set(midKey, []).get(midKey)!).push(item);
     }
   }
 
@@ -284,10 +341,42 @@ function buildDuplicateGroups(
 
   for (const item of items) parent.set(item.id, item.id);
 
-  // For every shared key (title or cover), union items together
-  for (const list of [...titleIdx.values(), ...coverIdx.values()]) {
+  // For every shared key (title, cover, or titleEnglish), union items together
+  for (const list of [...titleIdx.values(), ...coverIdx.values(), ...englishIdx.values(), ...anilistIdx.values(), ...malIdx.values()]) {
     if (list.length < 2) continue;
     for (let i = 1; i < list.length; i++) union(list[0].id, list[i].id);
+  }
+
+  // Additional pass: detect "(YYYY)" asymmetry duplicates.
+  // RAWG adds "(YYYY)" placeholders to legacy entries; the real entry
+  // has no year suffix. We union them ONLY if:
+  //   - same type
+  //   - same normalized title (without the year suffix)
+  //   - one has the year suffix, the other doesn't (true asymmetry)
+  //   - release dates within 2 years (guards against remakes/reboots)
+  const asymKey = new Map<string, GameNimeItem[]>();
+  for (const item of items) {
+    const key = `${item.type}:N:${normalizeTitle(item.title)}`;
+    const list = asymKey.get(key) || [];
+    list.push(item);
+    asymKey.set(key, list);
+  }
+  for (const list of asymKey.values()) {
+    if (list.length < 2) continue;
+    const withYear = list.filter((i) => hasYearSuffix(i.title));
+    const withoutYear = list.filter((i) => !hasYearSuffix(i.title));
+    if (withYear.length === 0 || withoutYear.length === 0) continue;
+
+    // Asymmetry exists. Now check pairwise dates within 2 years.
+    for (const a of withoutYear) {
+      for (const b of withYear) {
+        const dateA = a.releaseDate ? new Date(a.releaseDate + "T00:00:00Z") : null;
+        const dateB = b.releaseDate ? new Date(b.releaseDate + "T00:00:00Z") : null;
+        if (!dateA || !dateB) continue;
+        const yearsApart = Math.abs(dateA.getTime() - dateB.getTime()) / (365.25 * 86400000);
+        if (yearsApart <= 2) union(a.id, b.id);
+      }
+    }
   }
 
   // Group by root id
@@ -317,6 +406,16 @@ export async function registerGameNimeRoutes(
   // ─────────────────────────────────────────────────
   // GET /feed/home — mixed top items (homepage)
   // ─────────────────────────────────────────────────
+
+// SESSION 12.7+: applique le strip des tags métadonnées aux descriptions servies au frontend.
+// Les tags restent intacts en DB.
+function applyDisplayStripToItems<T extends { description?: string | null }>(items: T[]): T[] {
+  return items.map(i => ({
+    ...i,
+    description: stripDisplayTags(i.description),
+  }));
+}
+
   app.get("/feed/home", async (req: FastifyRequest, reply: FastifyReply) => {
     const cacheKey = "feed:home";
     const cached = getCached(cacheKey);
@@ -333,11 +432,14 @@ export async function registerGameNimeRoutes(
       pool.query(SELECT_GAMES, [wide.start, wide.end, MAX_DB_FETCH]),
     ]);
 
-    const anime = sortForGameNimeTop(animeRaw, CAPACITY_ANIME, now);
-    const games = sortForGameNimeTop(gamesRaw, CAPACITY_GAMES, now);
+    const animeRawSorted = sortForGameNimeTop(animeRaw, CAPACITY_ANIME, now);
+    const gamesRawSorted = sortForGameNimeTop(gamesRaw, CAPACITY_GAMES, now);
 
     // Mixed top: combine and re-sort
-    const mixed = sortForGameNimeTop([...anime, ...games], CAPACITY_HOME, now);
+    const mixedRaw = sortForGameNimeTop([...animeRawSorted, ...gamesRawSorted], CAPACITY_HOME, now);
+    const anime = applyDisplayStripToItems(animeRawSorted);
+    const games = applyDisplayStripToItems(gamesRawSorted);
+    const mixed = applyDisplayStripToItems(mixedRaw);
 
     const payload = {
       window: getReleaseWindow(now),
@@ -362,7 +464,8 @@ export async function registerGameNimeRoutes(
   // ─────────────────────────────────────────────────
   app.get("/feed/anime", async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = feedQuerySchema.safeParse(req.query);
-    const limit = parsed.success ? parsed.data.limit ?? CAPACITY_ANIME : CAPACITY_ANIME;
+    const requested = parsed.success ? parsed.data.limit ?? CAPACITY_ANIME : CAPACITY_ANIME;
+    const limit = Math.min(requested, CAPACITY_ANIME);
     const status: ReleaseStatus = parsed.success ? parsed.data.status : "all";
     const orderBy: "score" | "date" = parsed.success ? parsed.data.orderBy : "score";
 
@@ -370,9 +473,10 @@ export async function registerGameNimeRoutes(
     const wide = buildWideDateFilter(now);
     const allRows: GameNimeItem[] = await pool.query(SELECT_ANIME, [wide.start, wide.end, MAX_DB_FETCH]);
     const filtered = filterByStatus(allRows, status, now);
-    const items = orderBy === "date"
+    const itemsRaw = orderBy === "date"
       ? sortByDate(filtered, limit, now, status === "upcoming")
       : sortForGameNimeTop(filtered, limit, now);
+    const items = applyDisplayStripToItems(itemsRaw);
 
     req.log.info({ fetched: allRows.length, filtered: filtered.length, returned: items.length, status, orderBy }, "feed.anime computed");
 
@@ -390,7 +494,8 @@ export async function registerGameNimeRoutes(
   // ─────────────────────────────────────────────────
   app.get("/feed/games", async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = feedQuerySchema.safeParse(req.query);
-    const limit = parsed.success ? parsed.data.limit ?? CAPACITY_GAMES : CAPACITY_GAMES;
+    const requested = parsed.success ? parsed.data.limit ?? CAPACITY_GAMES : CAPACITY_GAMES;
+    const limit = Math.min(requested, CAPACITY_GAMES);
     const status: ReleaseStatus = parsed.success ? parsed.data.status : "all";
     const orderBy: "score" | "date" = parsed.success ? parsed.data.orderBy : "score";
 
@@ -398,9 +503,10 @@ export async function registerGameNimeRoutes(
     const wide = buildWideDateFilter(now);
     const allRows: GameNimeItem[] = await pool.query(SELECT_GAMES, [wide.start, wide.end, MAX_DB_FETCH]);
     const filtered = filterByStatus(allRows, status, now);
-    const items = orderBy === "date"
+    const itemsRaw = orderBy === "date"
       ? sortByDate(filtered, limit, now, status === "upcoming")
       : sortForGameNimeTop(filtered, limit, now);
+    const items = applyDisplayStripToItems(itemsRaw);
 
     req.log.info({ fetched: allRows.length, filtered: filtered.length, returned: items.length, status, orderBy }, "feed.games computed");
 
@@ -431,7 +537,7 @@ export async function registerGameNimeRoutes(
 
     if (type === "anime" || type === "all") {
       anime = await pool.query(
-        `SELECT id, title, cover, genre, platform, description, rating, popularity, screenshots,
+        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
                 trailer_url AS trailerUrl,
                 'anime' AS type
@@ -444,7 +550,7 @@ export async function registerGameNimeRoutes(
 
     if (type === "game" || type === "all") {
       games = await pool.query(
-        `SELECT id, title, cover, genre, platform, description, rating, popularity, screenshots,
+        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
                 trailer_url AS trailerUrl,
                 'game' AS type
@@ -456,7 +562,8 @@ export async function registerGameNimeRoutes(
     }
 
     // Score and sort search results too
-    const items = sortForGameNimeTop([...anime, ...games], SEARCH_LIMIT_PER_TYPE * 2, now);
+    const itemsRaw = sortForGameNimeTop([...anime, ...games], SEARCH_LIMIT_PER_TYPE * 2, now);
+    const items = applyDisplayStripToItems(itemsRaw);
 
     req.log.info({ query: q, type, found: items.length }, "feed.search executed");
 
@@ -593,11 +700,14 @@ export async function registerGameNimeRoutes(
 
     // Fetch all items (wide range, no limit since we need to compare everything)
     const SELECT_ALL = (table: string, kind: "anime" | "game") => `
-      SELECT CAST(id AS UNSIGNED) AS id, title, cover, genre, platform,
+      SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform,
              description, rating,
+         CAST(rating_score AS SIGNED) AS ratingScore,
              CAST(popularity AS SIGNED) AS popularity,
              trailer_url AS trailerUrl, screenshots,
              DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+             CAST(anilist_id AS SIGNED) AS anilistId,
+             CAST(mal_id AS SIGNED) AS malId,
              '${kind}' AS type
       FROM ${table}
     `;
@@ -619,15 +729,19 @@ export async function registerGameNimeRoutes(
     for (const [key, items] of groups.entries()) {
       if (items.length < 2) continue;
 
-      // Sort by completeness desc, popularity desc, id asc
+      // Sort: no-year-suffix first (RAWG legacy entries have year suffix),
+      // then completeness, popularity, oldest id (stable winner)
       items.sort((a, b) => {
+        const ya = hasYearSuffix(a.title) ? 1 : 0;
+        const yb = hasYearSuffix(b.title) ? 1 : 0;
+        if (ya !== yb) return ya - yb;  // no-year-suffix wins
         const ca = computeFieldCount(a);
         const cb = computeFieldCount(b);
         if (ca !== cb) return cb - ca;
         const pa = Number(a.popularity || 0);
         const pb = Number(b.popularity || 0);
         if (pa !== pb) return pb - pa;
-        return a.id - b.id;
+        return Number(a.id) - Number(b.id);
       });
 
       duplicates.push({
@@ -693,11 +807,14 @@ export async function registerGameNimeRoutes(
     const dryRun = parsed.data.dryRun !== "false";
 
     const SELECT_ALL = (table: string, kind: "anime" | "game") => `
-      SELECT CAST(id AS UNSIGNED) AS id, title, cover, genre, platform,
+      SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform,
              description, rating,
+         CAST(rating_score AS SIGNED) AS ratingScore,
              CAST(popularity AS SIGNED) AS popularity,
              trailer_url AS trailerUrl, screenshots,
              DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+             CAST(anilist_id AS SIGNED) AS anilistId,
+             CAST(mal_id AS SIGNED) AS malId,
              '${kind}' AS type
       FROM ${table}
     `;
@@ -735,15 +852,19 @@ export async function registerGameNimeRoutes(
     for (const [key, items] of groups.entries()) {
       if (items.length < 2) continue;
 
-      // Sort: most complete first, then popular, then oldest id (stable winner)
+      // Sort: no-year-suffix first (RAWG legacy entries have year suffix),
+      // then completeness, popularity, oldest id (stable winner)
       items.sort((a, b) => {
+        const ya = hasYearSuffix(a.title) ? 1 : 0;
+        const yb = hasYearSuffix(b.title) ? 1 : 0;
+        if (ya !== yb) return ya - yb;
         const ca = computeFieldCount(a);
         const cb = computeFieldCount(b);
         if (ca !== cb) return cb - ca;
         const pa = Number(a.popularity || 0);
         const pb = Number(b.popularity || 0);
         if (pa !== pb) return pb - pa;
-        return a.id - b.id;
+        return Number(a.id) - Number(b.id);
       });
 
       const winner = items[0];
@@ -751,8 +872,21 @@ export async function registerGameNimeRoutes(
       const table = winner.type === "anime" ? "anime_items" : "game_items";
 
       // Build merge updates
+      // - For "platform": MERGE the lists (never lose a valid platform)
+      // - For other fields: take the first non-empty loser value if winner is empty
       const updates: any = {};
       for (const field of Object.keys(FIELD_TO_COL)) {
+        if (field === "platform") {
+          // Always merge platforms across winner + all losers (lossless)
+          let combined = (winner as any).platform;
+          for (const loser of losers) {
+            combined = mergePlatforms(combined, (loser as any).platform);
+          }
+          if (combined !== (winner as any).platform) {
+            updates.platform = combined;
+          }
+          continue;
+        }
         if (isMissing((winner as any)[field])) {
           for (const loser of losers) {
             if (!isMissing((loser as any)[field])) {
@@ -803,22 +937,24 @@ export async function registerGameNimeRoutes(
               // for the same user, the UPDATE on a unique key would fail.
               // Strategy: DELETE conflicting + UPDATE the rest.
               try {
-                // First, delete relations on the loser that would conflict on the winner
-                // (e.g. user already favorited winner). We use a self-aware DELETE.
+                // ETAT CLEAN: prevent UNIQUE constraint violation during merge.
+                // For tables with (user_id, item_type, item_id) unique key
+                // (favorites, votes, alert_log, reminder_log), delete loser rows
+                // whose user_id already has an equivalent row on the winner.
+                // Uses multi-table DELETE (MariaDB-supported).
                 await conn.query(
-                  `DELETE FROM ${relTable}
-                   WHERE item_type = ? AND item_id = ?
-                     AND EXISTS (
-                       SELECT 1 FROM (
-                         SELECT 1 FROM ${relTable} r2
-                         WHERE r2.item_type = ? AND r2.item_id = ?
-                           AND ${relTable}.user_id = r2.user_id
-                       ) AS dup
-                     )`,
-                  [winner.type, loser.id, winner.type, winner.id]
+                  `DELETE l FROM ${relTable} l
+                   INNER JOIN ${relTable} w
+                     ON w.user_id = l.user_id
+                    AND w.item_type = l.item_type
+                    AND w.item_id = ?
+                   WHERE l.item_type = ?
+                     AND l.item_id = ?`,
+                  [winner.id, winner.type, loser.id]
                 );
               } catch (e) {
-                // Some tables may not have user_id (e.g. notification_events) — skip dedup
+                // Tables without user_id (e.g. notification_events) — skip dedup,
+                // they don't have unique constraints that could fail.
               }
 
               // Then migrate the rest

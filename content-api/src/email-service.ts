@@ -26,6 +26,20 @@ import {
 } from "./email-templates.js";
 
 // ============================================================
+// Title cleanup for display (emails, notifications)
+// ============================================================
+// Retire les artefacts de la DB destinés à des usages internes :
+// - Suffixe " (YYYY)" en fin de titre (RAWG pour différencier homonymes)
+// - Tags métadonnées [FORMAT:X] [STATUS:X] etc. au cas où ils traîneraient
+function cleanTitleForDisplay(title: string | null | undefined): string {
+  if (!title) return "";
+  return String(title)
+    .replace(/\s*\[(FORMAT|STATUS|SEASON|EPISODES|LENGTH|NEXT_EP):[^\]]*\]/g, "")
+    .replace(/\s*\((19|20)\d{2}\)\s*$/, "")
+    .trim();
+}
+
+// ============================================================
 // Configuration constants
 // ============================================================
 
@@ -277,6 +291,7 @@ export interface SendReminderEmailParams {
   itemId: number;
   daysLeft: number;
   releaseDate: string | null;
+  platform?: string | null;
 }
 
 /**
@@ -285,17 +300,19 @@ export interface SendReminderEmailParams {
  */
 export async function sendReminderEmail(params: SendReminderEmailParams): Promise<EmailResult> {
   if (!params.email || !params.itemTitle) return { ok: false, reason: "missing_data" };
-
+  const cleanedTitle = cleanTitleForDisplay(params.itemTitle);
   try {
-    const itemUrl = `${SITE_URL}/${params.itemType}#item-${params.itemId}`;
+    const isUpcoming = params.releaseDate && new Date(params.releaseDate) > new Date();
+    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemId}`;
     const tpl = reminderEmailTemplate({
       displayName: params.displayName || "",
-      itemTitle: params.itemTitle,
+      itemTitle: cleanedTitle,
       itemCover: params.itemCover,
       itemType: params.itemType,
       daysLeft: params.daysLeft,
       releaseDate: params.releaseDate,
       itemUrl,
+      platform: params.platform || null,
     });
 
     const sent = await sendEmail({ to: params.email, subject: tpl.subject, html: tpl.html });
@@ -319,6 +336,8 @@ export interface SendAlertEmailParams {
   itemType: "anime" | "game";
   itemId: number;
   matchValue: string;
+  releaseDate?: string | null;
+  platform?: string | null;
 }
 
 /**
@@ -327,16 +346,19 @@ export interface SendAlertEmailParams {
  */
 export async function sendAlertEmail(params: SendAlertEmailParams): Promise<EmailResult> {
   if (!params.email || !params.itemTitle) return { ok: false, reason: "missing_data" };
+  const cleanedTitle = cleanTitleForDisplay(params.itemTitle);
 
   try {
-    const itemUrl = `${SITE_URL}/${params.itemType}#item-${params.itemId}`;
+    const isUpcoming = params.releaseDate && new Date(params.releaseDate) > new Date();
+    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemId}`;
     const tpl = alertEmailTemplate({
       displayName: params.displayName || "",
-      itemTitle: params.itemTitle,
+      itemTitle: cleanedTitle,
       itemCover: params.itemCover,
       itemType: params.itemType,
       matchValue: params.matchValue,
       itemUrl,
+      platform: params.platform || null,
     });
 
     const sent = await sendEmail({ to: params.email, subject: tpl.subject, html: tpl.html });

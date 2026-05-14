@@ -225,6 +225,43 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       if(res.ok){cur.value="";nw.value="";if(msg){msg.textContent="✅ Mot de passe changé";msg.classList.remove("hidden","account-msg--error");}}
       else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
     });
+    // SESSION 13: brancher les 2 toggles in-app/email du drawer Compte sur l'API
+    // Source de vérité = /me/notification-channels (même que page /account/preferences)
+    document.getElementById("toggleNotif")?.addEventListener("change", async function(){
+      var t = this;
+      try {
+        var res = await fetch(authEndpoint("/me/notification-channels"), {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ notificationsEnabled: t.checked })
+        });
+        if (res.ok) {
+          var d = await res.json();
+          if (currentUser) { currentUser.notificationsEnabled = d.notificationsEnabled; }
+          t.checked = d.notificationsEnabled;
+        } else {
+          t.checked = !t.checked; // rollback visuel si erreur
+        }
+      } catch(e) { t.checked = !t.checked; }
+    });
+    document.getElementById("toggleEmail")?.addEventListener("change", async function(){
+      var t = this;
+      try {
+        var res = await fetch(authEndpoint("/me/notification-channels"), {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ emailNotificationsEnabled: t.checked })
+        });
+        if (res.ok) {
+          var d = await res.json();
+          if (currentUser) { currentUser.emailNotificationsEnabled = d.emailNotificationsEnabled; }
+          // Backend peut forcer à false si user pas Premium — refléter dans l'UI
+          t.checked = d.emailNotificationsEnabled;
+        } else {
+          t.checked = !t.checked;
+        }
+      } catch(e) { t.checked = !t.checked; }
+    });
 
     document.getElementById("accountLogout")?.addEventListener("click",function(){closeAccountDrawer();authLogout();});
     document.getElementById("openResetFromAccount")?.addEventListener("click",function(){closeAccountDrawer();openResetDrawerFn();});

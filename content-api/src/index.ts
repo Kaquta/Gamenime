@@ -8,7 +8,11 @@ import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
 import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
 import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
-import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform } from "./gamenime/core.js";
+import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
+
+import { startRefetchCron, adminRefetchHandler } from "./gamenime/refetch-cron.js";
+import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
+import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -45,6 +49,10 @@ const pool = mariadb.createPool({
   database: process.env.DB_NAME!,
   connectionLimit: 8,
 });
+
+// Phase B : exposer pool à Fastify pour le cron refetch
+(app as any).pool = pool;
+
 
 const COOKIE_NAME = process.env.APP_COOKIE_NAME || "gn_session";
 const COOKIE_SECURE = String(process.env.APP_COOKIE_SECURE || "false") === "true";
@@ -185,15 +193,25 @@ async function logPremiumAction(userId: number, action: string, data: any = {}) 
 // ── Zod schemas ────────────────────────────────────
 const Item = z.object({
   title: z.string().min(1),
+  titleEnglish: z.string().max(500).nullable().optional().default(null),
   cover: z.string().nullable().optional().default(null),
   genre: z.string().nullable().optional().default(null),
   platform: z.string().nullable().optional().default(null),
   releaseDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional().default(null),
   releaseDatetime: z.string().nullable().optional().default(null),
+  titleNative: z.string().nullable().optional().default(null),  // SESSION 12.5 : utilisé pour isLikelyJapaneseAnime, NON stocké en DB
+  anilistId: z.number().int().nullable().optional().default(null),  // PHASE A : ID externe AniList
+  malId: z.number().int().nullable().optional().default(null),  // PHASE A : ID externe MyAnimeList/Jikan
+  animeScheduleRoute: z.string().nullable().optional().default(null),  // PHASE A : route AnimeSchedule
+  releasePrecision: z.enum(["day", "month", "year"]).optional().default("day"),
   isRecentlyReleased: z.boolean().optional().default(false),
   trailerUrl: z.string().url().nullable().optional().default(null),
   description: z.string().nullable().optional().default(null),
   rating: z.string().nullable().optional().default(null),
+  // Session 10: note qualitative 0-100, normalisée par les workflows.
+  // Distincte de `popularity` (signal social, nb fans/votes) et `rating` (PEGI/ESRB texte).
+  // NULL = inconnu → core.ts dégrade en popularity-only.
+  ratingScore: z.number().int().min(0).max(100).nullable().optional().default(null),
   popularity: z.number().int().optional().default(0),
   screenshots: z.string().nullable().optional().default(null),
   dlcs: z.string().nullable().optional().default(null),
@@ -704,6 +722,7 @@ app.post("/premium/generate-reminders", async (req, reply) => {
                   itemId: row.item_id,
                   daysLeft: offset,
                   releaseDate: row.release_date ? String(row.release_date).slice(0, 10) : null,
+                  platform: row.platform || null,
                 });
                 if (emailResult.ok) {
                   await pool.query(
@@ -888,6 +907,8 @@ app.post("/premium/generate-alerts", async (req, reply) => {
                   itemType,
                   itemId: item.id,
                   matchValue,
+                  platform: item.platform || null,
+                  releaseDate: item.releaseDate || null,
                 });
                 if (emailResult.ok) {
                   await pool.query(
@@ -1219,6 +1240,69 @@ app.post("/notifications/read-all", async (req, reply) => {
   }
 });
 
+
+// ────────────────────────────────────────────────────
+// PATCH /me/notification-channels — toggle in-app / email
+// SESSION 12.7+: Free = in-app uniquement. Email = Premium only.
+// Le serveur applique cette règle indépendamment du frontend.
+// ────────────────────────────────────────────────────
+app.patch("/me/notification-channels", async (req, reply) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return reply.code(401).send({ error: "Non authentifié" });
+
+    const schema = z.object({
+      notificationsEnabled: z.boolean().optional(),
+      emailNotificationsEnabled: z.boolean().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+    }
+
+    const { notificationsEnabled, emailNotificationsEnabled } = parsed.data;
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (typeof notificationsEnabled === "boolean") {
+      updates.push("notifications_enabled = ?");
+      params.push(notificationsEnabled ? 1 : 0);
+    }
+
+    if (typeof emailNotificationsEnabled === "boolean") {
+      // Règle métier : email = Premium only. Si user pas Premium, on force false.
+      const isPremiumActive = Number(user.isPremium) === 1 &&
+        (user.premiumExpiresAt === null || new Date(user.premiumExpiresAt).getTime() > Date.now());
+      const finalValue = isPremiumActive ? emailNotificationsEnabled : false;
+      updates.push("email_notifications_enabled = ?");
+      params.push(finalValue ? 1 : 0);
+    }
+
+    if (updates.length === 0) {
+      return reply.code(400).send({ error: "no_changes" });
+    }
+
+    params.push(user.id);
+    await pool.query(
+      "UPDATE users SET " + updates.join(", ") + " WHERE id = ?",
+      params
+    );
+
+    const updated: any = await pool.query(
+      "SELECT notifications_enabled AS notificationsEnabled, email_notifications_enabled AS emailNotificationsEnabled FROM users WHERE id = ?",
+      [user.id]
+    );
+    return reply.send({
+      ok: true,
+      notificationsEnabled: Number(updated[0].notificationsEnabled) === 1,
+      emailNotificationsEnabled: Number(updated[0].emailNotificationsEnabled) === 1,
+    });
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
 // ── Notification helpers ───────────────────────────
 function isBlankNotificationValue(v: any): boolean {
   return v === null || v === undefined || String(v).trim() === "" || String(v).trim() === "Unknown";
@@ -1412,6 +1496,36 @@ async function createNotificationsForItemChange(
 }
 
 
+// ── Phase B refetch endpoint ──
+app.post("/admin/refetch-incomplete", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  return adminRefetchHandler(app, req, reply);
+});
+
+
+// Phase C : Lookup AniList IDs par titre (pour items legacy sans IDs externes)
+app.post("/admin/lookup-anilist-ids", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  return adminLookupHandler(app, req, reply);
+});
+
+
+// Quality check J-7 : auto-enrichit les items sortant dans 7 jours, retourne ceux qui restent incomplets
+app.post("/admin/quality-check-j7", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  return adminQualityCheckHandler(app, req, reply);
+});
+
+
 // ── Content domains ────────────────────────────────
 function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "ANIME_API_KEY" | "GAMES_API_KEY") {
   const itemType = prefix === "/anime" ? "anime" : "game";
@@ -1458,7 +1572,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
 
     const rows: any = await pool.query(
-      `SELECT id, title, cover, genre, platform, description, rating, popularity, screenshots,
+      `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
               DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
               is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl
@@ -1473,7 +1587,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const { id } = req.params as { id: string };
 
     const rows: any = await pool.query(
-      `SELECT id, title, cover, genre, platform, description, rating, popularity, screenshots,
+      `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
               DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
               is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl
@@ -1574,17 +1688,39 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         //   3. cover URL + release_date (catches different language titles: Smoking Behind / Yani Suu Futari)
         // Generic covers (default.jpg, placeholder, etc.) are excluded from the cover match
         // because dozens of items share them when no real image is available.
+        // ═══ SESSION 12.5 : Filtre d admission EU/JP ═══
+        // Source unique de vérité pour le pays d origine.
+        // Les workflows poussent brut (avec titleNative), l API tranche.
+        // Si l item n est pas probable JP (hangul/pinyin tons), on skip.
+        const jpCheck = gnIsLikelyJapaneseAnime(b as any);
+        if (!jpCheck.likely) {
+          app.log.info({ title: b.title, reason: jpCheck.reason }, "item rejected: not japanese");
+          continue;
+        }
+
         const normalizedIncoming = gnNormalizeTitle(b.title);
+        const normalizedStrictIncoming = gnNormalizeTitleStrict(b.title);  // SESSION 12.5c
         const coverIsGeneric = !b.cover ||
           /\/(default|placeholder|noimage|no-image|missing)\.(jpg|png)/i.test(b.cover) ||
           /cover\/(medium|large)\/default/i.test(b.cover);
         const lookupCover = coverIsGeneric ? null : b.cover;
 
         const beforeRows: any = await conn.query(
-          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
+          `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
            FROM ${table}
            WHERE (
-             title = ?
+             /* SESSION 12.7 — Critère 7 : anilist_id (clé d'identification stable AniList) */
+             (? IS NOT NULL AND anilist_id = ?)
+             /* SESSION 12.7 — Critère 8 : mal_id (clé d'identification stable MAL/Jikan) */
+             OR (? IS NOT NULL AND mal_id = ?)
+             /* Critère 1 : titre exact */
+             OR title = ?
+             OR (
+               release_date = ?
+               AND title_normalized_strict IS NOT NULL
+               AND title_normalized_strict != ''
+               AND title_normalized_strict = ?
+             )
              OR (
                release_date = ?
                AND LOWER(REGEXP_REPLACE(title, '[^[:alnum:]]', '')) = ?
@@ -1597,20 +1733,50 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
            )
            LIMIT 1`,
           [
+            /* Critère 7 : anilist_id (NULL-check + match) */
+            b.anilistId, b.anilistId,
+            /* Critère 8 : mal_id (NULL-check + match) */
+            b.malId, b.malId,
+            /* Critère 1 : titre exact */
             b.title,
+            /* Critère 2 : normalize_strict + date */
+            b.releaseDate || null, normalizedStrictIncoming,
+            /* Critère 3 : regex + date */
             b.releaseDate || null, normalizedIncoming,
+            /* Critère 4 : cover + date (non-générique) */
             lookupCover, b.releaseDate || null, lookupCover,
           ]
         );
         const before = beforeRows.length ? beforeRows[0] : null;
 
+        // ETAT CLEAN: when updating an existing item, GameNime API merges
+        // platform lists (never loses a valid platform). For new inserts,
+        // the platform is just the sanitized incoming value.
+        if (before) {
+          (b as any).platform = gnMergePlatforms(before.platform, b.platform);
+        }
+
+        // ETAT CLEAN session 12:
+        // Sanitization du release_datetime (validation format + cohérence avec release_date).
+        // Évite les datetime polluants (résidus jpnTime des saisons précédentes
+        // poussés par AnimeSchedule pour des items qui sortent dans plusieurs mois).
+        // Si datetime invalide/incohérent → null, et la règle lossless conserve la
+        // valeur précédente (IF VALUES(release_datetime) IS NOT NULL ...).
+        (b as any).releaseDatetime = gnSanitizeReleaseDatetime(b.releaseDate, b.releaseDatetime);
+
+        // ETAT CLEAN session 10:
+        // INSERT colonnes/placeholders/values incluent rating_score (note qualitative 0-100).
+        // - INT, donc pas de comparaison `!= ''` (interdit sur INT en MariaDB)
+        // - Pas de comparaison `> 0` non plus : un score=0 reste valide même si peu probable
+        // - Règle lossless : `IF(? IS NOT NULL, ?, rating_score)` (pattern aligné sur release_date)
         const insertCols = itemType === "game"
-          ? "(title,cover,genre,platform,release_date,release_datetime,is_recently_released,trailer_url,description,rating,popularity,screenshots,dlcs)"
-          : "(title,cover,genre,platform,release_date,release_datetime,is_recently_released,trailer_url,description,rating,popularity,screenshots)";
-        const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?)";
+          ? "(title,title_english,title_normalized_strict,anilist_id,mal_id,anime_schedule_route,cover,genre,platform,release_date,release_datetime,release_precision,is_recently_released,trailer_url,description,rating,rating_score,popularity,screenshots,dlcs)"
+          : "(title,title_english,title_normalized_strict,anilist_id,mal_id,anime_schedule_route,cover,genre,platform,release_date,release_datetime,release_precision,is_recently_released,trailer_url,description,rating,rating_score,popularity,screenshots)";
+        const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         const insertVals: any[] = [
-          b.title, b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
-          b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.popularity, b.screenshots
+          b.title, b.titleEnglish, normalizedStrictIncoming, b.anilistId, b.malId, b.animeScheduleRoute, b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
+          b.releasePrecision || "day",
+          b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.ratingScore, b.popularity, b.screenshots
         ];
         if (itemType === "game") insertVals.push((b as any).dlcs ?? null);
 
@@ -1626,29 +1792,43 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
 
           await conn.query(
             `UPDATE ${table} SET
-               cover = IF(? IS NOT NULL AND ? != '', ?, cover),
+               title_english = IF(? IS NOT NULL AND ? != '', ?, title_english),
+             cover = IF(? IS NOT NULL AND ? != '', ?, cover),
                genre = IF(? IS NOT NULL AND ? != '', ?, genre),
                platform = IF(? IS NOT NULL AND ? != '' AND ? != 'Unknown', ?, platform),
+               title_normalized_strict = IF(? IS NOT NULL AND ? != '', ?, title_normalized_strict),
+               anilist_id = IF(? IS NOT NULL, ?, anilist_id),
+               mal_id = IF(? IS NOT NULL, ?, mal_id),
+               anime_schedule_route = IF(? IS NOT NULL AND ? != '', ?, anime_schedule_route),
                release_date = IF(? IS NOT NULL, ?, release_date),
                release_datetime = IF(? IS NOT NULL, ?, release_datetime),
+               release_precision = ?,
                is_recently_released = ?,
                trailer_url = IF(? IS NOT NULL AND ? != '', ?, trailer_url),
                description = IF(? IS NOT NULL AND ? != '', ?, description),
                rating = IF(? IS NOT NULL AND ? != '', ?, rating),
+               rating_score = IF(? IS NOT NULL, ?, rating_score),
                popularity = IF(? > 0, ?, popularity),
                screenshots = IF(? IS NOT NULL AND ? != '', ?, screenshots)${dlcsClause},
                updated_at = CURRENT_TIMESTAMP
              WHERE id = ?`,
             [
+              b.titleEnglish, b.titleEnglish, b.titleEnglish,
               b.cover, b.cover, b.cover,
               b.genre, b.genre, b.genre,
               b.platform, b.platform, b.platform, b.platform,
+              normalizedStrictIncoming, normalizedStrictIncoming, normalizedStrictIncoming,
+              b.anilistId, b.anilistId,
+              b.malId, b.malId,
+              b.animeScheduleRoute, b.animeScheduleRoute, b.animeScheduleRoute,
               b.releaseDate, b.releaseDate,
               b.releaseDatetime, b.releaseDatetime,
+              b.releasePrecision || "day",
               b.isRecentlyReleased ? 1 : 0,
               b.trailerUrl, b.trailerUrl, b.trailerUrl,
               b.description, b.description, b.description,
               b.rating, b.rating, b.rating,
+              b.ratingScore, b.ratingScore,
               b.popularity, b.popularity,
               b.screenshots, b.screenshots, b.screenshots,
               ...dlcsParams,
@@ -1663,15 +1843,22 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
                ${insertCols}
              VALUES ${insertPh}
              ON DUPLICATE KEY UPDATE
+               title_english=IF(VALUES(title_english) IS NOT NULL AND VALUES(title_english) != '', VALUES(title_english), title_english),
                cover=IF(VALUES(cover) IS NOT NULL AND VALUES(cover) != '', VALUES(cover), cover),
                genre=IF(VALUES(genre) IS NOT NULL AND VALUES(genre) != '', VALUES(genre), genre),
                platform=IF(VALUES(platform) IS NOT NULL AND VALUES(platform) != '' AND VALUES(platform) != 'Unknown', VALUES(platform), platform),
+               title_normalized_strict=IF(VALUES(title_normalized_strict) IS NOT NULL AND VALUES(title_normalized_strict) != '', VALUES(title_normalized_strict), title_normalized_strict),
+               anilist_id=IF(VALUES(anilist_id) IS NOT NULL, VALUES(anilist_id), anilist_id),
+               mal_id=IF(VALUES(mal_id) IS NOT NULL, VALUES(mal_id), mal_id),
+               anime_schedule_route=IF(VALUES(anime_schedule_route) IS NOT NULL AND VALUES(anime_schedule_route) != '', VALUES(anime_schedule_route), anime_schedule_route),
                release_date=IF(VALUES(release_date) IS NOT NULL, VALUES(release_date), release_date),
                release_datetime=IF(VALUES(release_datetime) IS NOT NULL, VALUES(release_datetime), release_datetime),
+               release_precision=VALUES(release_precision),
                is_recently_released=VALUES(is_recently_released),
                trailer_url=IF(VALUES(trailer_url) IS NOT NULL AND VALUES(trailer_url) != '', VALUES(trailer_url), trailer_url),
                description=IF(VALUES(description) IS NOT NULL AND VALUES(description) != '', VALUES(description), description),
                rating=IF(VALUES(rating) IS NOT NULL AND VALUES(rating) != '', VALUES(rating), rating),
+               rating_score=IF(VALUES(rating_score) IS NOT NULL, VALUES(rating_score), rating_score),
                popularity=IF(VALUES(popularity) > 0, VALUES(popularity), popularity),
                screenshots=IF(VALUES(screenshots) IS NOT NULL AND VALUES(screenshots) != '', VALUES(screenshots), screenshots)${itemType === "game" ? ",\n               dlcs=IF(VALUES(dlcs) IS NOT NULL AND VALUES(dlcs) != '', VALUES(dlcs), dlcs)" : ""},
                updated_at=CURRENT_TIMESTAMP`,
@@ -1680,7 +1867,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         }
 
         const afterRows: any = await conn.query(
-          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating${itemType === "game" ? ", dlcs" : ""}
+          `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
            FROM ${table} WHERE title = ? LIMIT 1`,
           [b.title]
         );
@@ -1747,3 +1934,12 @@ await registerGameNimeRoutes(app, pool, {
 });
 
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
+
+startRefetchCron(app);
+
+// Phase C : démarre le cron interne lookup AniList par titre (toutes les heures)
+startLookupCron(app);
+
+// Quality check J-7 : démarre cron quotidien 8h UTC
+startQualityCron(app);
+

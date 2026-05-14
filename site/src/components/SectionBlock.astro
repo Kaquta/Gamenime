@@ -27,7 +27,7 @@ const { title, source, limit, href } = Astro.props;
 </div>
 
 <script>
-import { getAnimeItems, getGameItems, getFeedAnime, getFeedGames, getItemDetail, postVote } from "../lib/api";
+import { getAnimeItems, getGameItems, getFeedAnime, getFeedGames, getItemDetail, postVote, displayTitle } from "../lib/api";
 import type { ContentItem } from "../lib/api";
 
 function formatDate(v) {
@@ -35,6 +35,13 @@ function formatDate(v) {
   var d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
   return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
+}
+// ETAT CLEAN: prefer the GameNime API-generated label (handles fuzzy dates
+// like "Prévu 2026"). Fall back to formatDate for legacy endpoints that
+// don't include releaseDateLabel.
+function dateLabel(item) {
+  if (item && item.releaseDateLabel) return item.releaseDateLabel;
+  return formatDate(item ? item.releaseDate : null);
 }
 
 function getStatusLabel(item) {
@@ -130,7 +137,7 @@ function getHypeLabel(item) {
 function renderCard(item, domain, rank) {
   var status = getStatusLabel(item);
   var media = item.cover
-    ? '<img src="' + item.cover + '" alt="' + item.title + '" loading="lazy" />'
+    ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" loading="lazy" />'
     : '<div class="item-placeholder">Aucune image</div>';
   var info = simplifyPlatform(item.platform) || item.genre || "Information à venir";
   var countdown = getCountdownHtml(item);
@@ -154,8 +161,8 @@ function renderCard(item, domain, rank) {
     rankBadge +
     '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +
-    '<h3>' + item.title + '</h3>' +
-    '<p>' + formatDate(item.releaseDate) + '</p>' +
+    '<h3>' + displayTitle(item) + '</h3>' +
+    '<p>' + dateLabel(item) + '</p>' +
     '<p>' + info + '</p>' +
     countdown +
     '<div class="item-badges-row">' +
@@ -303,10 +310,10 @@ function setupDetailModal() {
 
       inner.innerHTML =
         '<div class="detail-header">' +
-          '<div class="detail-cover">' + (item.cover ? '<img src="' + item.cover + '" alt="' + item.title + '" />' : '') + '</div>' +
+          '<div class="detail-cover">' + (item.cover ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" />' : '') + '</div>' +
           '<div class="detail-info">' +
-            '<h2>' + item.title + '</h2>' +
-            '<p class="detail-meta">' + formatDate(item.releaseDate) + ' · ' + (item.platform || '') + '</p>' +
+            '<h2>' + displayTitle(item) + '</h2>' +
+            '<p class="detail-meta">' + dateLabel(item) + ' · ' + (item.platform || 'À confirmer') + '</p>' +
             '<div class="detail-genres">' +
               genres.map(function(g) { return '<span class="genre-tag">⭐ ' + g + '</span>'; }).join("") +
               ratingHtml +
@@ -397,9 +404,9 @@ async function loadSection(section) {
     } else if (source === "games-upcoming") {
       items = await getFeedGames({ status: "upcoming", limit: 100, orderBy: "date" }); domain = "games";
     } else if (source === "top-anime") {
-      items = await getFeedAnime({ status: "released", limit: 12 }); domain = "anime"; isTop = true;
+      items = await getFeedAnime({ status: "released", limit: 25 }); domain = "anime"; isTop = true;
     } else if (source === "top-games") {
-      items = await getFeedGames({ status: "released", limit: 12 }); domain = "games"; isTop = true;
+      items = await getFeedGames({ status: "released", limit: 25 }); domain = "games"; isTop = true;
     } else {
       var a = await getFeedAnime({ status: "upcoming", limit: 50, orderBy: "date" });
       var g = await getFeedGames({ status: "upcoming", limit: 50, orderBy: "date" });
@@ -455,6 +462,31 @@ setInterval(updateCountdowns, 1000);
 setupHoverTrailer();
 setupDetailModal();
 setupFavorites();
+autoOpenFromHash();
+// SESSION 12.7+: ouvre automatiquement le modal d'un item si l'URL contient #item-{id}
+// Utilisé pour les CTA "Voir la fiche" / "Découvrir" des emails Premium.
+function autoOpenFromHash() {
+  var match = window.location.hash.match(/^#item-(\d+)$/);
+  if (!match) return;
+  var itemId = match[1];
+  var attempts = 0;
+  var tryOpen = function() {
+    attempts++;
+    var card = document.querySelector('.item-card[data-id="' + itemId + '"]');
+    if (card) {
+      (card as HTMLElement).click();
+      // Scroller doucement vers le top après ouverture
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (attempts < 20) {
+      setTimeout(tryOpen, 200);
+    }
+  };
+  tryOpen();
+}
+window.addEventListener("hashchange", autoOpenFromHash);
+
 function setupFavorites() {
   var favApiBase = "/api";
   var favCache = {};

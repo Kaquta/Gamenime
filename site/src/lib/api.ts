@@ -1,6 +1,7 @@
 export interface ContentItem {
   id: number | string;
   title: string;
+  titleEnglish?: string | null;
   cover: string | null;
   genre: string | null;
   platform: string | null;
@@ -103,4 +104,13 @@ export async function searchFeed(query: string, type: "anime" | "game" | "all" =
   const url = `/api/feed/search?q=${encodeURIComponent(query)}&type=${type}`;
   const data = await fetchJson<{ items: FeedItem[] }>(url);
   return data.items;
+}
+
+/**
+ * Session 10 ETAT CLEAN — Helper displayTitle.
+ * Retourne le titre anglais si dispo, sinon retombe sur le titre romaji (clé DB).
+ * Source unique de verite pour l'affichage des titres dans tout le frontend.
+ */
+export function displayTitle(item: { title: string; titleEnglish?: string | null }): string {
+  return item.titleEnglish ?? item.title;
 }

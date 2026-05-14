@@ -146,6 +146,7 @@ export interface ReminderEmailData {
   daysLeft: number; // 7, 1, or 0
   releaseDate: string | null;
   itemUrl: string;
+  platform: string | null;
 }
 
 export function reminderEmailTemplate(data: ReminderEmailData) {
@@ -171,6 +172,7 @@ export function reminderEmailTemplate(data: ReminderEmailData) {
     <p style="margin:0 0 12px;">Bonjour ${safeName},</p>
     <p style="margin:0 0 12px;">Le ${typeLabel} <strong>${safeTitle}</strong> que tu suis sort ${data.daysLeft === 0 ? "aujourd'hui" : data.daysLeft === 1 ? "demain" : "dans " + data.daysLeft + " jours"} !</p>
     ${coverHtml}
+    <p style="margin:8px 0 16px;color:#444;font-size:14px;">📺 <strong>Plateforme :</strong> ${data.platform && data.platform.trim() ? escapeHtml(data.platform) : '<em style="color:#888;">à confirmer (annonce officielle pas encore publiée)</em>'}</p>
     ${button("Voir la fiche", data.itemUrl)}
     <p style="margin:16px 0 0;color:#888;font-size:12px;">Tu reçois cet email parce que cet ${typeLabel} est dans tes favoris. Tu peux désactiver les notifications email dans ton compte.</p>
   `;
@@ -187,6 +189,7 @@ export interface AlertEmailData {
   itemType: "anime" | "game";
   matchValue: string; // e.g. "Action sur PC"
   itemUrl: string;
+  platform: string | null;
 }
 
 export function alertEmailTemplate(data: AlertEmailData) {
@@ -204,6 +207,7 @@ export function alertEmailTemplate(data: AlertEmailData) {
     <p style="margin:0 0 12px;">Un nouveau ${typeLabel} correspond à tes préférences <strong>${safeMatch}</strong> :</p>
     <h3 style="margin:0 0 8px;color:#222;font-size:18px;">${safeTitle}</h3>
     ${coverHtml}
+    <p style="margin:8px 0 16px;color:#444;font-size:14px;">📺 <strong>Plateforme :</strong> ${data.platform && data.platform.trim() ? escapeHtml(data.platform) : '<em style="color:#888;">à confirmer (annonce officielle pas encore publiée)</em>'}</p>
     ${button("Découvrir", data.itemUrl)}
     <p style="margin:16px 0 0;color:#888;font-size:12px;">Tu reçois cet email grâce à tes préférences Premium. Tu peux modifier tes alertes ou désactiver les emails dans ton compte.</p>
   `;
