@@ -1705,7 +1705,43 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           /cover\/(medium|large)\/default/i.test(b.cover);
         const lookupCover = coverIsGeneric ? null : b.cover;
 
-        const beforeRows: any = await conn.query(
+
+        // ═══ SESSION 13+: Check merge_blocklist (priorité absolue) ═══
+        // Auto-Merge mémorise les losers ici. Si un workflow re-pousse un loser,
+        // on redirige vers le winner au lieu de recréer le doublon.
+        // Critères ABSOLUS (zéro faux positif possible) : anilist_id / mal_id / cover / title exact
+        let blocklistRedirect: any = null;
+        try {
+          const blRows: any = await conn.query(
+            `SELECT redirect_to_id FROM merge_blocklist
+             WHERE item_type = ?
+               AND (
+                 (? IS NOT NULL AND blocked_anilist_id = ?)
+                 OR (? IS NOT NULL AND blocked_mal_id = ?)
+                 OR (? IS NOT NULL AND blocked_cover = ?)
+                 OR blocked_title = ?
+               )
+             LIMIT 1`,
+            [itemType, b.anilistId, b.anilistId, b.malId, b.malId, lookupCover, lookupCover, b.title]
+          );
+          if (blRows.length > 0) {
+            const winRows: any = await conn.query(
+              `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
+               FROM ${table} WHERE id = ? LIMIT 1`,
+              [blRows[0].redirect_to_id]
+            );
+            if (winRows.length > 0) {
+              blocklistRedirect = winRows[0];
+              app.log.info({ title: b.title, redirectId: blRows[0].redirect_to_id, type: itemType }, "blocklist hit, redirecting to winner");
+            } else {
+              app.log.warn({ redirectId: blRows[0].redirect_to_id, title: b.title }, "blocklist winner not found, falling back to normal flow");
+            }
+          }
+        } catch (e: any) {
+          app.log.error({ err: e?.message, title: b.title }, "blocklist check failed, falling back");
+        }
+
+        const beforeRows: any = blocklistRedirect ? [blocklistRedirect] : await conn.query(
           `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
            FROM ${table}
            WHERE (

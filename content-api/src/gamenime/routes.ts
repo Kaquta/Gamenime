@@ -968,8 +968,17 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
             }
           }
 
-          // 3. DELETE losers from main table
+          // 3. SESSION 13+: INSERT blocklist (mémorise loser pour empêcher recréation au push)
+          //    DELETE losers from main table
           for (const loser of losers) {
+            await conn.query(
+              `INSERT INTO merge_blocklist
+               (item_type, blocked_title, blocked_cover, blocked_anilist_id, blocked_mal_id, redirect_to_id, reason)
+               VALUES (?, ?, ?, ?, ?, ?, 'auto_merge')`,
+              [winner.type, loser.title, loser.cover || null,
+               (loser as any).anilistId || null, (loser as any).malId || null,
+               winner.id]
+            );
             await conn.query(`DELETE FROM ${table} WHERE id = ?`, [loser.id]);
             deleted++;
           }

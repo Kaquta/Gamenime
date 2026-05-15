@@ -470,6 +470,8 @@ export function normalizeTitleStrict(title: string | null | undefined): string {
   let s = title;
 
   // 1. Strip "(YYYY)" trailing
+  // SESSION 13+: convertir "Zero" trailing en "0" (Phantom Blade Zero == Phantom Blade 0)
+  s = s.replace(/\s+zero\s*$/i, " 0");
   s = s.replace(/\s*\(\d{4}\)\s*$/, "");
 
   // 2. Extract saison/cour comme suffixes séparés
