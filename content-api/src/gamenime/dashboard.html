@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GameNime API · Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  body { min-height: 100vh; background: radial-gradient(ellipse at top, #2a0e08 0%, #150705 60%, #0a0301 100%); color: #fff4e8; padding: 24px; }
+  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid rgba(255, 170, 90, 0.18); }
+  .header h1 { font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: clamp(1.6rem, 3vw, 2.4rem); background: linear-gradient(135deg, #fff3e0, #ffb366, #e85a20); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 999px; background: #44c46614; border: 1px solid rgba(68, 196, 102, 0.4); color: #44c466; font-size: 0.85rem; font-weight: 700; }
+  .live.disconnected { background: #ff3c3c14; border-color: rgba(255, 60, 60, 0.4); color: #ff6b6b; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .section { padding: 22px; border-radius: 18px; background: linear-gradient(180deg, #2a120eeb, #170a09f2); border: 1px solid rgba(255, 170, 90, 0.18); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+  .section h2 { font-size: 0.9rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #ffc896b3; margin-bottom: 18px; }
+  .metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255, 170, 90, 0.08); }
+  .metric:last-child { border-bottom: none; }
+  .metric .label { color: #ffe2cdcc; font-size: 0.92rem; }
+  .metric .value { color: #fff4ea; font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
+  .gauge { margin: 14px 0; }
+  .gauge-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.88rem; color: #ffe2cdcc; }
+  .gauge-label .val { font-weight: 800; color: #fff4ea; font-variant-numeric: tabular-nums; }
+  .gauge-bar { height: 8px; border-radius: 999px; background: #1e0c0a; overflow: hidden; }
+  .gauge-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
+  .gauge-fill.ok { background: linear-gradient(90deg, #44c466, #88dc88); }
+  .gauge-fill.warn { background: linear-gradient(90deg, #ffb366, #e85a20); }
+  .gauge-fill.crit { background: linear-gradient(90deg, #e85a20, #ff3c3c); }
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+  .badge-ok { background: rgba(68, 196, 102, 0.15); color: #44c466; border: 1px solid rgba(68, 196, 102, 0.3); }
+  .badge-warn { background: rgba(255, 180, 60, 0.15); color: #ffb43c; border: 1px solid rgba(255, 180, 60, 0.3); }
+  .badge-crit { background: rgba(255, 60, 60, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 60, 60, 0.3); }
+  .cron-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255, 170, 90, 0.08); }
+  .cron-row:last-child { border-bottom: none; }
+  .cron-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255, 140, 60, 0.2), rgba(255, 100, 30, 0.1)); flex-shrink: 0; font-size: 1.05rem; }
+  .cron-info { flex: 1; min-width: 0; }
+  .cron-name { font-weight: 700; font-size: 0.93rem; color: #fff4ea; }
+  .cron-meta { color: #ffe2cd99; font-size: 0.8rem; margin-top: 2px; line-height: 1.4; }
+  .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255, 170, 90, 0.18); text-align: center; color: #ffc89699; font-size: 0.85rem; }
+  .span-2 { grid-column: span 2; }
+  @media (max-width: 720px) { .span-2 { grid-column: span 1; } }
+  .activity-icon-ok { background: rgba(68, 196, 102, 0.18) !important; }
+  .activity-icon-merge { background: rgba(255, 140, 60, 0.18) !important; }
+  .activity-icon-block { background: rgba(255, 60, 60, 0.18) !important; }
+  .activity-icon-mail { background: rgba(120, 180, 255, 0.18) !important; }
+  .activity-icon-warn { background: rgba(255, 180, 60, 0.18) !important; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>GameNime API · Dashboard</h1>
+  <div class="live" id="status"><span class="pulse"></span> <span id="status-text">Connexion...</span></div>
+</div>
+
+<div class="grid">
+  <div class="section">
+    <h2>🖥️ Système</h2>
+    <div class="gauge"><div class="gauge-label"><span>CPU (load 1min)</span><span class="val" id="cpu-load">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="cpu-bar" style="width:0%"></div></div></div>
+    <div class="gauge"><div class="gauge-label"><span>RAM</span><span class="val" id="ram-text">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="ram-bar" style="width:0%"></div></div></div>
+    <div class="gauge"><div class="gauge-label"><span>Disque /</span><span class="val" id="disk-text">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="disk-bar" style="width:0%"></div></div></div>
+    <div class="metric"><span class="label">📡 Réseau ↓</span><span class="value" id="net-rx">—</span></div>
+    <div class="metric"><span class="label">📡 Réseau ↑</span><span class="value" id="net-tx">—</span></div>
+    <div class="metric"><span class="label">Load 5 / 15min</span><span class="value" id="load-others">—</span></div>
+    <div class="metric"><span class="label">⏱️ Uptime</span><span class="value" id="uptime">—</span></div>
+  </div>
+
+  <div class="section">
+    <h2>📚 Catalogue</h2>
+    <div class="metric"><span class="label">🎌 Anime</span><span class="value" id="anime-total">—</span></div>
+    <div class="metric"><span class="label">🎮 Games</span><span class="value" id="game-total">—</span></div>
+    <div class="metric"><span class="label">❌ Anime sans cover</span><span class="value" id="anime-nocover">—</span></div>
+    <div class="metric"><span class="label">⚠️ Cover hotlink</span><span class="value" id="anime-hotlink">—</span></div>
+    <div class="metric"><span class="label">❌ Games sans cover</span><span class="value" id="game-nocover">—</span></div>
+    <div class="metric"><span class="label">🚫 Sans plateforme</span><span class="value" id="anime-noplatform">—</span></div>
+    <div class="metric"><span class="label">⛔ Blocklist active</span><span class="value" id="blocklist">—</span></div>
+  </div>
+
+  <div class="section">
+    <h2>⭐ Utilisateurs</h2>
+    <div class="metric"><span class="label">👥 Comptes totaux</span><span class="value" id="user-total">—</span></div>
+    <div class="metric"><span class="label">✨ Premium actifs</span><span class="value" id="user-premium">—</span></div>
+    <div class="metric"><span class="label">✓ Emails vérifiés</span><span class="value" id="user-verified">—</span></div>
+    <div class="metric"><span class="label">❤️ Favoris totaux</span><span class="value" id="favorites">—</span></div>
+    <div class="metric"><span class="label">🔔 Notifs unread</span><span class="value" id="notif-unread">—</span></div>
+    <div class="metric"><span class="label">📨 Reminders 24h</span><span class="value" id="reminders-24h">—</span></div>
+    <div class="metric"><span class="label">📡 SSE connectés</span><span class="value" id="sse-active">—</span></div>
+  </div>
+
+  <div class="section span-2">
+    <h2>🔄 Crons GameNime API</h2>
+    <div id="crons-list">
+      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">En attente de données...</div></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>🗄️ Database & Cache</h2>
+    <div class="metric"><span class="label">⚡ Latence DB</span><span class="value" id="db-latency">—</span></div>
+    <div class="metric"><span class="label">📊 Connexions DB</span><span class="value" id="db-conn">—</span></div>
+    <div class="metric"><span class="label">📦 Taille DB</span><span class="value" id="db-size">—</span></div>
+    <div class="metric"><span class="label">🎯 Cache hit rate</span><span class="value" id="cache-rate">—</span></div>
+    <div class="metric"><span class="label">🔄 Requêtes /min</span><span class="value" id="req-min">—</span></div>
+    <div class="metric"><span class="label">✓ Hits / ✗ Misses</span><span class="value" id="cache-hm">—</span></div>
+  </div>
+
+  <div class="section span-2">
+    <h2>⚡ Workflows externes (sources)</h2>
+    <div id="workflows-list">
+      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">En attente...</div></div></div>
+    </div>
+  </div>
+
+  <div class="section span-2">
+    <h2>📡 Activité live (20 derniers événements)</h2>
+    <div id="activity-list">
+      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">Aucun événement encore...</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">GameNime API · SSE update toutes les 2s · Session 13</div>
+
+<script>
+  function fmtBytes(b) { if (!b && b !== 0) return "—"; const u=["B","KB","MB","GB","TB"]; let i=0; while (b>=1024 && i<u.length-1) { b/=1024; i++; } return b.toFixed(b<10&&i>0?1:0)+" "+u[i]; }
+  function fmtBps(b) { return fmtBytes(b) + "/s"; }
+  function fmtUptime(s) { if(!s) return "—"; const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60); return (d?d+"j ":"")+h+"h "+m+"min"; }
+  function fmtAgo(ts) { if(!ts) return "jamais"; const s=Math.floor((Date.now()-ts)/1000); if(s<60) return "il y a "+s+"s"; const m=Math.floor(s/60); if(m<60) return "il y a "+m+"min"; const h=Math.floor(m/60); if(h<24) return "il y a "+h+"h "+(m%60)+"min"; const d=Math.floor(h/24); return "il y a "+d+"j "+(h%24)+"h"; }
+  function fmtIn(ms) { if(ms<=0) return "imminent"; const s=Math.floor(ms/1000); if(s<60) return "dans "+s+"s"; const m=Math.floor(s/60); if(m<60) return "dans "+m+"min"; const h=Math.floor(m/60); return "dans "+h+"h "+(m%60)+"min"; }
+  function gaugeClass(p) { return p<60?"ok":(p<85?"warn":"crit"); }
+
+  // Type → icon class
+  const ACT_ICONS = {
+    refetch: { icon: "✓", cls: "activity-icon-ok" },
+    lookup: { icon: "🔍", cls: "activity-icon-ok" },
+    quality: { icon: "🎯", cls: "activity-icon-warn" },
+    push: { icon: "⚡", cls: "activity-icon-merge" },
+    merge: { icon: "🧹", cls: "activity-icon-merge" },
+    blocklist_hit: { icon: "⛔", cls: "activity-icon-block" },
+    reminder: { icon: "📧", cls: "activity-icon-mail" },
+    error: { icon: "❌", cls: "activity-icon-block" },
+  };
+
+  function update(m) {
+    document.getElementById("status").className = "live";
+    document.getElementById("status-text").textContent = "Temps réel";
+
+    // System
+    if (m.system && !m.system.error) {
+      const cpuPercent = Math.min(100, Math.round(m.system.load["1min"] * 25));
+      document.getElementById("cpu-load").textContent = m.system.load["1min"].toFixed(2);
+      const cpuBar = document.getElementById("cpu-bar");
+      cpuBar.style.width = cpuPercent + "%";
+      cpuBar.className = "gauge-fill " + gaugeClass(cpuPercent);
+
+      document.getElementById("ram-text").textContent = fmtBytes(m.system.mem.used) + " / " + fmtBytes(m.system.mem.total) + " (" + m.system.mem.percent + "%)";
+      const ramBar = document.getElementById("ram-bar");
+      ramBar.style.width = m.system.mem.percent + "%";
+      ramBar.className = "gauge-fill " + gaugeClass(m.system.mem.percent);
+
+      document.getElementById("disk-text").textContent = fmtBytes(m.system.disk.used) + " / " + fmtBytes(m.system.disk.total) + " (" + m.system.disk.percent + "%)";
+      const diskBar = document.getElementById("disk-bar");
+      diskBar.style.width = m.system.disk.percent + "%";
+      diskBar.className = "gauge-fill " + gaugeClass(m.system.disk.percent);
+
+      document.getElementById("net-rx").textContent = fmtBps(m.system.net?.rx_per_sec || 0);
+      document.getElementById("net-tx").textContent = fmtBps(m.system.net?.tx_per_sec || 0);
+      document.getElementById("load-others").textContent = m.system.load["5min"].toFixed(2) + " / " + m.system.load["15min"].toFixed(2);
+      document.getElementById("uptime").textContent = fmtUptime(m.system.uptime);
+    }
+
+    // Catalog
+    if (m.catalog && !m.catalog.error) {
+      document.getElementById("anime-total").textContent = m.catalog.anime.total;
+      document.getElementById("game-total").textContent = m.catalog.games.total;
+      const aNoCov = m.catalog.anime.no_cover;
+      document.getElementById("anime-nocover").innerHTML = aNoCov + (aNoCov>0 ? ' <span class="badge badge-warn">Manquant</span>' : ' <span class="badge badge-ok">✓ Clean</span>');
+      const hotlink = m.catalog.anime.hotlink;
+      document.getElementById("anime-hotlink").innerHTML = hotlink + (hotlink>0 ? ' <span class="badge badge-warn">Phase B</span>' : ' <span class="badge badge-ok">✓ Clean</span>');
+      document.getElementById("game-nocover").textContent = m.catalog.games.no_cover;
+      document.getElementById("anime-noplatform").textContent = m.catalog.anime.no_platform;
+      document.getElementById("blocklist").innerHTML = m.catalog.blocklist + ' <span class="badge badge-ok">Actif</span>';
+
+      document.getElementById("user-total").textContent = m.catalog.users.total;
+      document.getElementById("user-premium").textContent = m.catalog.users.premium;
+      document.getElementById("user-verified").textContent = m.catalog.users.verified;
+      document.getElementById("favorites").textContent = m.catalog.favorites;
+      document.getElementById("notif-unread").textContent = m.catalog.notif_unread;
+      document.getElementById("reminders-24h").textContent = m.catalog.reminders_24h;
+
+      // DB
+      document.getElementById("db-latency").innerHTML = m.catalog.db.latency_ms + " ms" + (m.catalog.db.latency_ms<50 ? ' <span class="badge badge-ok">Fast</span>' : '');
+      document.getElementById("db-conn").textContent = m.catalog.db.connections;
+      document.getElementById("db-size").textContent = fmtBytes(m.catalog.db.size_bytes);
+    }
+
+    document.getElementById("sse-active").innerHTML = (m.sse_active||0) + ' <span class="badge badge-ok">Live</span>';
+    document.getElementById("req-min").textContent = m.requests_per_min || 0;
+
+    // Cache
+    if (m.cache) {
+      document.getElementById("cache-rate").innerHTML = m.cache.hit_rate + "%" + (m.cache.hit_rate>70 ? ' <span class="badge badge-ok">Bon</span>' : '');
+      document.getElementById("cache-hm").textContent = m.cache.hits + " / " + m.cache.misses;
+    }
+
+    // Crons avec prochain run
+    const cronInfo = {
+      "refetch-cron": { icon: "🔄", name: "Phase B · Refetch enrichment", interval: 3600000 },
+      "lookup-cron": { icon: "🔍", name: "Phase C · Lookup AniList", interval: 3600000 },
+      "quality-cron": { icon: "🎯", name: "Quality Check J-7", interval: 86400000 },
+      "auto-merge": { icon: "🧹", name: "Auto-Merge n8n", interval: 300000 }
+    };
+    const cronsHtml = Object.entries(cronInfo).map(([key, info]) => {
+      const run = m.crons[key];
+      let meta = "Jamais exécuté";
+      let badge = '<span class="badge badge-warn">⏳ Attente</span>';
+      if (run) {
+        const detailParts = run.details ? Object.entries(run.details).map(([k,v])=>`${k}: ${v}`).join(" · ") : "";
+        const nextIn = (run.ts + info.interval) - Date.now();
+        const nextText = nextIn > 0 ? "prochain " + fmtIn(nextIn) : "imminent";
+        meta = fmtAgo(run.ts) + " · " + detailParts + " · " + nextText;
+        badge = '<span class="badge badge-ok">✓ OK</span>';
+      }
+      return `<div class="cron-row"><div class="cron-icon">${info.icon}</div><div class="cron-info"><div class="cron-name">${info.name}</div><div class="cron-meta">${meta}</div></div>${badge}</div>`;
+    }).join("");
+    document.getElementById("crons-list").innerHTML = cronsHtml;
+
+    // Workflows (enriched : items pushed + next run)
+    if (m.workflows && !m.workflows.error) {
+      const wfNames = {
+        anilist: { icon: "🎌", name: "Anime FULL v2 · AniList" },
+        jikan: { icon: "📺", name: "Jikan (MAL complement)" },
+        animeschedule: { icon: "📅", name: "AnimeSchedule" },
+        rawg: { icon: "🎮", name: "Games FULL v2 · RAWG" }
+      };
+      const wfHtml = Object.entries(wfNames).map(([key, info]) => {
+        const wf = m.workflows[key] || {};
+        const ts = wf.last_push ? new Date(wf.last_push).getTime() : null;
+        const ago = ts ? fmtAgo(ts) : "jamais";
+        const ageMin = ts ? (Date.now() - ts) / 60000 : 99999;
+        const badge = ageMin < 240 ? '<span class="badge badge-ok">✓ Healthy</span>' : (ageMin < 480 ? '<span class="badge badge-warn">⚠ Slow</span>' : '<span class="badge badge-crit">❌ Stale</span>');
+        const parts = [ago];
+        if (wf.items_pushed != null) parts.push(`${wf.items_pushed} items pushed`);
+        if (wf.next_run) {
+          const nextIn = wf.next_run - Date.now();
+          parts.push(nextIn > 0 ? "prochain run " + fmtIn(nextIn) : "imminent");
+        }
+        return `<div class="cron-row"><div class="cron-icon">${info.icon}</div><div class="cron-info"><div class="cron-name">${info.name}</div><div class="cron-meta">${parts.join(" · ")}</div></div>${badge}</div>`;
+      }).join("");
+      document.getElementById("workflows-list").innerHTML = wfHtml;
+    }
+
+    // Activity avec icônes & couleurs typées
+    if (m.activity && m.activity.length > 0) {
+      const actHtml = m.activity.map(a => {
+        const cfg = ACT_ICONS[a.type] || ACT_ICONS["refetch"];
+        const lvlClass = a.level === "error" ? "activity-icon-block" : (a.level === "warn" ? "activity-icon-warn" : cfg.cls);
+        return `<div class="cron-row" style="padding:8px 0"><div class="cron-icon ${lvlClass}">${cfg.icon}</div><div class="cron-info"><div class="cron-name" style="font-size:0.88rem">${a.message}</div><div class="cron-meta">${a.detail||""} · ${fmtAgo(a.ts)}</div></div></div>`;
+      }).join("");
+      document.getElementById("activity-list").innerHTML = actHtml;
+    }
+  }
+
+  let es;
+  function connect() {
+    es = new EventSource("/dashboard/stream");
+    es.addEventListener("metrics", e => { try { update(JSON.parse(e.data)); } catch(err) { console.error(err); } });
+    es.onerror = () => {
+      document.getElementById("status").className = "live disconnected";
+      document.getElementById("status-text").textContent = "Reconnexion...";
+      es.close();
+      setTimeout(connect, 3000);
+    };
+  }
+  connect();
+</script>
+</body>
+</html>

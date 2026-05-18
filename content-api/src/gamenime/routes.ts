@@ -17,6 +17,7 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { trackLastRun, pushActivity } from "./dashboard.js";
 import { z } from "zod";
 import {
   CAPACITY_ANIME,
@@ -1005,6 +1006,17 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
       { groups: actions.length, merged, deleted, relationsMigrated, dryRun },
       "admin.merge-duplicates"
     );
+    if (!dryRun) {
+      trackLastRun("auto-merge", { groups: actions.length, merged, deleted });
+      if (merged > 0) {
+        pushActivity({
+          type: "merge",
+          message: `Auto-Merge fusionne ${merged} items`,
+          detail: `${actions.length} groupes traites, ${deleted} supprimes, ${relationsMigrated} relations migrees`,
+          level: "info",
+        });
+      }
+    }
 
     return reply.send({
       dryRun,
@@ -1114,6 +1126,102 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   });
 
   // ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────
+  // POST /admin/cleanup-niches — Session 13.3
+  // Supprime les games niches deja en DB (memes criteres que filtre au push)
+  // Query params : type=game, dryRun=true|false (default true)
+  // ─────────────────────────────────────────────────
+  app.post("/admin/cleanup-niches", async (req: FastifyRequest, reply: FastifyReply) => {
+    if (options.adminApiKey) {
+      const apiKey = req.headers["x-api-key"];
+      if (apiKey !== options.adminApiKey) {
+        return reply.code(401).send({ error: "unauthorized" });
+      }
+    }
+    const query = req.query as any;
+    const type = query?.type;
+    const dryRun = String(query?.dryRun ?? "true") !== "false";
+
+    if (type !== "game") {
+      return reply.code(400).send({ error: "type must be 'game' (anime not supported)" });
+    }
+
+    const NICHE_POP_THRESHOLD = 10;
+    const NICHE_AGE_DAYS = 30;
+    const NICHE_RATING_PROTECTION = 70;
+
+    try {
+      const niches: any[] = await pool.query(
+        `SELECT id, title, popularity, rating_score, release_date,
+                DATEDIFF(CURDATE(), release_date) AS age_days
+         FROM game_items
+         WHERE release_date <= CURDATE()
+           AND release_date < DATE_SUB(CURDATE(), INTERVAL ? DAY)
+           AND popularity < ?
+           AND (rating_score IS NULL OR rating_score < ?)
+         ORDER BY popularity ASC, release_date ASC`,
+        [NICHE_AGE_DAYS, NICHE_POP_THRESHOLD, NICHE_RATING_PROTECTION]
+      );
+
+      const nicheIds = niches.map((n: any) => Number(n.id));
+
+      let affectedFavorites = 0, affectedVotes = 0, affectedNotifs = 0;
+      if (nicheIds.length > 0) {
+        const favCount: any = await pool.query(
+          `SELECT COUNT(*) AS n FROM favorites WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]
+        );
+        affectedFavorites = Number(favCount[0]?.n || 0);
+        const voteCount: any = await pool.query(
+          `SELECT COUNT(*) AS n FROM votes WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]
+        );
+        affectedVotes = Number(voteCount[0]?.n || 0);
+        const notifCount: any = await pool.query(
+          `SELECT COUNT(*) AS n FROM notification_events WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]
+        );
+        affectedNotifs = Number(notifCount[0]?.n || 0);
+      }
+
+      if (dryRun) {
+        return reply.send({
+          dryRun: true,
+          niches_count: niches.length,
+          would_delete: niches.length,
+          affected_favorites: affectedFavorites,
+          affected_votes: affectedVotes,
+          affected_notifs: affectedNotifs,
+          sample: niches.slice(0, 10).map((n: any) => ({
+            id: Number(n.id), title: n.title, popularity: Number(n.popularity),
+            rating_score: n.rating_score == null ? null : Number(n.rating_score),
+            release_date: n.release_date, age_days: Number(n.age_days),
+          })),
+        });
+      }
+
+      let deleted = 0;
+      if (nicheIds.length > 0) {
+        await pool.query(`DELETE FROM favorites WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]);
+        await pool.query(`DELETE FROM votes WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]);
+        await pool.query(`DELETE FROM user_notifications WHERE event_id IN (SELECT id FROM notification_events WHERE item_type = 'game' AND item_id IN (?))`, [nicheIds]).catch(() => {});
+        await pool.query(`DELETE FROM notification_events WHERE item_type = 'game' AND item_id IN (?)`, [nicheIds]);
+        const result: any = await pool.query(`DELETE FROM game_items WHERE id IN (?)`, [nicheIds]);
+        deleted = Number(result?.affectedRows || nicheIds.length);
+        clearFeedCache();
+      }
+
+      req.log.info({ deleted, affectedFavorites, affectedVotes, affectedNotifs }, "admin.cleanup-niches");
+      return reply.send({
+        dryRun: false,
+        deleted,
+        affected_favorites: affectedFavorites,
+        affected_votes: affectedVotes,
+        affected_notifs: affectedNotifs,
+      });
+    } catch (e: any) {
+      req.log.error({ err: e?.message }, "cleanup-niches failed");
+      return reply.code(500).send({ error: "Internal error", detail: e?.message });
+    }
+  });
+
   // GET /admin/feed/stats — diagnostic (admin only)
   // ─────────────────────────────────────────────────
   app.get("/admin/feed/stats", async (req: FastifyRequest, reply: FastifyReply) => {

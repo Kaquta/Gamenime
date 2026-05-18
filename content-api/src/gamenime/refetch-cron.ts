@@ -3,6 +3,7 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import { trackLastRun, pushActivity } from "./dashboard.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000;
 const REFETCH_BATCH_SIZE = 200;
@@ -284,6 +285,8 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
     }
 
     app.log.info({ scanned, enriched, errors, changesCount: changes.length }, "Refetch cycle termine");
+    trackLastRun("refetch-cron", { scanned, enriched, errors });
+    if (enriched > 0) pushActivity({ type: "refetch", message: `Phase B enriched ${enriched} items`, detail: `${scanned} scanned, ${errors} errors`, level: "info" });
   } finally {
     conn.release();
   }

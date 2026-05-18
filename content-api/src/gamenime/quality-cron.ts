@@ -12,6 +12,7 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import { trackLastRun, pushActivity } from "./dashboard.js";
 import {
   fetchAniList,
   fetchJikan,
@@ -188,6 +189,8 @@ export async function qualityCheckCycle(
       { scanned, enriched, still_incomplete: incomplete_items.length },
       "Quality check J-X termine"
     );
+    trackLastRun("quality-cron", { scanned, enriched, still_incomplete: incomplete_items.length });
+    if (incomplete_items.length > 0 || enriched > 0) pushActivity({ type: "quality", message: `Quality Check J-7 termine`, detail: `${enriched} enriched, ${incomplete_items.length} still incomplete`, level: incomplete_items.length > 0 ? "warn" : "info" });
   } finally {
     conn.release();
   }

@@ -4,6 +4,7 @@
  */
 
 import type { FastifyInstance } from "fastify";
+import { trackLastRun, pushActivity } from "./dashboard.js";
 
 const LOOKUP_INTERVAL_MS = 60 * 60 * 1000;  // 1 heure
 const LOOKUP_DELAY_MS = 1500;
@@ -41,6 +42,43 @@ async function lookupAniListByTitle(
 ): Promise<{ match: AniListMatch | null; reason: string }> {
   if (!title || title.length < 3) {
     return { match: null, reason: "title_too_short" };
+  }
+
+  // Fast path : si mal_id connu, query direct par idMal (zero faux match)
+  if (knownMalId && knownMalId > 0) {
+    try {
+      const malQuery = `query ($idMal: Int) {
+        Media(idMal: $idMal, type: ANIME) {
+          id idMal format startDate { year } title { romaji english }
+        }
+      }`;
+      const res = await fetch("https://graphql.anilist.co", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: malQuery, variables: { idMal: knownMalId } }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        const media = data?.data?.Media;
+        if (media && media.id) {
+          const format: string = media.format || "";
+          if (ALLOWED_FORMATS.has(format)) {
+            return {
+              match: {
+                anilistId: media.id,
+                malId: media.idMal ?? null,
+                matchedTitle: media.title?.romaji || media.title?.english || "",
+                format,
+                year: media.startDate?.year ?? null,
+              },
+              reason: "idMal_direct",
+            };
+          }
+        }
+      }
+    } catch (e) {
+      // fallthrough to search by title
+    }
   }
 
   const query = `query ($search: String) {
@@ -196,6 +234,8 @@ export async function lookupMissingIdsCycle(
     }
 
     app.log.info({ scanned: items.length, matched, no_match, errors, changesCount: changes.length }, "Lookup cycle termine");
+    trackLastRun("lookup-cron", { scanned: items.length, matched, no_match, errors });
+    if (matched > 0) pushActivity({ type: "lookup", message: `Phase C matched ${matched} items`, detail: `${items.length} scanned, ${no_match} no_match, ${errors} errors`, level: "info" });
   } finally {
     conn.release();
   }

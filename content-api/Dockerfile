@@ -5,6 +5,7 @@ RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
+COPY src/gamenime/dashboard.html ./dist/gamenime/dashboard.html
 
 FROM node:20-alpine
 WORKDIR /app

@@ -11,8 +11,10 @@ import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
 import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
 import { startRefetchCron, adminRefetchHandler } from "./gamenime/refetch-cron.js";
+import { startRefetchGamesCron } from "./gamenime/refetch-games-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
+import { startDashboard, pushActivity, trackLastRun } from "./gamenime/dashboard.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -203,6 +205,8 @@ const Item = z.object({
   anilistId: z.number().int().nullable().optional().default(null),  // PHASE A : ID externe AniList
   malId: z.number().int().nullable().optional().default(null),  // PHASE A : ID externe MyAnimeList/Jikan
   animeScheduleRoute: z.string().nullable().optional().default(null),  // PHASE A : route AnimeSchedule
+  rawgId: z.number().int().nullable().optional().default(null),  // PHASE B GAMES : ID externe RAWG
+  igdbId: z.number().int().nullable().optional().default(null),  // PHASE B GAMES : ID externe IGDB
   releasePrecision: z.enum(["day", "month", "year"]).optional().default("day"),
   isRecentlyReleased: z.boolean().optional().default(false),
   trailerUrl: z.string().url().nullable().optional().default(null),
@@ -1698,6 +1702,24 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           continue;
         }
 
+        // ═══ SESSION 13.3 : Filtre NICHES (GAMES UNIQUEMENT) ═══
+        // Reject games si : popularity < 10 ET released > 30 jours ET rating_score < 70
+        // Logique : laisse 30j aux nouveautes pour monter + protege cult favorites
+        // ZERO IMPACT sur anime (garde itemType === "game")
+        if (itemType === "game") {
+          const pop = Number((b as any).popularity ?? 0);
+          const ratingScore = (b as any).ratingScore != null ? Number((b as any).ratingScore) : null;
+          const releaseDate = (b as any).releaseDate;
+          if (releaseDate) {
+            const ageDays = (Date.now() - new Date(releaseDate).getTime()) / 86400000;
+            const isNiche = pop < 10 && ageDays > 30 && (ratingScore === null || ratingScore < 70);
+            if (isNiche) {
+              app.log.info({ title: b.title, popularity: pop, ratingScore, ageDays: Math.round(ageDays) }, "game rejected: niche");
+              continue;
+            }
+          }
+        }
+
         const normalizedIncoming = gnNormalizeTitle(b.title);
         const normalizedStrictIncoming = gnNormalizeTitleStrict(b.title);  // SESSION 12.5c
         const coverIsGeneric = !b.cover ||
@@ -1726,13 +1748,19 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           );
           if (blRows.length > 0) {
             const winRows: any = await conn.query(
-              `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
+              `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute${itemType === "game" ? ", rawg_id AS rawgId, igdb_id AS igdbId" : ""}, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
                FROM ${table} WHERE id = ? LIMIT 1`,
               [blRows[0].redirect_to_id]
             );
             if (winRows.length > 0) {
               blocklistRedirect = winRows[0];
               app.log.info({ title: b.title, redirectId: blRows[0].redirect_to_id, type: itemType }, "blocklist hit, redirecting to winner");
+              pushActivity({
+                type: "blocklist_hit",
+                message: `Blocklist hit : ${b.title}`,
+                detail: `Redirige vers id ${blRows[0].redirect_to_id} (${itemType})`,
+                level: "warn",
+              });
             } else {
               app.log.warn({ redirectId: blRows[0].redirect_to_id, title: b.title }, "blocklist winner not found, falling back to normal flow");
             }
@@ -1742,7 +1770,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         }
 
         const beforeRows: any = blocklistRedirect ? [blocklistRedirect] : await conn.query(
-          `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
+          `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute${itemType === "game" ? ", rawg_id AS rawgId, igdb_id AS igdbId" : ""}, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
            FROM ${table}
            WHERE (
              /* SESSION 12.7 — Critère 7 : anilist_id (clé d'identification stable AniList) */
@@ -1773,6 +1801,9 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
             b.anilistId, b.anilistId,
             /* Critère 8 : mal_id (NULL-check + match) */
             b.malId, b.malId,
+            /* PHASE B GAMES : rawg_id + igdb_id (lossless append) */
+            (b as any).rawgId ?? null, (b as any).rawgId ?? null,
+            (b as any).igdbId ?? null, (b as any).igdbId ?? null,
             /* Critère 1 : titre exact */
             b.title,
             /* Critère 2 : normalize_strict + date */
@@ -1806,11 +1837,11 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         // - Pas de comparaison `> 0` non plus : un score=0 reste valide même si peu probable
         // - Règle lossless : `IF(? IS NOT NULL, ?, rating_score)` (pattern aligné sur release_date)
         const insertCols = itemType === "game"
-          ? "(title,title_english,title_normalized_strict,anilist_id,mal_id,anime_schedule_route,cover,genre,platform,release_date,release_datetime,release_precision,is_recently_released,trailer_url,description,rating,rating_score,popularity,screenshots,dlcs)"
+          ? "(title,title_english,title_normalized_strict,anilist_id,mal_id,anime_schedule_route,rawg_id,igdb_id,cover,genre,platform,release_date,release_datetime,release_precision,is_recently_released,trailer_url,description,rating,rating_score,popularity,screenshots,dlcs)"
           : "(title,title_english,title_normalized_strict,anilist_id,mal_id,anime_schedule_route,cover,genre,platform,release_date,release_datetime,release_precision,is_recently_released,trailer_url,description,rating,rating_score,popularity,screenshots)";
-        const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+        const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         const insertVals: any[] = [
-          b.title, b.titleEnglish, normalizedStrictIncoming, b.anilistId, b.malId, b.animeScheduleRoute, b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
+          b.title, b.titleEnglish, normalizedStrictIncoming, b.anilistId, b.malId, b.animeScheduleRoute, ...(itemType === "game" ? [(b as any).rawgId ?? null, (b as any).igdbId ?? null] : []), b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
           b.releasePrecision || "day",
           b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.ratingScore, b.popularity, b.screenshots
         ];
@@ -1829,19 +1860,21 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           await conn.query(
             `UPDATE ${table} SET
                title_english = IF(? IS NOT NULL AND ? != '', ?, title_english),
-             cover = IF(? IS NOT NULL AND ? != '', ?, cover),
+             cover = IF(cover IS NULL OR cover = '', ?, cover),
                genre = IF(? IS NOT NULL AND ? != '', ?, genre),
                platform = IF(? IS NOT NULL AND ? != '' AND ? != 'Unknown', ?, platform),
                title_normalized_strict = IF(? IS NOT NULL AND ? != '', ?, title_normalized_strict),
                anilist_id = IF(? IS NOT NULL, ?, anilist_id),
-               mal_id = IF(? IS NOT NULL, ?, mal_id),
+               mal_id = IF(? IS NOT NULL, ?, mal_id),${itemType === "game" ? `
+               rawg_id = IF(? IS NOT NULL, ?, rawg_id),
+               igdb_id = IF(? IS NOT NULL, ?, igdb_id),` : ""}
                anime_schedule_route = IF(? IS NOT NULL AND ? != '', ?, anime_schedule_route),
                release_date = IF(? IS NOT NULL, ?, release_date),
                release_datetime = IF(? IS NOT NULL, ?, release_datetime),
                release_precision = ?,
                is_recently_released = ?,
                trailer_url = IF(? IS NOT NULL AND ? != '', ?, trailer_url),
-               description = IF(? IS NOT NULL AND ? != '', ?, description),
+               description = IF(description IS NULL OR description = '', ?, description),
                rating = IF(? IS NOT NULL AND ? != '', ?, rating),
                rating_score = IF(? IS NOT NULL, ?, rating_score),
                popularity = IF(? > 0, ?, popularity),
@@ -1850,19 +1883,23 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
              WHERE id = ?`,
             [
               b.titleEnglish, b.titleEnglish, b.titleEnglish,
-              b.cover, b.cover, b.cover,
+              b.cover,
               b.genre, b.genre, b.genre,
               b.platform, b.platform, b.platform, b.platform,
               normalizedStrictIncoming, normalizedStrictIncoming, normalizedStrictIncoming,
               b.anilistId, b.anilistId,
               b.malId, b.malId,
+              ...(itemType === "game" ? [
+                (b as any).rawgId ?? null, (b as any).rawgId ?? null,
+                (b as any).igdbId ?? null, (b as any).igdbId ?? null,
+              ] : []),
               b.animeScheduleRoute, b.animeScheduleRoute, b.animeScheduleRoute,
               b.releaseDate, b.releaseDate,
               b.releaseDatetime, b.releaseDatetime,
               b.releasePrecision || "day",
               b.isRecentlyReleased ? 1 : 0,
               b.trailerUrl, b.trailerUrl, b.trailerUrl,
-              b.description, b.description, b.description,
+              b.description,
               b.rating, b.rating, b.rating,
               b.ratingScore, b.ratingScore,
               b.popularity, b.popularity,
@@ -1880,19 +1917,21 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
              VALUES ${insertPh}
              ON DUPLICATE KEY UPDATE
                title_english=IF(VALUES(title_english) IS NOT NULL AND VALUES(title_english) != '', VALUES(title_english), title_english),
-               cover=IF(VALUES(cover) IS NOT NULL AND VALUES(cover) != '', VALUES(cover), cover),
+               cover=IF(cover IS NULL OR cover = '', VALUES(cover), cover),
                genre=IF(VALUES(genre) IS NOT NULL AND VALUES(genre) != '', VALUES(genre), genre),
                platform=IF(VALUES(platform) IS NOT NULL AND VALUES(platform) != '' AND VALUES(platform) != 'Unknown', VALUES(platform), platform),
                title_normalized_strict=IF(VALUES(title_normalized_strict) IS NOT NULL AND VALUES(title_normalized_strict) != '', VALUES(title_normalized_strict), title_normalized_strict),
                anilist_id=IF(VALUES(anilist_id) IS NOT NULL, VALUES(anilist_id), anilist_id),
-               mal_id=IF(VALUES(mal_id) IS NOT NULL, VALUES(mal_id), mal_id),
+               mal_id=IF(VALUES(mal_id) IS NOT NULL, VALUES(mal_id), mal_id),${itemType === "game" ? `
+               rawg_id=IF(VALUES(rawg_id) IS NOT NULL, VALUES(rawg_id), rawg_id),
+               igdb_id=IF(VALUES(igdb_id) IS NOT NULL, VALUES(igdb_id), igdb_id),` : ""}
                anime_schedule_route=IF(VALUES(anime_schedule_route) IS NOT NULL AND VALUES(anime_schedule_route) != '', VALUES(anime_schedule_route), anime_schedule_route),
                release_date=IF(VALUES(release_date) IS NOT NULL, VALUES(release_date), release_date),
                release_datetime=IF(VALUES(release_datetime) IS NOT NULL, VALUES(release_datetime), release_datetime),
                release_precision=VALUES(release_precision),
                is_recently_released=VALUES(is_recently_released),
                trailer_url=IF(VALUES(trailer_url) IS NOT NULL AND VALUES(trailer_url) != '', VALUES(trailer_url), trailer_url),
-               description=IF(VALUES(description) IS NOT NULL AND VALUES(description) != '', VALUES(description), description),
+               description=IF(description IS NULL OR description = '', VALUES(description), description),
                rating=IF(VALUES(rating) IS NOT NULL AND VALUES(rating) != '', VALUES(rating), rating),
                rating_score=IF(VALUES(rating_score) IS NOT NULL, VALUES(rating_score), rating_score),
                popularity=IF(VALUES(popularity) > 0, VALUES(popularity), popularity),
@@ -1936,6 +1975,24 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       req.log.warn(cleanErr, "adult cleanup failed");
     }
 
+    // Tracking dashboard : detect source via cover heuristique
+    if (cleanedItems.length > 0) {
+      const sample = cleanedItems[0];
+      const cover = String((sample as any).cover || "");
+      let source = "unknown";
+      if (cover.includes("anilistcdn") || cover.includes("anilist.co")) source = "anilist";
+      else if (cover.includes("myanimelist.net")) source = "jikan";
+      else if (cover.includes("animeschedule.net")) source = "animeschedule";
+      else if (cover.includes("rawg.io") || cover.includes("igdb")) source = "rawg";
+      const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
+      trackLastRun(`push-${prefix.replace("/", "")}-${source}`, { total: cleanedItems.length, filtered });
+      pushActivity({
+        type: "push",
+        message: `${sourceLabel} pushed ${cleanedItems.length} ${prefix.replace("/", "")} items`,
+        detail: filtered > 0 ? `${filtered} filtered (adult)` : `${cleanedItems.length} items processed`,
+        level: "info",
+      });
+    }
     return reply.code(200).send({ ok: true, total: cleanedItems.length, filtered });
   });
 }
@@ -1969,6 +2026,8 @@ await registerGameNimeRoutes(app, pool, {
   adminApiKey: process.env.ANIME_API_KEY,
 });
 
+startDashboard(app, pool);
+startRefetchGamesCron(app);
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
 
 startRefetchCron(app);

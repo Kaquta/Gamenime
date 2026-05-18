@@ -211,3 +211,17 @@ export const PLATFORM_ALIASES: Readonly<Record<string, string>> = Object.freeze(
   // The frontend simplifyPlatform() collapses them on cards for compact display,
   // while the modal shows the full version for detail.
 });
+
+// ════════════════════════════════════════════════════════════════
+// NICHE FILTERING — Session 13.3
+// Critères pour rejeter les niches games au push ET cleanup DB
+// ════════════════════════════════════════════════════════════════
+// Un game est considéré "niche à rejeter" si TOUS ces critères sont vrais :
+//   - popularity < NICHE_POPULARITY_THRESHOLD
+//   - release_date < (today - NICHE_AGE_DAYS days)
+//   - rating_score IS NULL OU < NICHE_RATING_PROTECTION (préserve cult favorites)
+// Une fois ces 3 critères réunis : l'item est dégagé (push refusé OU cleanup applicable).
+
+export const NICHE_POPULARITY_THRESHOLD = 10;
+export const NICHE_AGE_DAYS = 30;
+export const NICHE_RATING_PROTECTION = 70; // un game noté >= 70 reste même si peu populaire

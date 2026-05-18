@@ -24,6 +24,9 @@ services:
       DB_PASS: ${MARIADB_PASSWORD}
       ANIME_API_KEY: ${ANIME_API_KEY}
       GAMES_API_KEY: ${GAMES_API_KEY}
+      RAWG_API_KEY: ${RAWG_API_KEY}
+      TWITCH_CLIENT_ID: ${TWITCH_CLIENT_ID}
+      TWITCH_CLIENT_SECRET: ${TWITCH_CLIENT_SECRET}
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_SECURE: ${SMTP_SECURE}
@@ -87,7 +90,6 @@ services:
       - ./site/dist:/usr/share/nginx/html:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
-      - /opt/stack/nginx/.htpasswd-netdata:/etc/nginx/.htpasswd-netdata:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro
     depends_on: [content-api, n8n]
     networks: [internal, public]

@@ -1,5 +1,0 @@
-services:
-  web:
-    networks:
-      - internal
-      - public
