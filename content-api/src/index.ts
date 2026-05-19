@@ -669,7 +669,7 @@ app.post("/premium/generate-reminders", async (req, reply) => {
         const table = itemType === "anime" ? "anime_items" : "game_items";
 
         const rows: any = await pool.query(
-          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.release_date,
+          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.platform, i.release_date,
                   u.email AS user_email, u.display_name AS user_display_name,
                   u.email_notifications_enabled AS user_email_enabled,
                   u.email_verified AS user_email_verified
