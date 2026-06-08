@@ -163,13 +163,10 @@ async function requireAuth(req: any, reply: any) {
 }
 
 async function requirePremium(req: any, reply: any) {
-  const user = await requireAuth(req, reply);
-  if (!user) return null;
-  if (!user.isPremium) {
-    reply.code(403).send({ error: "Accès Premium requis", premiumRequired: true });
-    return null;
-  }
-  return user;
+  // FREE LAUNCH : plus de restriction Premium, juste authentification.
+  // Pour reactiver le Premium plus tard, restaurer le check ci-dessous :
+  //   if (!user.isPremium) { reply.code(403).send({ error: "Accès Premium requis", premiumRequired: true }); return null; }
+  return await requireAuth(req, reply);
 }
 
 async function requireEmailVerified(req: any, reply: any) {
@@ -672,14 +669,16 @@ app.post("/premium/generate-reminders", async (req, reply) => {
           `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.platform, i.release_date,
                   u.email AS user_email, u.display_name AS user_display_name,
                   u.email_notifications_enabled AS user_email_enabled,
-                  u.email_verified AS user_email_verified
+                  u.email_verified AS user_email_verified,
+                  u.is_premium AS user_is_premium,
+                  u.premium_expires_at AS user_premium_expires_at,
+                  u.notifications_enabled AS user_notifs_enabled
            FROM favorites f
            INNER JOIN ${table} i ON i.id = f.item_id
            INNER JOIN users u ON u.id = f.user_id
            WHERE f.item_type = ?
              AND DATE(i.release_date) = ?
-             AND u.is_premium = 1
-             AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
+             AND u.notifications_enabled = 1
              AND NOT EXISTS (
                SELECT 1 FROM reminder_log r
                WHERE r.user_id = f.user_id
@@ -703,8 +702,10 @@ app.post("/premium/generate-reminders", async (req, reply) => {
           const eventRows: any = await pool.query(`SELECT id FROM notification_events WHERE event_key = ? LIMIT 1`, [eventKey]);
           const eventId = eventRows[0].id;
 
+          // FREE LAUNCH : tout le monde recoit en instantane (deliver_at NULL)
+          // L'infra Premium reste en place (vierge) pour un futur Premium different
           await pool.query(
-            `INSERT INTO user_notifications (user_id, event_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE event_id = event_id`,
+            `INSERT INTO user_notifications (user_id, event_id, deliver_at) VALUES (?, ?, NULL) ON DUPLICATE KEY UPDATE event_id = event_id`,
             [row.user_id, eventId]
           );
 
@@ -713,6 +714,7 @@ app.post("/premium/generate-reminders", async (req, reply) => {
             [row.user_id, itemType, row.item_id, offset, targetStr]
           );
 
+          // FREE LAUNCH : email pour tous ceux qui l'ont active + verifie (plus de condition Premium)
           const reminderEmailEligible = !!(Number(row.user_email_enabled) === 1 && Number(row.user_email_verified) === 1);
           if (reminderEmailEligible) {
             void (async () => {
@@ -811,13 +813,11 @@ app.post("/premium/generate-alerts", async (req, reply) => {
               u.email_verified AS user_email_verified
        FROM user_alert_preferences p
        INNER JOIN users u ON u.id = p.user_id
-       WHERE u.is_premium = 1
-         AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
-         AND (p.alert_genres IS NOT NULL OR p.alert_platforms IS NOT NULL)`
+       WHERE (p.alert_genres IS NOT NULL OR p.alert_platforms IS NOT NULL)`
     );
 
     if (!prefsRows.length) {
-      return reply.send({ ok: true, ...results, message: "Aucun user Premium avec prefs" });
+      return reply.send({ ok: true, ...results, message: "Aucun user avec prefs" });
     }
 
     for (const itemType of ["anime", "game"] as const) {
@@ -1077,6 +1077,150 @@ app.delete("/favorites/:itemType/:itemId", async (req, reply) => {
   }
 });
 
+// ── Calendar export (ICS) ──────────────────────────
+app.get("/me/calendar-token", async (req, reply) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return reply.code(401).send({ error: "Non authentifié" });
+    const rows: any = await pool.query(
+      `SELECT calendar_token FROM users WHERE id = ?`,
+      [user.id]
+    );
+    let token = rows?.[0]?.calendar_token || null;
+    if (!token) {
+      token = randomBytes(32).toString("hex");
+      await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ?`, [token, user.id]);
+    }
+    const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
+    const host = base.replace(/^https?:\/\//, "");
+    return reply.send({
+      ok: true,
+      token,
+      url: `${base}/cal/${token}.ics`,
+      webcal: `webcal://${host}/cal/${token}.ics`,
+    });
+  } catch (err: any) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+app.post("/me/calendar-token/regenerate", async (req, reply) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return reply.code(401).send({ error: "Non authentifié" });
+    const token = randomBytes(32).toString("hex");
+    await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ?`, [token, user.id]);
+    const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
+    const host = base.replace(/^https?:\/\//, "");
+    return reply.send({
+      ok: true,
+      token,
+      url: `${base}/cal/${token}.ics`,
+      webcal: `webcal://${host}/cal/${token}.ics`,
+    });
+  } catch (err: any) {
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+// ── Calendar ICS feed (public, via token) ──────────
+function icsEscape(s: string | null): string {
+  if (!s) return "";
+  return String(s)
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
+}
+function icsDate(d: any): string {
+  // Format YYYYMMDD pour un evenement "toute la journee"
+  const dt = new Date(d);
+  const y = dt.getUTCFullYear();
+  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(dt.getUTCDate()).padStart(2, "0");
+  return `${y}${m}${day}`;
+}
+function icsDateNextDay(d: any): string {
+  const dt = new Date(d);
+  dt.setUTCDate(dt.getUTCDate() + 1);
+  return icsDate(dt);
+}
+
+app.get("/cal/:token.ics", async (req, reply) => {
+  try {
+    const token = (req.params as any).token;
+    if (!token || typeof token !== "string" || token.length < 32) {
+      return reply.code(404).send("Not found");
+    }
+    const users = await pool.query(
+      `SELECT id FROM users WHERE calendar_token = ? LIMIT 1`,
+      [token]
+    );
+    if (!users || users.length === 0) {
+      return reply.code(404).send("Not found");
+    }
+    const userId = users[0].id;
+
+    // Favoris avec vraie date (exclut precision=year — Q3)
+    const rows = await pool.query(
+      `SELECT f.item_type, i.title, i.title_english AS titleEnglish, i.platform,
+              DATE_FORMAT(i.release_date, '%Y-%m-%d') AS releaseDate
+       FROM favorites f
+       INNER JOIN anime_items i ON f.item_type = 'anime' AND f.item_id = i.id
+       WHERE f.user_id = ?
+         AND i.release_date IS NOT NULL
+         AND (i.release_precision IS NULL OR i.release_precision != 'year')
+       UNION ALL
+       SELECT f.item_type, g.title, g.title_english AS titleEnglish, g.platform,
+              DATE_FORMAT(g.release_date, '%Y-%m-%d') AS releaseDate
+       FROM favorites f
+       INNER JOIN game_items g ON f.item_type = 'game' AND f.item_id = g.id
+       WHERE f.user_id = ?
+         AND g.release_date IS NOT NULL
+         AND (g.release_precision IS NULL OR g.release_precision != 'year')`,
+      [userId, userId]
+    );
+
+    const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
+    const now = new Date();
+    const stamp = `${icsDate(now)}T000000Z`;
+
+    let ics = "BEGIN:VCALENDAR\r\n";
+    ics += "VERSION:2.0\r\n";
+    ics += "PRODID:-//GameNime//Radar Sorties//FR\r\n";
+    ics += "CALSCALE:GREGORIAN\r\n";
+    ics += "METHOD:PUBLISH\r\n";
+    ics += "X-WR-CALNAME:GameNime — Mes sorties\r\n";
+    ics += "X-WR-TIMEZONE:Europe/Paris\r\n";
+
+    for (const it of rows) {
+      const title = it.titleEnglish || it.title || "Sortie";
+      const emoji = it.item_type === "anime" ? "📺" : "🎮";
+      const platform = it.platform ? ` — ${it.platform}` : "";
+      const uid = `${it.item_type}-${icsDate(it.releaseDate)}-${Buffer.from(title).toString("hex").slice(0, 16)}@gamenime.fr`;
+      ics += "BEGIN:VEVENT\r\n";
+      ics += `UID:${uid}\r\n`;
+      ics += `DTSTAMP:${stamp}\r\n`;
+      ics += `DTSTART;VALUE=DATE:${icsDate(it.releaseDate)}\r\n`;
+      ics += `DTEND;VALUE=DATE:${icsDateNextDay(it.releaseDate)}\r\n`;
+      ics += `SUMMARY:${emoji} ${icsEscape(title)}\r\n`;
+      ics += `DESCRIPTION:${icsEscape("Sortie" + platform + " · via GameNime " + base)}\r\n`;
+      ics += "END:VEVENT\r\n";
+    }
+
+    ics += "END:VCALENDAR\r\n";
+
+    reply.header("Content-Type", "text/calendar; charset=utf-8");
+    reply.header("Content-Disposition", 'inline; filename="gamenime.ics"');
+    return reply.send(ics);
+  } catch (err) {
+    req.log.error(err);
+    return reply.code(500).send("Error");
+  }
+});
+
 // ── Notifications ──────────────────────────────────
 function parseNotificationPayload(value: any) {
   if (!value) return null;
@@ -1091,7 +1235,7 @@ function parseNotificationPayload(value: any) {
 app.get("/notifications/stream", async (req, reply) => {
   const user = await getAuthenticatedUser(req);
   if (!user) return reply.code(401).send({ error: "Non authentifié" });
-  if (!user.isPremium) return reply.code(403).send({ error: "SSE requires Premium" });
+  // FREE LAUNCH : SSE temps reel ouvert a tous les users connectes
 
   reply.raw.setHeader("Content-Type", "text/event-stream");
   reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
@@ -1205,6 +1349,7 @@ app.post("/notifications/:id/read", async (req, reply) => {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
   }
+});
 
 app.delete("/notifications/:id", async (req, reply) => {
   try {
@@ -1223,7 +1368,6 @@ app.delete("/notifications/:id", async (req, reply) => {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
   }
-});
 });
 
 app.post("/notifications/read-all", async (req, reply) => {
@@ -1274,12 +1418,9 @@ app.patch("/me/notification-channels", async (req, reply) => {
     }
 
     if (typeof emailNotificationsEnabled === "boolean") {
-      // Règle métier : email = Premium only. Si user pas Premium, on force false.
-      const isPremiumActive = Number(user.isPremium) === 1 &&
-        (user.premiumExpiresAt === null || new Date(user.premiumExpiresAt).getTime() > Date.now());
-      const finalValue = isPremiumActive ? emailNotificationsEnabled : false;
+      // FREE LAUNCH : email activable par tous (plus de restriction Premium)
       updates.push("email_notifications_enabled = ?");
-      params.push(finalValue ? 1 : 0);
+      params.push(emailNotificationsEnabled ? 1 : 0);
     }
 
     if (updates.length === 0) {
@@ -1371,26 +1512,20 @@ async function createNotificationEventAndFanout(
   const eventId = Number(result.insertId || 0);
   if (!eventId) return;
 
-  // Premium users: immediate delivery (deliver_at = NULL)
-  // Free users: 6h delay (deliver_at = NOW() + 6h)
+  // FREE LAUNCH : livraison instantanee pour tous (deliver_at = NULL)
   await db.query(
     `INSERT IGNORE INTO user_notifications (user_id, event_id, deliver_at)
-     SELECT f.user_id, ?,
-       CASE
-         WHEN u.is_premium = 1 AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())
-         THEN NULL
-         ELSE DATE_ADD(NOW(), INTERVAL 6 HOUR)
-       END AS deliver_at
+     SELECT f.user_id, ?, NULL AS deliver_at
      FROM favorites f
      INNER JOIN users u ON u.id = f.user_id
      WHERE f.item_type = ? AND f.item_id = ? AND u.notifications_enabled = 1`,
     [eventId, itemType, itemId]
   );
 
-  // Emit real-time to Premium users via SSE
+  // FREE LAUNCH : emit temps reel SSE a tous les users avec notifs activees
   try {
     const targetRows: any = await db.query(
-      `SELECT f.user_id FROM favorites f INNER JOIN users u ON u.id = f.user_id WHERE f.item_type = ? AND f.item_id = ? AND u.notifications_enabled = 1 AND u.is_premium = 1 AND (u.premium_expires_at IS NULL OR u.premium_expires_at > NOW())`,
+      `SELECT f.user_id FROM favorites f INNER JOIN users u ON u.id = f.user_id WHERE f.item_type = ? AND f.item_id = ? AND u.notifications_enabled = 1`,
       [itemType, itemId]
     );
     const sseNotif = { id: eventId, itemType, itemId, eventType, eventKey, payload, eventAt: new Date().toISOString() };
@@ -1551,8 +1686,8 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     if (q.noCover === "1") conditions.push("(cover IS NULL OR cover = '')");
     if (q.releasedAfter) { conditions.push("release_date >= ?"); params.push(q.releasedAfter); }
     if (q.releasedBefore) { conditions.push("release_date <= ?"); params.push(q.releasedBefore); }
-    if (q.upcoming === "1") conditions.push("release_date > CURDATE()");
-    if (q.released === "1") conditions.push("release_date <= CURDATE()");
+    if (q.upcoming === "1") conditions.push("(release_date > CURDATE() OR release_precision = 'year')");
+    if (q.released === "1") conditions.push("release_date <= CURDATE() AND (release_precision IS NULL OR release_precision != 'year')");
     if (q.genre) { conditions.push("genre LIKE ?"); params.push(`%${q.genre}%`); }
     if (q.platform) {
       const plats = String(q.platform).split(",").map((p:string) => p.trim()).filter(Boolean);
@@ -1579,7 +1714,8 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
               DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
-              is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl
+              is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl,
+              release_precision AS releasePrecision
        FROM ${table} ${where} ORDER BY ${orderBy} ${order} LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );

@@ -130,13 +130,35 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     try{var res=await fetch(authEndpoint("/favorites/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];
     if(favDrawerCount)favDrawerCount.textContent=items.length+" favori"+(items.length>1?"s":"");
     if(!items.length){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.<br>Ajoute avec le ♡ !</div>';return;}
-    if(favDrawerContent)favDrawerContent.innerHTML=items.map(function(f){var info=simplifyPlatform(f.platform)||f.genre||"";var tb=f.itemType==="anime"?"🎌":"🎮";return'<div class="drawer-card"><div class="drawer-card__thumb">'+(f.cover?'<img src="'+f.cover+'" alt="" />':'')+'</div><div class="drawer-card__body"><div class="drawer-card__title">'+tb+' '+escapeHtml(f.title)+'</div><div class="drawer-card__sub">'+escapeHtml(info)+'</div></div><button class="drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer">✕</button></div>';}).join("");
+    if(favDrawerContent)favDrawerContent.innerHTML=items.map(function(f){var info=simplifyPlatform(f.platform)||f.genre||"";var tb=f.itemType==="anime"?"🎌":"🎮";return'<div class="drawer-card" data-type="'+f.itemType+'" data-id="'+f.itemId+'" data-release-date="'+(f.releaseDate||"")+'" style="cursor:pointer"><div class="drawer-card__thumb">'+(f.cover?'<img src="'+f.cover+'" alt="" />':'')+'</div><div class="drawer-card__body"><div class="drawer-card__title">'+tb+' '+escapeHtml(f.title)+'</div><div class="drawer-card__sub">'+escapeHtml(info)+'</div></div><button class="drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer">✕</button></div>';}).join("");
     }catch(e){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
   if(favDrawerClose)favDrawerClose.addEventListener("click",closeFavDrawer);
   if(favOverlay)favOverlay.addEventListener("click",closeFavDrawer);
   document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();});
-  if(favDrawerContent)favDrawerContent.addEventListener("click",async function(e){var btn=e.target.closest(".drawer-card__remove");if(!btn)return;try{var res=await fetch(authEndpoint("/favorites/"+btn.dataset.type+"/"+btn.dataset.id),{method:"DELETE",credentials:"include",headers:{Accept:"application/json"}});if(res.ok){var card=btn.closest(".drawer-card");if(card)card.remove();document.dispatchEvent(new CustomEvent("favChanged",{detail:{type:btn.dataset.type,id:btn.dataset.id,action:"remove"}}));var rem=favDrawerContent.querySelectorAll(".drawer-card").length;if(favDrawerCount)favDrawerCount.textContent=rem+" favori"+(rem>1?"s":"");if(!rem)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.</div>';}}catch(err){}});
+  if(favDrawerContent)favDrawerContent.addEventListener("click",async function(e){
+    // Cas 1: click sur bouton "✕" remove
+    var btn=e.target.closest(".drawer-card__remove");
+    if(btn){
+      e.stopPropagation();
+      try{var res=await fetch(authEndpoint("/favorites/"+btn.dataset.type+"/"+btn.dataset.id),{method:"DELETE",credentials:"include",headers:{Accept:"application/json"}});if(res.ok){var card=btn.closest(".drawer-card");if(card)card.remove();document.dispatchEvent(new CustomEvent("favChanged",{detail:{type:btn.dataset.type,id:btn.dataset.id,action:"remove"}}));var rem=favDrawerContent.querySelectorAll(".drawer-card").length;if(favDrawerCount)favDrawerCount.textContent=rem+" favori"+(rem>1?"s":"");if(!rem)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.</div>';}}catch(err){}
+      return;
+    }
+    // Cas 2: click sur la card -> fermer drawer + ouvrir modal INSTANTANEMENT
+    var card=e.target.closest(".drawer-card");
+    if(!card||!card.dataset.id)return;
+    var itemType=card.dataset.type;
+    var itemId=card.dataset.id;
+    var domain=itemType==="game"?"games":"anime";
+    closeFavDrawer();
+    if(typeof window.__openItemModal==="function"){
+      window.__openItemModal(domain,itemId);
+    }else{
+      // Fallback si SectionBlock pas charge sur la page actuelle
+      var targetPage=itemType==="anime"?"/anime":"/games";
+      window.location.href=targetPage+"#item-"+itemId;
+    }
+  });
 
   // ── COMPTE ───────────────────────────────────────
   var accountDrawer=document.getElementById("accountDrawer"),accountOverlay=document.getElementById("accountOverlay"),accountDrawerClose=document.getElementById("accountDrawerClose"),accountDrawerContent=document.getElementById("accountDrawerContent");
@@ -147,7 +169,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var u=currentUser;var av=getAv(u.avatar||"luffy");
 
     accountDrawerContent.innerHTML=
-      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp">'+av.svg+'</div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div>'+(u.emailVerified===false?'<button type="button" id="emailUnverifiedBtn" class="account-email-unverified">Email non vérifié — Renvoyer</button>':'')+'</div></div>'+
+      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp">'+av.svg+'</div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+(u.isPremium?' <span class="premium-text-badge">PREMIUM</span>':'')+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div>'+(u.emailVerified===false?'<button type="button" id="emailUnverifiedBtn" class="account-email-unverified">Email non vérifié — Renvoyer</button>':'')+'</div></div>'+
 
       '<button class="account-option" data-toggle="avatarForm" type="button">🎭 Changer d\'avatar</button>'+
       '<div id="avatarForm" class="account-subform hidden"><div class="avatar-grid">'+AVATARS.map(function(a){var sel=(u.avatar||"luffy")===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'">'+a.svg+'</button>';}).join("")+'</div></div>'+
@@ -159,7 +181,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div></div>'+
 
       '<button class="account-option" data-toggle="notifOptForm" type="button">🔔 Options notifications</button>'+
-      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label>'+(u.isPremium?'<a href="/account/preferences" class="account-prefs-link">⚡ Mes préférences →</a>':'')+'</div>'+
+      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label><a href="/account/preferences" class="account-prefs-link">⚡ Mes préférences →</a></div>'+
 
       (u.isPremium?'<a href="/account" class="account-option account-option--premium">🤚 Gérer mon abonnement</a>':'')+'<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
 
@@ -302,14 +324,43 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     try{var res=await fetch(authEndpoint("/notifications/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];var unread=Number(data.unreadCount||0);
     if(notifPMeta)notifPMeta.textContent=unread>0?unread+" non lue"+(unread>1?"s":""):"Tout est lu";
     if(!items.length){if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Aucune notification.</div>';return;}
-if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.payload||{};var title=p.title||"Mise à jour";var label=p.label||item.eventType;var detail=p.newValue||"";var icon=evIcon(item.eventType);var uc=item.isRead?"":" notif-card--unread";var thumb=p.cover?'<img src="'+p.cover+'" alt="" />':'<span style="font-size:1.3rem;display:flex;align-items:center;justify-content:center;height:100%">'+icon+'</span>';return'<button class="notif-card'+uc+'" data-id="'+item.id+'" type="button"><div class="notif-card__thumb">'+thumb+'</div><div class="notif-card__content"><div class="notif-card__title">'+escapeHtml(label)+' — '+escapeHtml(title)+'</div>'+(detail?'<div class="notif-card__text">'+escapeHtml(detail)+'</div>':'')+'<div class="notif-card__time">'+timeAgo(item.eventAt||item.createdAt)+'</div></div></button>';}).join("");
+if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.payload||{};var title=p.title||"Mise à jour";var label=p.label||item.eventType;var detail=p.newValue||"";var icon=evIcon(item.eventType);var uc=item.isRead?"":" notif-card--unread";var thumb=p.cover?'<img src="'+p.cover+'" alt="" />':'<span style="font-size:1.3rem;display:flex;align-items:center;justify-content:center;height:100%">'+icon+'</span>';return'<div class="notif-card'+uc+'" data-id="'+item.id+'" data-item-type="'+(item.itemType||"")+'" data-item-id="'+(item.itemId||"")+'" style="cursor:pointer;position:relative"><div class="notif-card__thumb">'+thumb+'</div><div class="notif-card__content"><div class="notif-card__title">'+escapeHtml(label)+' — '+escapeHtml(title)+'</div>'+(detail?'<div class="notif-card__text">'+escapeHtml(detail)+'</div>':'')+'<div class="notif-card__time">'+timeAgo(item.eventAt||item.createdAt)+'</div></div><button class="notif-card__remove" data-notif-id="'+item.id+'" title="Supprimer" type="button">✕</button></div>';}).join("");
     }catch(e){if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
   if(notifPClose)notifPClose.addEventListener("click",closeNotifPageDrawer);
   if(notifPOverlay)notifPOverlay.addEventListener("click",closeNotifPageDrawer);
   document.getElementById("openNotifPage")?.addEventListener("click",function(){openNotifPageDrawer();});
   if(notifPReadAll)notifPReadAll.addEventListener("click",async function(){try{var res=await fetch(authEndpoint("/notifications/read-all"),{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({})});if(res.ok)openNotifPageDrawer();}catch(e){}});
-  if(notifPContent)notifPContent.addEventListener("click",async function(e){var rmBtn=e.target.closest(".notif-card__remove");if(rmBtn){e.stopPropagation();var nid=Number(rmBtn.dataset.notifId||0);if(nid>0){try{var dr=await fetch(authEndpoint("/notifications/"+nid),{method:"DELETE",credentials:"include"});if(dr.ok){var rc=rmBtn.closest(".notif-card");if(rc)rc.remove();}}catch(x){}}return;}var card=e.target.closest(".notif-card");if(!card)return;var id=Number(card.dataset.id||0);if(id<=0)return;try{var res=await fetch(authEndpoint("/notifications/"+id+"/read"),{method:"POST",credentials:"include"});if(res.ok){card.classList.remove("notif-card--unread");}}catch(e){}});
+  if(notifPContent)notifPContent.addEventListener("click",async function(e){
+    // Cas 1: bouton supprimer
+    var rmBtn=e.target.closest(".notif-card__remove");
+    if(rmBtn){
+      e.stopPropagation();
+      var nid=Number(rmBtn.dataset.notifId||0);
+      if(nid>0){try{var dr=await fetch(authEndpoint("/notifications/"+nid),{method:"DELETE",credentials:"include"});if(dr.ok){var rc=rmBtn.closest(".notif-card");if(rc)rc.remove();}}catch(x){}}
+      return;
+    }
+    // Cas 2: click sur la card -> marquer lue + ouvrir modal de l'item
+    var card=e.target.closest(".notif-card");
+    if(!card)return;
+    var id=Number(card.dataset.id||0);
+    if(id<=0)return;
+    var itemType=card.dataset.itemType;
+    var itemId=card.dataset.itemId;
+    // Marquer comme lue (fire-and-forget)
+    try{var res=await fetch(authEndpoint("/notifications/"+id+"/read"),{method:"POST",credentials:"include"});if(res.ok)card.classList.remove("notif-card--unread");}catch(e){}
+    // Ouvrir modal de l'item si on a les infos
+    if(itemType&&itemId){
+      var domain=itemType==="game"?"games":"anime";
+      closeNotifPageDrawer();
+      if(typeof window.__openItemModal==="function"){
+        window.__openItemModal(domain,itemId);
+      }else{
+        var targetPage=itemType==="anime"?"/anime":"/games";
+        window.location.href=targetPage+"#item-"+itemId;
+      }
+    }
+  });
 
   fetchMe();
 </script>

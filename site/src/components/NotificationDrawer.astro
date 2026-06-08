@@ -135,14 +135,15 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
             : '<span style="font-size:1.3rem;display:flex;align-items:center;justify-content:center;height:100%">' + icon + '</span>';
 
           return (
-            '<button class="notif-card' + uc + '" data-id="' + item.id + '" type="button">' +
+            '<div class="notif-card' + uc + '" data-id="' + item.id + '" data-item-type="' + (item.itemType || "") + '" data-item-id="' + (item.itemId || "") + '" style="cursor:pointer;position:relative">' +
               '<div class="notif-card__thumb">' + thumb + '</div>' +
               '<div class="notif-card__content">' +
                 '<div class="notif-card__title">' + escapeHtml(label) + ' — ' + escapeHtml(title) + '</div>' +
                 (detail ? '<div class="notif-card__text">' + escapeHtml(detail) + '</div>' : '') +
                 '<div class="notif-card__time">' + timeAgo(item.eventAt || item.createdAt) + '</div>' +
               '</div>' +
-            '</button>'
+              '<button class="notif-card__remove" data-notif-id="' + item.id + '" title="Supprimer" type="button">✕</button>' +
+            '</div>'
           );
         })
         .join("");
@@ -266,12 +267,44 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     if (readAllBtn) readAllBtn.addEventListener("click", function () { void markAllAsRead(); });
 
     if (content) {
-      content.addEventListener("click", function (event) {
+      content.addEventListener("click", async function (event) {
         var target = event.target;
+        // Cas 1: clic sur bouton ✕ supprimer (avant le card !)
+        var rmBtn = target && target.closest ? target.closest(".notif-card__remove") : null;
+        if (rmBtn) {
+          event.stopPropagation();
+          var nid = Number(rmBtn.dataset.notifId || 0);
+          if (nid > 0) {
+            try {
+              var dr = await fetch(endpoint("/notifications/" + nid), { method: "DELETE", credentials: "include" });
+              if (dr.ok) {
+                var rc = rmBtn.closest(".notif-card");
+                if (rc && rc.parentNode) rc.parentNode.removeChild(rc);
+                notifications = notifications.filter(function(n) { return n.id !== nid; });
+                renderMeta();
+                if (!notifications.length && content) content.innerHTML = '<div class="notif-state">Aucune notification.</div>';
+              }
+            } catch (e) {}
+          }
+          return;
+        }
+        // Cas 2: clic sur la card -> marquer lue + ouvrir modal
         var card = target && target.closest ? target.closest(".notif-card") : null;
         if (!card) return;
         var id = Number(card.dataset.id || 0);
         if (id > 0) void markOneAsRead(id);
+        var itemType = card.dataset.itemType;
+        var itemId = card.dataset.itemId;
+        if (itemType && itemId) {
+          var domain = itemType === "game" ? "games" : "anime";
+          closeDrawer();
+          if (typeof (window).__openItemModal === "function") {
+            (window).__openItemModal(domain, itemId);
+          } else {
+            var targetPage = itemType === "anime" ? "/anime" : "/games";
+            window.location.href = targetPage + "#item-" + itemId;
+          }
+        }
       });
     }
 

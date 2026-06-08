@@ -40,12 +40,18 @@ function formatDate(v) {
 // like "Prévu 2026"). Fall back to formatDate for legacy endpoints that
 // don't include releaseDateLabel.
 function dateLabel(item) {
+  // precision=year: ne jamais afficher le 01-01 fictif, montrer "Prevu AAAA"
+  if (item && item.releasePrecision === "year" && item.releaseDate) {
+    return "🟢PRÉVU " + String(item.releaseDate).slice(0, 4);
+  }
   if (item && item.releaseDateLabel) return item.releaseDateLabel;
   return formatDate(item ? item.releaseDate : null);
 }
 
 function getStatusLabel(item) {
   if (!item.releaseDate) return "À surveiller";
+  // precision=year: la date 01-01 est fictive (on connait que l'annee) -> toujours "A venir"
+  if (item.releasePrecision === "year") return "À venir";
   var now = new Date(); now.setHours(0,0,0,0);
   var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
   var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
@@ -246,13 +252,9 @@ function setupDetailModal() {
   if (closeBtn) closeBtn.addEventListener("click", close);
   document.addEventListener("keydown", function(e) { if (e.key === "Escape") close(); });
 
-  document.addEventListener("click", async function(e) {
-    var card = (e.target as HTMLElement).closest(".item-card");
-    if ((e.target as HTMLElement).closest(".fav-heart")) return;
-    if (!card || !modal || !inner) return;
-    var id = (card as HTMLElement).dataset.id;
-    var domain = (card as HTMLElement).dataset.domain;
-    if (!id || !domain) return;
+  // Expose la fonction d'ouverture globale (pour drawer Favoris/Notifs)
+  (window as any).__openItemModal = async function(domain: string, id: string) {
+    if (!modal || !inner) return;
     if (activeCard) killHover(activeCard);
     modal.classList.add("active");
     document.body.style.overflow = "hidden";
@@ -369,6 +371,17 @@ function setupDetailModal() {
     } catch (err) {
       inner.innerHTML = '<p class="detail-loading">Erreur de chargement.</p>';
     }
+  };
+
+  // Handler click existant: delegue a la fonction globale
+  document.addEventListener("click", function(e) {
+    var card = (e.target as HTMLElement).closest(".item-card");
+    if ((e.target as HTMLElement).closest(".fav-heart")) return;
+    if (!card) return;
+    var id = (card as HTMLElement).dataset.id;
+    var domain = (card as HTMLElement).dataset.domain;
+    if (!id || !domain) return;
+    (window as any).__openItemModal(domain, id);
   });
 }
 

@@ -538,12 +538,15 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
 
     if (type === "anime" || type === "all") {
       anime = await pool.query(
-        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, popularity, screenshots,
+        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+                DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
+                release_precision AS releasePrecision,
+                is_recently_released AS isRecentlyReleased,
                 trailer_url AS trailerUrl,
                 'anime' AS type
          FROM anime_items
-         WHERE title LIKE ? ESCAPE '\\'
+         WHERE title LIKE ?
          LIMIT ?`,
         [escapedPattern, SEARCH_LIMIT_PER_TYPE]
       );
@@ -551,12 +554,15 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
 
     if (type === "game" || type === "all") {
       games = await pool.query(
-        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, popularity, screenshots,
+        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+                DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
+                release_precision AS releasePrecision,
+                is_recently_released AS isRecentlyReleased,
                 trailer_url AS trailerUrl,
                 'game' AS type
          FROM game_items
-         WHERE title LIKE ? ESCAPE '\\'
+         WHERE title LIKE ?
          LIMIT ?`,
         [escapedPattern, SEARCH_LIMIT_PER_TYPE]
       );

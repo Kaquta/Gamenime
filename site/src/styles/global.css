@@ -26,7 +26,7 @@ body {
   background-position: center top;
   background-size: contain;
   background-repeat: no-repeat;
-  background-attachment: scroll;
+  background-attachment: fixed;
 }
 
 /* SESSION 13.4: image dediee mobile portrait (1882x3344 - ruelle japonaise).

@@ -40,6 +40,7 @@ function formatDate(v) {
 
 function getStatusLabel(item) {
   if (!item.releaseDate) return "À surveiller";
+  if (item.releasePrecision === "year") return "À venir";
   var now = new Date(); now.setHours(0,0,0,0);
   var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
   var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
@@ -100,7 +101,7 @@ function renderSearchCard(item, domain) {
     "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
     "<div class=\"item-body\">" +
     "<h3>" + displayTitle(item) + "</h3>" +
-    "<p>" + formatDate(item.releaseDate) + "</p>" +
+    "<p>" + (item.releasePrecision === "year" && item.releaseDate ? "Prévu " + String(item.releaseDate).slice(0,4) : formatDate(item.releaseDate)) + "</p>" +
     "<p>" + info + "</p>" +
     "<div class=\"item-badges-row\">" +
     "<span class=\"item-badge\">" + status + "</span>" +

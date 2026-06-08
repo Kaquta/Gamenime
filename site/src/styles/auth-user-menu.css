@@ -183,23 +183,54 @@
 }
 
 .account-prefs-link {
-  display: block;
-  margin-top: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, rgba(255, 140, 60, 0.12), rgba(255, 100, 30, 0.06));
-  border: 1px solid rgba(255, 170, 90, 0.3);
-  color: #ffd4a8;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #b85c5c 0%, #a04848 50%, #8b3a3a 100%);
+  border: 1px solid rgba(255, 180, 180, 0.35);
+  color: #fff;
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
   text-align: center;
-  transition: all 180ms ease;
+  overflow: hidden;
+  box-shadow:
+    0 4px 12px rgba(120, 50, 50, 0.35),
+    inset 0 1px 0 rgba(255, 200, 200, 0.3),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, filter 220ms ease;
+}
+.account-prefs-link::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 220, 220, 0.35) 50%, transparent 70%);
+  transition: left 600ms ease;
+  pointer-events: none;
 }
 .account-prefs-link:hover {
-  background: linear-gradient(135deg, rgba(255, 140, 60, 0.2), rgba(255, 100, 30, 0.12));
-  border-color: rgba(255, 170, 90, 0.5);
+  transform: translateY(-2px) scale(1.01);
+  filter: brightness(1.08);
+  box-shadow:
+    0 8px 20px rgba(120, 50, 50, 0.5),
+    inset 0 1px 0 rgba(255, 200, 200, 0.4),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.18);
   color: #fff;
+}
+.account-prefs-link:hover::before {
+  left: 100%;
+}
+.account-prefs-link:active {
+  transform: translateY(0) scale(0.99);
 }
 
 .account-email-unverified {
@@ -242,4 +273,25 @@
   box-shadow: 0 0 12px rgba(68, 196, 102, 0.25);
   animation: none;
   cursor: default;
+}
+
+/* Badge PREMIUM lumineux (V6 rose-doré pulsant) */
+.premium-text-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #ffcf8f;
+  vertical-align: middle;
+  animation: premiumRoseGlow 2.2s ease-in-out infinite;
+}
+@keyframes premiumRoseGlow {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(232, 155, 155, 0.6), 0 0 14px rgba(255, 200, 120, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 16px rgba(255, 210, 180, 1), 0 0 26px rgba(232, 155, 155, 0.7);
+  }
 }

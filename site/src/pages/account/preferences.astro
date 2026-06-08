@@ -57,6 +57,29 @@ import HeroHeader from "../../components/HeroHeader.astro";
       </div>
     </section>
 
+      <!-- Section Agenda : visible pour tous (Free + Premium) -->
+      <section class="prefs-section prefs-agenda">
+        <h2 class="prefs-section__title">📅 Ajouter à mon agenda</h2>
+        <p class="prefs-section__desc">Synchronise tes sorties favorites (animes + jeux) dans Google Calendar, Apple Calendar ou Outlook. Mise à jour automatique — ne rate plus jamais une sortie. ✨</p>
+        <div id="agendaLoading" class="prefs-state">Chargement...</div>
+        <div id="agendaControls" class="hidden">
+          <div class="agenda-url-row">
+            <input id="agendaUrl" class="agenda-url-input" type="text" readonly value="" />
+            <button id="agendaCopyBtn" class="agenda-copy-btn" type="button">Copier</button>
+          </div>
+          <details class="agenda-help">
+            <summary>Comment l'ajouter à mon agenda ?</summary>
+            <ul class="agenda-steps">
+              <li><strong>Google Agenda :</strong> Autres agendas → ＋ → « À partir de l'URL » → colle le lien</li>
+              <li><strong>Apple Calendar :</strong> Fichier → Nouvel abonnement → colle le lien</li>
+              <li><strong>Outlook :</strong> Ajouter un agenda → « S'abonner à partir du web » → colle le lien</li>
+              <li>La première synchronisation peut prendre quelques heures côté Google. C'est normal.</li>
+            </ul>
+          </details>
+          <div id="agendaMsg" class="prefs-msg hidden"></div>
+        </div>
+      </section>
+
     <form id="prefsForm" class="hidden">
       <section class="prefs-section">
         <h2 class="prefs-section__title">Genres préférés</h2>
@@ -108,15 +131,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
           userIsPremium = !!(user.isPremium);
           if (toggleInApp) toggleInApp.checked = !!user.notificationsEnabled;
           if (toggleEmail) toggleEmail.checked = !!user.emailNotificationsEnabled;
-          if (!userIsPremium) {
-            // Free user : email disabled + badge
-            if (toggleEmail) {
-              toggleEmail.disabled = true;
-              toggleEmail.checked = false;
-            }
-            if (emailChannelRow) emailChannelRow.classList.add("prefs-channel-disabled");
-            if (emailSubLabel) emailSubLabel.innerHTML = "Disponible uniquement avec Premium — <a href=\"/premium\">découvrir</a>";
-          }
+          // FREE LAUNCH : email activable par tous (plus de restriction Premium)
           if (chLoadingEl) chLoadingEl.classList.add("hidden");
           if (chControlsEl) chControlsEl.classList.remove("hidden");
         } catch (e) {
@@ -159,6 +174,39 @@ import HeroHeader from "../../components/HeroHeader.astro";
       });
 
       loadChannels();
+
+      // ── Agenda (export calendrier ICS) ──
+      async function loadAgenda() {
+        var loading = document.getElementById("agendaLoading");
+        var controls = document.getElementById("agendaControls");
+        var urlInput = document.getElementById("agendaUrl");
+        var copyBtn = document.getElementById("agendaCopyBtn");
+        var msg = document.getElementById("agendaMsg");
+        try {
+          var res = await fetch(apiBase + "/api/me/calendar-token", { credentials: "include" });
+          if (!res.ok) throw new Error("not_auth");
+          var data = await res.json();
+          if (urlInput) urlInput.value = data.webcal || data.url || "";
+          if (loading) loading.classList.add("hidden");
+          if (controls) controls.classList.remove("hidden");
+          if (copyBtn) {
+            copyBtn.addEventListener("click", function() {
+              var val = urlInput ? urlInput.value : "";
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(val);
+              } else if (urlInput) {
+                urlInput.select();
+                try { document.execCommand("copy"); } catch (e) {}
+              }
+              copyBtn.textContent = "✓ Copié";
+              setTimeout(function(){ copyBtn.textContent = "Copier"; }, 1500);
+            });
+          }
+        } catch (e) {
+          if (loading) loading.textContent = "Connecte-toi pour obtenir ton lien d'agenda.";
+        }
+      }
+      loadAgenda();
       // ═══ FIN SECTION CANAUX ═══
 
       var loadingEl = document.getElementById("prefsLoading");
@@ -282,4 +330,44 @@ import HeroHeader from "../../components/HeroHeader.astro";
   .prefs-switch input:checked + .prefs-switch-slider { background: #ffad61; }
   .prefs-switch input:checked + .prefs-switch-slider::before { transform: translateX(22px); }
   .prefs-switch input:disabled + .prefs-switch-slider { cursor: not-allowed; opacity: 0.5; }
+
+/* ── Section Agenda (export ICS) ── */
+.prefs-agenda-badge {
+  display: inline-block; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
+  background: rgba(100,200,120,0.15); color: #7ed99a;
+  border: 1px solid rgba(126,217,154,0.3); border-radius: 999px;
+  padding: 2px 8px; margin-left: 8px; vertical-align: middle; text-transform: uppercase;
+}
+.agenda-url-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.agenda-url-input {
+  flex: 1; min-width: 0;
+  background: rgba(0,0,0,0.35);
+  border: 1px solid rgba(255,171,93,0.25);
+  border-radius: 10px; padding: 11px 14px;
+  color: #e8d5c4; font-size: 13px; font-family: ui-monospace, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.agenda-copy-btn {
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #b85c5c 0%, #a04848 50%, #8b3a3a 100%);
+  border: 1px solid rgba(255,180,180,0.35);
+  border-radius: 10px; padding: 11px 18px;
+  color: #fff; font-size: 14px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 3px 10px rgba(120,50,50,0.3), inset 0 1px 0 rgba(255,200,200,0.3);
+  transition: transform 180ms ease, filter 180ms ease;
+}
+.agenda-copy-btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.agenda-copy-btn:active { transform: translateY(0); }
+.agenda-help { border-top: 1px solid rgba(255,171,93,0.12); padding-top: 14px; }
+.agenda-help summary {
+  cursor: pointer; color: #ffb87a; font-size: 13px; font-weight: 600;
+  list-style: none; user-select: none;
+}
+.agenda-help summary::-webkit-details-marker { display: none; }
+.agenda-help summary::before { content: "▸ "; }
+.agenda-help[open] summary::before { content: "▾ "; }
+.agenda-steps { margin: 12px 0 0 0; padding: 0; list-style: none; color: #c4a892; font-size: 13px; line-height: 1.7; }
+.agenda-steps li { margin-bottom: 8px; padding-left: 18px; position: relative; }
+.agenda-steps li::before { content: "•"; position: absolute; left: 4px; color: #b85c5c; }
+.agenda-steps strong { color: #ffd4a8; }
 </style>
