@@ -222,7 +222,6 @@ import HeroHeader from "../../components/HeroHeader.astro";
       var REMINDERS = [
         { value: 7, label: "7 jours avant" },
         
-        { value: 1, label: "La veille" },
         { value: 0, label: "Le jour même" }
       ];
 
@@ -254,7 +253,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
 
           renderGrid(genresGrid, GENRES, data.alertGenres || [], false);
           renderGrid(platformsGrid, PLATFORMS, data.alertPlatforms || [], false);
-          renderGrid(reminderGrid, REMINDERS, data.reminderDaysBefore || [7, 1, 0], true);
+          renderGrid(reminderGrid, REMINDERS, data.reminderDaysBefore || [7, 0], true);
         } catch (e) {
           if (loadingEl) loadingEl.textContent = "Erreur de chargement.";
         }

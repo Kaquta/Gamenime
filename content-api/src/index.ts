@@ -657,7 +657,7 @@ app.post("/premium/generate-reminders", async (req, reply) => {
     today.setHours(0, 0, 0, 0);
     const results = { created: 0, skipped: 0, details: [] as any[] };
 
-    for (const offset of [7, 1, 0]) {
+    for (const offset of [7, 0]) {
       const targetDate = new Date(today);
       targetDate.setDate(targetDate.getDate() + offset);
       const targetStr = targetDate.toISOString().slice(0, 10);
@@ -762,13 +762,13 @@ app.get("/premium/preferences", async (req, reply) => {
       [user.id]
     );
     if (!rows.length) {
-      return reply.send({ alertGenres: [], alertPlatforms: [], reminderDaysBefore: [7, 1, 0] });
+      return reply.send({ alertGenres: [], alertPlatforms: [], reminderDaysBefore: [7, 0] });
     }
     const p = rows[0];
     return reply.send({
       alertGenres: parseJsonSafe(p.alert_genres, []),
       alertPlatforms: parseJsonSafe(p.alert_platforms, []),
-      reminderDaysBefore: parseJsonSafe(p.reminder_days_before, [7, 1, 0]),
+      reminderDaysBefore: parseJsonSafe(p.reminder_days_before, [7, 0]),
     });
   } catch (err) {
     req.log.error(err);
@@ -783,7 +783,7 @@ app.patch("/premium/preferences", async (req, reply) => {
     const body = req.body as any;
     const alertGenres = Array.isArray(body.alertGenres) ? body.alertGenres.slice(0, 30).map(String) : [];
     const alertPlatforms = Array.isArray(body.alertPlatforms) ? body.alertPlatforms.slice(0, 30).map(String) : [];
-    const reminderDays = Array.isArray(body.reminderDaysBefore) ? body.reminderDaysBefore.filter((d: any) => [0, 1, 3, 7, 14, 30].includes(Number(d))) : [7, 1, 0];
+    const reminderDays = Array.isArray(body.reminderDaysBefore) ? body.reminderDaysBefore.filter((d: any) => [0, 7].includes(Number(d))) : [7, 0];
 
     await pool.query(
       `INSERT INTO user_alert_preferences (user_id, alert_genres, alert_platforms, reminder_days_before) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE alert_genres = VALUES(alert_genres), alert_platforms = VALUES(alert_platforms), reminder_days_before = VALUES(reminder_days_before)`,
