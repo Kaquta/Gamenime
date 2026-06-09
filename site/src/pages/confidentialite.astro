@@ -1,0 +1,72 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+---
+<BaseLayout title="Politique de confidentialité — GameNime">
+  <HeroHeader />
+  <main class="legal container">
+    <h1 class="legal__title">Politique de confidentialité</h1>
+    <p class="legal__updated">Dernière mise à jour : juin 2026</p>
+
+    <section class="legal__section">
+      <h2>Préambule</h2>
+      <p>GameNime respecte ta vie privée. Cette politique explique quelles données nous collectons, pourquoi, et comment tu peux les contrôler. Nous collectons le strict minimum nécessaire au fonctionnement du service. Nous ne vendons jamais tes données et n'affichons aucune publicité.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Responsable du traitement</h2>
+      <p>Renald JEAN BAPTISTE — contact : <a href="mailto:contact@gamenime.fr">contact@gamenime.fr</a></p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Données collectées</h2>
+      <p>Lorsque tu crées un compte et utilises GameNime, nous stockons :</p>
+      <ul>
+        <li><strong>Adresse email</strong> — pour identifier ton compte et t'envoyer les notifications que tu actives.</li>
+        <li><strong>Mot de passe</strong> — stocké de façon chiffrée (haché bcrypt), jamais en clair. Nous ne pouvons pas le lire.</li>
+        <li><strong>Pseudo et avatar</strong> — choisis par toi, pour personnaliser ton compte.</li>
+        <li><strong>Favoris</strong> — les animes et jeux que tu suis.</li>
+        <li><strong>Préférences</strong> — genres, plateformes, types de rappels, canaux de notification.</li>
+        <li><strong>Données techniques</strong> — pour des raisons de sécurité, nos serveurs conservent temporairement des journaux de connexion (dont l'adresse IP), utilisés uniquement pour protéger le service contre les abus, puis supprimés.</li>
+      </ul>
+    </section>
+
+    <section class="legal__section">
+      <h2>Finalités</h2>
+      <p>Tes données servent exclusivement à :</p>
+      <ul>
+        <li>Faire fonctionner ton compte (connexion, favoris, préférences).</li>
+        <li>T'envoyer les notifications et rappels que tu as choisi d'activer.</li>
+        <li>Assurer la sécurité du service.</li>
+      </ul>
+      <p>Nous ne réalisons aucun profilage publicitaire et ne partageons pas tes données à des fins commerciales.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Base légale</h2>
+      <p>Le traitement repose sur l'exécution du service que tu demandes (création de compte, notifications) et, pour les journaux techniques, sur notre intérêt légitime à sécuriser le site.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Durée de conservation</h2>
+      <p>Tes données de compte sont conservées tant que ton compte existe. Si tu supprimes ton compte, elles sont effacées. Les journaux techniques sont conservés pour une durée limitée puis supprimés automatiquement.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Hébergement et emails</h2>
+      <p>Les données sont hébergées par OVH (France, Union européenne). Les emails (vérification, rappels) sont envoyés via le service de messagerie d'OVH.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Tes droits</h2>
+      <p>Conformément au RGPD, tu disposes d'un droit d'accès, de rectification, de suppression et de portabilité de tes données, ainsi que d'un droit d'opposition. La plupart de ces actions sont possibles directement depuis ton compte (modifier tes informations, gérer tes favoris et préférences). Pour toute demande, écris à <a href="mailto:contact@gamenime.fr">contact@gamenime.fr</a>. Tu peux aussi introduire une réclamation auprès de la CNIL (cnil.fr).</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Sécurité</h2>
+      <p>Les mots de passe sont chiffrés, les connexions sécurisées (HTTPS), et l'accès aux données est strictement limité. Aucun système n'étant infaillible, nous nous efforçons d'appliquer les bonnes pratiques pour protéger tes informations.</p>
+    </section>
+
+    <p class="legal__back"><a href="/">← Retour à l'accueil</a></p>
+  </main>
+</BaseLayout>

@@ -1,0 +1,48 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+---
+<BaseLayout title="Politique cookies — GameNime">
+  <HeroHeader />
+  <main class="legal container">
+    <h1 class="legal__title">Politique relative aux cookies</h1>
+    <p class="legal__updated">Dernière mise à jour : juin 2026</p>
+
+    <section class="legal__section">
+      <h2>Qu'est-ce qu'un cookie ?</h2>
+      <p>Un cookie est un petit fichier déposé sur ton appareil lorsque tu visites un site. GameNime utilise les cookies de manière minimale, uniquement pour faire fonctionner le service.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Les cookies que nous utilisons</h2>
+      <p>GameNime n'utilise que des cookies <strong>strictement nécessaires</strong> au fonctionnement du site :</p>
+      <ul>
+        <li><strong>Cookie de session</strong> — lorsqu'tu te connectes à ton compte, un cookie sécurisé est déposé pour te garder connecté(e) d'une page à l'autre. Sans lui, tu devrais te reconnecter en permanence. Il ne sert qu'à l'authentification.</li>
+      </ul>
+      <p>Ces cookies sont indispensables : ils ne nécessitent pas de consentement préalable car le service ne peut pas fonctionner sans eux.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Ce que nous n'utilisons PAS</h2>
+      <p>GameNime <strong>n'utilise aucun</strong> :</p>
+      <ul>
+        <li>Cookie publicitaire ou de ciblage ;</li>
+        <li>Traceur tiers (pas de Google Analytics, pas de réseaux publicitaires) ;</li>
+        <li>Cookie de revente de données.</li>
+      </ul>
+      <p>Nous ne te pistons pas et ne partageons rien avec des annonceurs.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Gérer les cookies</h2>
+      <p>Tu peux à tout moment supprimer les cookies via les paramètres de ton navigateur. Note que supprimer le cookie de session te déconnectera de ton compte.</p>
+    </section>
+
+    <section class="legal__section">
+      <h2>Contact</h2>
+      <p>Pour toute question : <a href="mailto:contact@gamenime.fr">contact@gamenime.fr</a></p>
+    </section>
+
+    <p class="legal__back"><a href="/">← Retour à l'accueil</a></p>
+  </main>
+</BaseLayout>

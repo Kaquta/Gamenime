@@ -19,6 +19,7 @@ interface IncompleteItem {
   platform: string | null;
   trailer_url: string | null;
   description: string | null;
+  format: string | null;
 }
 
 interface SourceData {
@@ -26,12 +27,13 @@ interface SourceData {
   platform?: string | null;
   trailerUrl?: string | null;
   description: string | null;
+  format?: string | null;
 }
 
 export async function fetchAniList(anilistId: number): Promise<SourceData | null> {
   if (!anilistId) return null;
 
-  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { description coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
+  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { format description coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
 
   try {
     const res = await fetch("https://graphql.anilist.co", {
@@ -68,7 +70,8 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
     }
 
     const description = stripDescriptionTags(media.description);
-    return { cover, platform, trailerUrl, description };
+    const format = media.format ?? null;
+    return { cover, platform, trailerUrl, description, format };
   } catch (e) {
     return null;
   }
@@ -185,6 +188,7 @@ export function mergeSources(
     platform: sources.find(s => s.platform)?.platform ?? null,
     trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
     description: sources.find(s => s.description)?.description ?? null,
+    format: sources.find(s => s.format)?.format ?? null,
   };
 }
 
@@ -209,7 +213,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
   try {
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description FROM anime_items WHERE (platform IS NULL OR platform = '' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format FROM anime_items WHERE (platform IS NULL OR platform = '' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -262,6 +266,13 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           updates.push("description = ?");
           params.push(merged.description);
           itemChanges.push({ field: "description", oldValue: item.description, newValue: merged.description.substring(0, 80) + "..." });
+        }
+        // FORMAT (lossless append - on remplit si vide)
+        const formatIsMissing = !item.format || item.format === "";
+        if (formatIsMissing && merged.format) {
+          updates.push("format = ?");
+          params.push(merged.format);
+          itemChanges.push({ field: "format", oldValue: item.format, newValue: merged.format });
         }
 
         if (updates.length > 0) {

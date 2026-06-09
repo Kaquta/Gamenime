@@ -151,6 +151,7 @@ function renderCard(item, domain, rank) {
   var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
   var screens = parseScreenshots(item);
   var rankBadge = rank ? '<div class="rank-badge">#' + rank + '</div>' : '';
+  var contentTagBadge = item.contentTag ? '<div class="content-tag">' + item.contentTag + '</div>' : '';
   var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : '';
   var hype = getHypeLabel(item);
   var hypeBadge = '';
@@ -164,6 +165,7 @@ function renderCard(item, domain, rank) {
     '<div class="item-hover-video"></div>' +
     '<div class="item-hover-slides"></div>' +
     '<div class="item-overlay"></div>' +
+    contentTagBadge +
     rankBadge +
     '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +

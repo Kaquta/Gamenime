@@ -194,6 +194,7 @@ const SELECT_ANIME = `
          DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
          release_precision AS releasePrecision,
          trailer_url AS trailerUrl,
+         format,
          'anime' AS type
   FROM anime_items
   WHERE release_date BETWEEN ? AND ?
@@ -212,6 +213,7 @@ const SELECT_GAMES = `
          release_precision AS releasePrecision,
          trailer_url AS trailerUrl,
          dlcs,
+         game_type AS gameType,
          'game' AS type
   FROM game_items
   WHERE release_date BETWEEN ? AND ?
@@ -414,6 +416,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   return items.map(i => ({
     ...i,
     description: stripDisplayTags(i.description),
+    contentTag: (i as any).format === "MOVIE" ? "FILM" : ((i as any).gameType === "DLC" ? "DLC" : null),
   }));
 }
 

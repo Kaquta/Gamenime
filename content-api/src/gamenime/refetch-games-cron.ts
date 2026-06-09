@@ -25,6 +25,7 @@ interface IncompleteGame {
   trailer_url: string | null;
   description: string | null;
   rating_score: number | null;
+  game_type: string | null;
 }
 
 interface SourceData {
@@ -33,6 +34,7 @@ interface SourceData {
   trailerUrl?: string | null;
   description?: string | null;
   ratingScore?: number | null;
+  gameType?: string | null;
 }
 
 /**
@@ -115,7 +117,7 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "text/plain",
       },
-      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating; where id = ${igdbId};`,
+      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, category; where id = ${igdbId};`,
     });
     if (!res.ok) return null;
     const data = await res.json() as any;
@@ -135,12 +137,15 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
 
     // IGDB rating : 0-100, on garde tel quel
     const ratingScore = game.total_rating ? Math.round(Number(game.total_rating)) : null;
-
+    // IGDB category : 1=DLC, 2=expansion, 4=standalone expansion -> tous "DLC"
+    const cat = game.category;
+    const gameType = (cat === 1 || cat === 2 || cat === 4) ? "DLC" : null;
     return {
       cover,
       platform: platforms,
       description: description ? String(description).substring(0, 2000) : null,
       ratingScore,
+      gameType,
     };
   } catch {
     return null;
@@ -154,6 +159,7 @@ function mergeSources(rawg: SourceData | null, igdb: SourceData | null): SourceD
     platform: sources.find(s => s.platform)?.platform ?? null,
     description: sources.find(s => s.description)?.description ?? null,
     ratingScore: sources.find(s => s.ratingScore != null)?.ratingScore ?? null,
+    gameType: sources.find(s => s.gameType)?.gameType ?? null,
   };
 }
 
@@ -176,9 +182,9 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
   try {
     const items: IncompleteGame[] = await conn.query(
-      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score " +
+      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type " +
       "FROM game_items " +
-      "WHERE (cover IS NULL OR cover = '' OR cover LIKE '%media.rawg.io%' OR cover LIKE '%images.igdb.com%' OR platform IS NULL OR platform = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR rating_score IS NULL) " +
+      "WHERE (cover IS NULL OR cover = '' OR cover LIKE '%media.rawg.io%' OR cover LIKE '%images.igdb.com%' OR platform IS NULL OR platform = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR rating_score IS NULL OR game_type IS NULL) " +
       "AND (rawg_id IS NOT NULL OR igdb_id IS NOT NULL) " +
       "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
@@ -225,6 +231,12 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
           updates.push("rating_score = ?");
           params.push(merged.ratingScore);
           itemChanges.push({ field: "rating_score", oldValue: item.rating_score, newValue: merged.ratingScore });
+        }
+        // game_type (lossless - on remplit si vide)
+        if ((item.game_type == null || item.game_type === "") && merged.gameType) {
+          updates.push("game_type = ?");
+          params.push(merged.gameType);
+          itemChanges.push({ field: "game_type", oldValue: item.game_type, newValue: merged.gameType });
         }
 
         if (updates.length > 0) {

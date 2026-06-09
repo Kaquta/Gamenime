@@ -23,8 +23,8 @@ body {
   background-image:
     linear-gradient(to bottom, rgba(18, 7, 4, 0.20), rgba(12, 5, 3, 0.78)),
     url("/gamenime.jpg");
-  background-position: center top;
-  background-size: contain;
+  background-position: center center;
+  background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
@@ -1788,6 +1788,34 @@ select.filter-select:focus {
 
 .hero-topbar__left {
   flex: 1;
+  display: flex;
+  align-items: center;
+}
+.discord-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 140, 60, 0.22), rgba(255, 90, 44, 0.14));
+  border: 1.5px solid rgba(255, 170, 100, 0.55);
+  color: #fff0e0;
+  text-decoration: none;
+  box-shadow: 0 0 16px rgba(255, 140, 60, 0.5), inset 0 1px 0 rgba(255, 220, 180, 0.35);
+  animation: discordPulseGlow 2.4s ease-in-out infinite;
+  transition: transform 200ms ease;
+}
+.discord-link:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+.discord-link svg {
+  display: block;
+  filter: drop-shadow(0 0 6px rgba(255, 200, 140, 0.9));
+}
+@keyframes discordPulseGlow {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 140, 60, 0.4), inset 0 1px 0 rgba(255, 220, 180, 0.35); }
+  50% { box-shadow: 0 0 22px rgba(255, 150, 70, 0.7), inset 0 1px 0 rgba(255, 220, 180, 0.35); }
 }
 
 .hero-topbar__right {
@@ -3063,4 +3091,46 @@ body.is-authenticated .fav-heart {
 .auth-card__forgot-msg--error {
   background: rgba(255, 100, 100, 0.1);
   color: #ff6b6b;
+}
+
+/* ── Footer : liens légaux ── */
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+  margin-bottom: 12px;
+}
+.site-footer__links a {
+  color: #b89580;
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 180ms ease;
+}
+.site-footer__links a:hover {
+  color: #ffb877;
+}
+.site-footer__credit {
+  text-align: center;
+  font-size: 12px;
+  color: #7a6555;
+  margin: 0;
+}
+
+/* ── Badge FILM / DLC (bande diagonale V3, coin haut gauche) ── */
+.item-card { position: relative; }
+.content-tag {
+  position: absolute;
+  top: 8px;
+  left: -38px;
+  background: #d62828;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 2px 38px;
+  transform: rotate(-45deg);
+  z-index: 3;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  pointer-events: none;
 }
