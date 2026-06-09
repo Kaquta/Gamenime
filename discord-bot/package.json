@@ -1,0 +1,15 @@
+{
+  "name": "gamenime-discord-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "setup": "node setup-structure.js",
+    "bot": "node bot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.26.4",
+    "dotenv": "^17.4.2",
+    "node-cron": "^4.2.1"
+  }
+}

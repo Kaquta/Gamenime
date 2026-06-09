@@ -93,6 +93,17 @@ services:
       - ./nginx/snippets:/etc/nginx/snippets:ro
     depends_on: [content-api, n8n]
     networks: [internal, public]
+  discord-bot:
+    build: ./discord-bot
+    container_name: discord-bot
+    restart: unless-stopped
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      PUBLIC_SITE_URL: ${PUBLIC_SITE_URL}
+    depends_on: [content-api]
+    networks: [internal, public]
+
   certbot:
     image: certbot/certbot
     container_name: certbot

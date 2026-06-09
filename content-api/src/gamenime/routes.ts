@@ -461,6 +461,50 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   });
 
   // ─────────────────────────────────────────────────
+  // GET /feed/today — sorties du jour (anime + jeux)
+  // Pour le bot Discord. Exclut precision=year (pas de fausse date).
+  // ─────────────────────────────────────────────────
+  app.get("/feed/today", async (req: FastifyRequest, reply: FastifyReply) => {
+    const now = new Date();
+    const todayISO = now.toISOString().slice(0, 10);
+    const SELECT_TODAY_ANIME = `
+      SELECT title, title_english AS titleEnglish, cover, platform,
+             DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+             'anime' AS type
+      FROM anime_items
+      WHERE release_date = ?
+        AND (release_precision IS NULL OR release_precision != 'year')
+        AND title IS NOT NULL AND title != ''
+      ORDER BY popularity DESC
+    `;
+    const SELECT_TODAY_GAMES = `
+      SELECT title, title_english AS titleEnglish, cover, platform,
+             DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
+             'game' AS type
+      FROM game_items
+      WHERE release_date = ?
+        AND (release_precision IS NULL OR release_precision != 'year')
+        AND title IS NOT NULL AND title != ''
+      ORDER BY popularity DESC
+    `;
+    const [anime, games]: [any[], any[]] = await Promise.all([
+      pool.query(SELECT_TODAY_ANIME, [todayISO]),
+      pool.query(SELECT_TODAY_GAMES, [todayISO]),
+    ]);
+    const animeClean = applyDisplayStripToItems(anime);
+    const gamesClean = applyDisplayStripToItems(games);
+    const payload = {
+      date: todayISO,
+      generatedAt: now.toISOString(),
+      counts: { anime: animeClean.length, games: gamesClean.length, total: animeClean.length + gamesClean.length },
+      anime: animeClean,
+      games: gamesClean,
+    };
+    req.log.info({ date: todayISO, anime: animeClean.length, games: gamesClean.length }, "feed.today");
+    return reply.send(payload);
+  });
+
+  // ─────────────────────────────────────────────────
   // GET /feed/anime — top anime
   // ─────────────────────────────────────────────────
   app.get("/feed/anime", async (req: FastifyRequest, reply: FastifyReply) => {

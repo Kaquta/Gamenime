@@ -2734,6 +2734,24 @@ body.is-authenticated .fav-heart {
   line-height: 1.5;
   margin: 0;
 }
+.premium__reassure {
+  max-width: 560px;
+  margin: 32px auto 0;
+  background: rgba(126, 217, 154, 0.08);
+  border: 1px solid rgba(126, 217, 154, 0.2);
+  border-radius: 14px;
+  padding: 16px 22px;
+  text-align: center;
+}
+.premium__reassure p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #b8d4c0;
+}
+.premium__reassure strong {
+  color: #7ed99a;
+}
 .premium__trust {
   text-align: center;
   margin-top: 32px;

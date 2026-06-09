@@ -8,7 +8,7 @@ import HeroHeader from "../components/HeroHeader.astro";
 
   <main class="premium container">
     <h1 class="premium__title">Premium</h1>
-    <p class="premium__sub">Ne rate plus jamais une sortie. Sois le premier informé.</p>
+    <p class="premium__sub">Ton agenda de sorties, taillé sur-mesure.</p>
 
     <div class="premium__plans">
       <div class="plan">
@@ -21,29 +21,30 @@ import HeroHeader from "../components/HeroHeader.astro";
         <div class="plan__btn">Plan actuel</div>
         <ul class="plan__features">
           <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Favoris illimités</li>
-          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Notifications J-0 (1h après sortie)</li>
-          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Alerte nouveautés</li>
-          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Notifications instantanées (J-7, J-1, Jour J)</li>
-          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Alertes personnalisées (genre + plateforme)</li>
-          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Email rappels</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Notifications instantanées (in-app + email)</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Alertes personnalisées (genre + plateforme)</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Rappels avant sortie (J-7, Jour J)</li>
+          <li><svg class="check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Agenda synchronisé (tous tes favoris)</li>
+          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Calendriers séparés anime / jeux</li>
+          <li><svg class="cross" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Filtre agenda par plateforme</li>
         </ul>
       </div>
 
       <div class="plan plan--premium">
-        <div class="plan__badge">Populaire</div>
+        <div class="plan__badge">Agenda avancé</div>
         <p class="plan__name plan__name--premium">Premium</p>
         <div class="plan__price">
-          <span class="plan__amount plan__amount--premium">2,99€</span>
+          <span class="plan__amount plan__amount--premium">1,99€</span>
           <span class="plan__period">/ mois</span>
         </div>
-        <p class="plan__yearly">ou 24€/an (2€/mois — 2 mois offerts)</p>
+        <p class="plan__yearly">ou 19€/an — 2 mois offerts 🎁</p>
         <button class="plan__btn plan__btn--premium" type="button">S'abonner</button>
         <ul class="plan__features">
           <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Tout</strong> du plan gratuit</li>
-          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Notifications instantanées (in-app + email)</li>
-          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Alertes personnalisées par genre et plateforme</li>
-          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Rappels avant sortie (J-7, J-1, Jour J)</li>
-          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Suivi épisodes anime + DLC jeux</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Calendriers séparés</strong> (animes / jeux)</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg><strong>Filtre agenda</strong> par plateforme</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Sorties confirmées uniquement</li>
+          <li><svg class="premium-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>Rappels intégrés dans l'agenda</li>
         </ul>
       </div>
     </div>
@@ -55,26 +56,30 @@ import HeroHeader from "../components/HeroHeader.astro";
           <div class="hl-card__icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
-          <p class="hl-card__title">Temps réel</p>
-          <p class="hl-card__desc">Sois alerté dès qu'un trailer, un épisode ou une date tombe.</p>
+          <p class="hl-card__title">Calendriers sur-mesure</p>
+          <p class="hl-card__desc">Un agenda dédié aux animes, un autre aux jeux. Séparés, synchronisés.</p>
         </div>
         <div class="hl-card">
           <div class="hl-card__icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
           </div>
-          <p class="hl-card__title">Rappels avant sortie</p>
-          <p class="hl-card__desc">Plus jamais une première de raté. Rappel J-7, J-1 et jour J.</p>
+          <p class="hl-card__title">Filtre intelligent</p>
+          <p class="hl-card__desc">Ne synchronise que tes plateformes : Crunchyroll, PlayStation…</p>
         </div>
         <div class="hl-card">
           <div class="hl-card__icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V22H4V12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
           </div>
-          <p class="hl-card__title">Alertes personnalisées</p>
-          <p class="hl-card__desc">Filtre par genre et plateforme. Ne reçois que ce qui t'intéresse.</p>
+          <p class="hl-card__title">Zéro bruit</p>
+          <p class="hl-card__desc">Masque les sorties « à confirmer ». Que du concret dans ton agenda.</p>
         </div>
       </div>
     </div>
 
+    <div class="premium__reassure">
+      <p><strong>Le radar GameNime reste 100% gratuit.</strong><br>
+      Favoris, notifications, alertes, agenda — tout est inclus sans payer. Premium ajoute juste le <strong>contrôle avancé de ton calendrier</strong>.</p>
+    </div>
     <p class="premium__trust">Sans engagement · Annulable à tout moment · Paiement sécurisé</p>
   </main>
 </BaseLayout>
