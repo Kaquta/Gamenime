@@ -759,17 +759,21 @@ app.get("/premium/preferences", async (req, reply) => {
   if (!user) return;
   try {
     const rows: any = await pool.query(
-      `SELECT alert_genres, alert_platforms, reminder_days_before FROM user_alert_preferences WHERE user_id = ?`,
+      `SELECT alert_genres, alert_platforms, reminder_days_before, agenda_type, agenda_platforms, agenda_confirmed, agenda_alarms FROM user_alert_preferences WHERE user_id = ?`,
       [user.id]
     );
     if (!rows.length) {
-      return reply.send({ alertGenres: [], alertPlatforms: [], reminderDaysBefore: [7, 0] });
+      return reply.send({ alertGenres: [], alertPlatforms: [], reminderDaysBefore: [7, 0], agendaType: "", agendaPlatforms: [], agendaConfirmed: false, agendaAlarms: [] });
     }
     const p = rows[0];
     return reply.send({
       alertGenres: parseJsonSafe(p.alert_genres, []),
       alertPlatforms: parseJsonSafe(p.alert_platforms, []),
       reminderDaysBefore: parseJsonSafe(p.reminder_days_before, [7, 0]),
+      agendaType: p.agenda_type || "",
+      agendaPlatforms: parseJsonSafe(p.agenda_platforms, []),
+      agendaConfirmed: p.agenda_confirmed === 1,
+      agendaAlarms: parseJsonSafe(p.agenda_alarms, []),
     });
   } catch (err) {
     req.log.error(err);
@@ -785,12 +789,16 @@ app.patch("/premium/preferences", async (req, reply) => {
     const alertGenres = Array.isArray(body.alertGenres) ? body.alertGenres.slice(0, 30).map(String) : [];
     const alertPlatforms = Array.isArray(body.alertPlatforms) ? body.alertPlatforms.slice(0, 30).map(String) : [];
     const reminderDays = Array.isArray(body.reminderDaysBefore) ? body.reminderDaysBefore.filter((d: any) => [0, 7].includes(Number(d))) : [7, 0];
+    const agendaType = (body.agendaType === "anime" || body.agendaType === "game") ? body.agendaType : "";
+    const agendaPlatforms = Array.isArray(body.agendaPlatforms) ? body.agendaPlatforms.slice(0, 20).map(String) : [];
+    const agendaConfirmed = (body.agendaConfirmed === true || body.agendaConfirmed === 1) ? 1 : 0;
+    const agendaAlarms = Array.isArray(body.agendaAlarms) ? body.agendaAlarms.filter((d: any) => [0, 1, 7].includes(Number(d))).map(Number) : [];
 
     await pool.query(
-      `INSERT INTO user_alert_preferences (user_id, alert_genres, alert_platforms, reminder_days_before) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE alert_genres = VALUES(alert_genres), alert_platforms = VALUES(alert_platforms), reminder_days_before = VALUES(reminder_days_before)`,
-      [user.id, JSON.stringify(alertGenres), JSON.stringify(alertPlatforms), JSON.stringify(reminderDays)]
+      `INSERT INTO user_alert_preferences (user_id, alert_genres, alert_platforms, reminder_days_before, agenda_type, agenda_platforms, agenda_confirmed, agenda_alarms) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE alert_genres = VALUES(alert_genres), alert_platforms = VALUES(alert_platforms), reminder_days_before = VALUES(reminder_days_before), agenda_type = VALUES(agenda_type), agenda_platforms = VALUES(agenda_platforms), agenda_confirmed = VALUES(agenda_confirmed), agenda_alarms = VALUES(agenda_alarms)`,
+      [user.id, JSON.stringify(alertGenres), JSON.stringify(alertPlatforms), JSON.stringify(reminderDays), agendaType, JSON.stringify(agendaPlatforms), agendaConfirmed, JSON.stringify(agendaAlarms)]
     );
-    return reply.send({ ok: true, alertGenres, alertPlatforms, reminderDaysBefore: reminderDays });
+    return reply.send({ ok: true, alertGenres, alertPlatforms, reminderDaysBefore: reminderDays, agendaType, agendaPlatforms, agendaConfirmed: agendaConfirmed === 1, agendaAlarms });
   } catch (err) {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
@@ -1164,9 +1172,32 @@ app.get("/cal/:token.ics", async (req, reply) => {
     }
     const userId = users[0].id;
 
+    // === AGENDA AVANCE (Premium) : filtres lus en DB (1 requete fusionnee) ===
+    const prefRows = await pool.query(
+      `SELECT u.is_premium, u.premium_expires_at,
+              p.agenda_type, p.agenda_platforms, p.agenda_confirmed, p.agenda_alarms
+       FROM users u
+       LEFT JOIN user_alert_preferences p ON p.user_id = u.id
+       WHERE u.id = ? LIMIT 1`,
+      [userId]
+    );
+    const pr = prefRows?.[0] || {};
+    const isPremium = !!(pr.is_premium === 1 && (pr.premium_expires_at == null || new Date(pr.premium_expires_at) > new Date()));
+    const dbType = (pr.agenda_type === "anime" || pr.agenda_type === "game") ? pr.agenda_type : null;
+    let dbPlatforms: string[] = [];
+    try { const arr = JSON.parse(pr.agenda_platforms || "[]"); if (Array.isArray(arr)) dbPlatforms = arr.map((x: any) => String(x).toLowerCase()); } catch {}
+    const dbConfirmed = pr.agenda_confirmed === 1;
+    let dbAlarms: number[] = [];
+    try { const arr = JSON.parse(pr.agenda_alarms || "[]"); if (Array.isArray(arr)) dbAlarms = arr.map((x: any) => Number(x)).filter((x: number) => !isNaN(x) && x >= 0 && x <= 30); } catch {}
+    const applyType = isPremium ? dbType : null;
+    const applyPlatforms = isPremium ? dbPlatforms : [];
+    const applyConfirmed = isPremium ? dbConfirmed : false;
+    const applyAlarms = isPremium ? dbAlarms : [];
+
     // Favoris avec vraie date (exclut precision=year — Q3)
     const rows = await pool.query(
       `SELECT f.item_type, i.title, i.title_english AS titleEnglish, i.platform,
+              i.release_precision AS releasePrecision,
               DATE_FORMAT(i.release_date, '%Y-%m-%d') AS releaseDate
        FROM favorites f
        INNER JOIN anime_items i ON f.item_type = 'anime' AND f.item_id = i.id
@@ -1175,6 +1206,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
          AND (i.release_precision IS NULL OR i.release_precision != 'year')
        UNION ALL
        SELECT f.item_type, g.title, g.title_english AS titleEnglish, g.platform,
+              g.release_precision AS releasePrecision,
               DATE_FORMAT(g.release_date, '%Y-%m-%d') AS releaseDate
        FROM favorites f
        INNER JOIN game_items g ON f.item_type = 'game' AND f.item_id = g.id
@@ -1183,6 +1215,17 @@ app.get("/cal/:token.ics", async (req, reply) => {
          AND (g.release_precision IS NULL OR g.release_precision != 'year')`,
       [userId, userId]
     );
+
+    // Appliquer les filtres Premium en memoire
+    let filtered = rows as any[];
+    if (applyType) filtered = filtered.filter((it) => it.item_type === applyType);
+    if (applyPlatforms.length > 0) {
+      filtered = filtered.filter((it) => {
+        const p = (it.platform || "").toLowerCase();
+        return applyPlatforms.some((pf: string) => p.includes(pf));
+      });
+    }
+    if (applyConfirmed) filtered = filtered.filter((it) => it.releasePrecision === "day");
 
     const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
     const now = new Date();
@@ -1196,7 +1239,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
     ics += "X-WR-CALNAME:GameNime — Mes sorties\r\n";
     ics += "X-WR-TIMEZONE:Europe/Paris\r\n";
 
-    for (const it of rows) {
+    for (const it of filtered) {
       const title = it.titleEnglish || it.title || "Sortie";
       const emoji = it.item_type === "anime" ? "📺" : "🎮";
       const platform = it.platform ? ` — ${it.platform}` : "";
@@ -1208,6 +1251,13 @@ app.get("/cal/:token.ics", async (req, reply) => {
       ics += `DTEND;VALUE=DATE:${icsDateNextDay(it.releaseDate)}\r\n`;
       ics += `SUMMARY:${emoji} ${icsEscape(title)}\r\n`;
       ics += `DESCRIPTION:${icsEscape("Sortie" + platform + " · via GameNime " + base)}\r\n`;
+      for (const ad of applyAlarms) {
+        ics += "BEGIN:VALARM\r\n";
+        ics += `TRIGGER:-P${ad}D\r\n`;
+        ics += "ACTION:DISPLAY\r\n";
+        ics += `DESCRIPTION:${icsEscape("Rappel : " + title)}\r\n`;
+        ics += "END:VALARM\r\n";
+      }
       ics += "END:VEVENT\r\n";
     }
 

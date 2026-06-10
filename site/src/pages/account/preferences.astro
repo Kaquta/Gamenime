@@ -21,7 +21,88 @@ import HeroHeader from "../../components/HeroHeader.astro";
       <a href="/premium" class="prefs-cta-btn">✨ Découvrir Premium</a>
     </div>
 
-    <!-- Section Canaux de notification : toujours visible (Free + Premium) -->
+      <!-- Section Agenda unifiee : Free = base + invite / Premium = avance -->
+      <section class="prefs-section prefs-agenda">
+        <h2 class="prefs-section__title">📅 Mon agenda</h2>
+        <p class="prefs-section__desc">Synchronise tes sorties favorites (animes + jeux) dans Google Calendar, Apple Calendar ou Outlook. Mise à jour automatique. ✨</p>
+        <div id="agendaLoading" class="prefs-state">Chargement...</div>
+        <div id="agendaControls" class="hidden">
+
+          <div id="agendaAdvanced" class="agenda-adv hidden">
+            <div class="agenda-adv__header">
+              <h3>⚙️ Options avancées</h3>
+              <span class="agenda-adv__prem">✨ PREMIUM</span>
+            </div>
+            <div class="agenda-adv__body">
+              <div class="agenda-grp">
+                <div class="agenda-grp__label">🎬 Contenu</div>
+                <div class="agenda-pills" data-group="type">
+                  <button type="button" class="agenda-pill active" data-val="">Tout</button>
+                  <button type="button" class="agenda-pill" data-val="anime">📺 Animes</button>
+                  <button type="button" class="agenda-pill" data-val="game">🎮 Jeux</button>
+                </div>
+              </div>
+              <div class="agenda-grp">
+                <div class="agenda-grp__label">📺 Plateformes dans l'agenda</div>
+                <div id="agendaPlatformsZone"></div>
+              </div>
+              <div class="agenda-grp">
+                <div class="agenda-grp__label">✓ Filtre</div>
+                <div class="agenda-toggle-card">
+                  <div>
+                    <div class="agenda-toggle-card__text">Sorties confirmées uniquement</div>
+                    <div class="agenda-toggle-card__sub">Masque les dates encore approximatives</div>
+                  </div>
+                  <button type="button" id="agendaConfirmed" class="agenda-sw" data-on="0"></button>
+                </div>
+              </div>
+              <div class="agenda-grp">
+                <div class="agenda-grp__label">🔔 Rappel dans l'agenda <span class="agenda-grp__hint">(plusieurs possibles)</span></div>
+                <div class="agenda-chips" data-group="alarms">
+                  <label class="agenda-chip"><input type="checkbox" value="7"><span class="agenda-chip__dot"></span>7 jours avant</label>
+                  <label class="agenda-chip"><input type="checkbox" value="1"><span class="agenda-chip__dot"></span>1 jour avant</label>
+                  <label class="agenda-chip"><input type="checkbox" value="0"><span class="agenda-chip__dot"></span>Jour J</label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="agenda-url-row">
+            <input id="agendaUrl" class="agenda-url-input" type="text" readonly value="" />
+            <button id="agendaCopyBtn" class="agenda-copy-btn" type="button">Copier</button>
+          </div>
+
+          <div id="agendaSyncZone" class="agenda-sync-zone hidden">
+            <div class="agenda-sync-row">
+              <button type="button" id="agendaSaveBtn" class="agenda-sync-btn">🔄 Synchroniser</button>
+              <span id="agendaSaveMsg" class="agenda-sync-msg hidden">✓ Enregistré</span>
+            </div>
+            <div class="agenda-sync-info">💡 Une fois ton lien ajouté à ton agenda, tu n'as plus besoin de le recopier. Quand tu changes tes options et cliques Synchroniser, tes préférences sont enregistrées et ton agenda se met à jour automatiquement à la prochaine synchronisation de ton application (Google, Apple...) — généralement quelques heures.</div>
+          </div>
+
+          <div id="agendaFreeInvite" class="agenda-free-invite hidden">
+            <div class="agenda-free-invite__txt">✨ Personnalise ton agenda avec Premium</div>
+            <div class="agenda-free-invite__sub">Filtre par type, par plateforme, ajoute des rappels...</div>
+            <a href="/premium" class="agenda-free-invite__btn">Découvrir Premium</a>
+          </div>
+
+          <p class="agenda-adv__note">⚠️ Les rappels (Premium) marchent sur Apple Calendrier, aléatoires sur Google Agenda. Les filtres marchent partout.</p>
+
+          <details class="agenda-help">
+            <summary>Comment l'ajouter à mon agenda ?</summary>
+            <ul class="agenda-steps">
+              <li><strong>Google Agenda :</strong> Autres agendas → ＋ → « À partir de l'URL » → colle le lien</li>
+              <li><strong>Apple Calendar :</strong> Fichier → Nouvel abonnement → colle le lien</li>
+              <li><strong>Outlook :</strong> Ajouter un agenda → « S'abonner à partir du web » → colle le lien</li>
+              <li>La première synchronisation peut prendre quelques heures côté Google. C'est normal.</li>
+            </ul>
+          </details>
+          <div id="agendaMsg" class="prefs-msg hidden"></div>
+        </div>
+      </section>
+
+
+    <form id="prefsForm">
     <section id="channelsSection" class="prefs-section prefs-channels">
       <h2 class="prefs-section__title">Canaux de notification</h2>
       <p class="prefs-section__desc">Comment veux-tu recevoir tes notifications ?</p>
@@ -56,31 +137,6 @@ import HeroHeader from "../../components/HeroHeader.astro";
         <div id="channelsMsg" class="prefs-msg hidden"></div>
       </div>
     </section>
-
-      <!-- Section Agenda : visible pour tous (Free + Premium) -->
-      <section class="prefs-section prefs-agenda">
-        <h2 class="prefs-section__title">📅 Ajouter à mon agenda</h2>
-        <p class="prefs-section__desc">Synchronise tes sorties favorites (animes + jeux) dans Google Calendar, Apple Calendar ou Outlook. Mise à jour automatique — ne rate plus jamais une sortie. ✨</p>
-        <div id="agendaLoading" class="prefs-state">Chargement...</div>
-        <div id="agendaControls" class="hidden">
-          <div class="agenda-url-row">
-            <input id="agendaUrl" class="agenda-url-input" type="text" readonly value="" />
-            <button id="agendaCopyBtn" class="agenda-copy-btn" type="button">Copier</button>
-          </div>
-          <details class="agenda-help">
-            <summary>Comment l'ajouter à mon agenda ?</summary>
-            <ul class="agenda-steps">
-              <li><strong>Google Agenda :</strong> Autres agendas → ＋ → « À partir de l'URL » → colle le lien</li>
-              <li><strong>Apple Calendar :</strong> Fichier → Nouvel abonnement → colle le lien</li>
-              <li><strong>Outlook :</strong> Ajouter un agenda → « S'abonner à partir du web » → colle le lien</li>
-              <li>La première synchronisation peut prendre quelques heures côté Google. C'est normal.</li>
-            </ul>
-          </details>
-          <div id="agendaMsg" class="prefs-msg hidden"></div>
-        </div>
-      </section>
-
-    <form id="prefsForm" class="hidden">
       <section class="prefs-section">
         <h2 class="prefs-section__title">Genres préférés</h2>
         <p class="prefs-section__desc">Sélectionne les genres qui t'intéressent.</p>
@@ -102,6 +158,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
       <button type="submit" class="prefs-save-btn">Enregistrer mes préférences</button>
       <div id="prefsMsg" class="prefs-msg hidden"></div>
     </form>
+
   </main>
 
   <script is:inline>
@@ -176,19 +233,226 @@ import HeroHeader from "../../components/HeroHeader.astro";
       loadChannels();
 
       // ── Agenda (export calendrier ICS) ──
+      var agendaBaseWebcal = "";
+      var agendaState = { type: "", platforms: [], confirmed: false, alarms: [] };
+
+      var ANIME_PLATFORMS = [
+        { v: "crunchyroll", l: "Crunchyroll" }, { v: "netflix", l: "Netflix" },
+        { v: "youtube", l: "YouTube" }, { v: "prime", l: "Prime Video" },
+        { v: "disney", l: "Disney+" }, { v: "hidive", l: "HIDIVE" },
+        { v: "bilibili", l: "Bilibili" }, { v: "iq", l: "iQ" }, { v: "tencent", l: "Tencent" }
+      ];
+      var GAME_PLATFORMS = [
+        { v: "pc", l: "PC" }, { v: "playstation", l: "PlayStation" },
+        { v: "xbox", l: "Xbox" }, { v: "nintendo", l: "Switch" },
+        { v: "ios", l: "iOS" }, { v: "android", l: "Android" }
+      ];
+
+      // Option B : lien FIXE (les filtres sont en DB, pas dans l'URL)
+      function refreshAgendaUrl() {
+        var urlInput = document.getElementById("agendaUrl");
+        if (urlInput) urlInput.value = agendaBaseWebcal;
+      }
+      async function saveAgenda() {
+        var btn = document.getElementById("agendaSaveBtn");
+        var msg = document.getElementById("agendaSaveMsg");
+        if (btn) { btn.disabled = true; btn.textContent = "Synchronisation..."; }
+        try {
+          var res = await fetch(apiBase + "/api/premium/preferences", {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              agendaType: agendaState.type,
+              agendaPlatforms: agendaState.platforms,
+              agendaConfirmed: agendaState.confirmed,
+              agendaAlarms: agendaState.alarms.map(function(x){ return Number(x); })
+            })
+          });
+          if (res.ok && msg) {
+            msg.classList.remove("hidden");
+            setTimeout(function(){ msg.classList.add("hidden"); }, 2500);
+          }
+        } catch (e) {}
+        if (btn) { btn.disabled = false; btn.textContent = "🔄 Synchroniser"; }
+      }
+      function applySavedAgenda(saved) {
+        if (!saved) return;
+        agendaState.type = (saved.agendaType === "anime" || saved.agendaType === "game") ? saved.agendaType : "";
+        var typeGrp = document.querySelector(".agenda-pills[data-group=type]");
+        if (typeGrp) {
+          typeGrp.querySelectorAll(".agenda-pill").forEach(function(b){
+            b.classList.toggle("active", b.getAttribute("data-val") === agendaState.type);
+          });
+        }
+        var savedPlatforms = Array.isArray(saved.agendaPlatforms) ? saved.agendaPlatforms.map(String) : [];
+        renderPlatforms();
+        var zone = document.getElementById("agendaPlatformsZone");
+        if (zone) {
+          zone.querySelectorAll("input[type=checkbox]").forEach(function(cb){
+            if (savedPlatforms.indexOf(cb.value) !== -1) {
+              cb.checked = true;
+              var label = cb.closest(".agenda-chip");
+              if (label) label.classList.add("active");
+            }
+          });
+        }
+        agendaState.platforms = savedPlatforms;
+        agendaState.confirmed = saved.agendaConfirmed === true;
+        var confBtn = document.getElementById("agendaConfirmed");
+        if (confBtn) {
+          confBtn.setAttribute("data-on", agendaState.confirmed ? "1" : "0");
+          confBtn.classList.toggle("on", agendaState.confirmed);
+        }
+        var savedAlarms = Array.isArray(saved.agendaAlarms) ? saved.agendaAlarms.map(String) : [];
+        var alarmGrp = document.querySelector(".agenda-chips[data-group=alarms]");
+        if (alarmGrp) {
+          alarmGrp.querySelectorAll("input[type=checkbox]").forEach(function(cb){
+            if (savedAlarms.indexOf(cb.value) !== -1) {
+              cb.checked = true;
+              var label = cb.closest(".agenda-chip");
+              if (label) label.classList.add("active");
+            }
+          });
+        }
+        agendaState.alarms = savedAlarms;
+        refreshAgendaUrl();
+      }
+
+      function chipHtml(p) {
+        return '<label class="agenda-chip"><input type="checkbox" value="' + p.v + '"><span class="agenda-chip__dot"></span>' + p.l + '</label>';
+      }
+
+      function renderPlatforms() {
+        var zone = document.getElementById("agendaPlatformsZone");
+        if (!zone) return;
+        var html = "";
+        if (agendaState.type === "anime") {
+          html = '<div class="agenda-chips" data-pfgroup="1">' + ANIME_PLATFORMS.map(chipHtml).join("") + '</div>';
+        } else if (agendaState.type === "game") {
+          html = '<div class="agenda-chips" data-pfgroup="1">' + GAME_PLATFORMS.map(chipHtml).join("") + '</div>';
+        } else {
+          html = '<div class="agenda-grp__sub">📺 Anime</div><div class="agenda-chips" data-pfgroup="1">' + ANIME_PLATFORMS.map(chipHtml).join("") + '</div>';
+          html += '<div class="agenda-grp__sub">🎮 Jeux</div><div class="agenda-chips" data-pfgroup="1">' + GAME_PLATFORMS.map(chipHtml).join("") + '</div>';
+        }
+        zone.innerHTML = html;
+        // Reset les plateformes cochées (le type a changé)
+        agendaState.platforms = [];
+        wirePlatformChips();
+        refreshAgendaUrl();
+      }
+
+      function wirePlatformChips() {
+        var zone = document.getElementById("agendaPlatformsZone");
+        if (!zone) return;
+        zone.querySelectorAll("input[type=checkbox]").forEach(function(cb) {
+          cb.addEventListener("change", function() {
+            var label = cb.closest(".agenda-chip");
+            if (cb.checked) { if (label) label.classList.add("active"); }
+            else { if (label) label.classList.remove("active"); }
+            var checked = [];
+            zone.querySelectorAll("input[type=checkbox]:checked").forEach(function(x){ checked.push(x.value); });
+            agendaState.platforms = checked;
+            refreshAgendaUrl();
+          });
+        });
+      }
+
+      function wireAgendaAdvanced() {
+        // Type (single-select)
+        var typeGrp = document.querySelector(".agenda-pills[data-group=type]");
+        if (typeGrp) {
+          typeGrp.querySelectorAll(".agenda-pill").forEach(function(btn) {
+            btn.addEventListener("click", function() {
+              typeGrp.querySelectorAll(".agenda-pill").forEach(function(b){ b.classList.remove("active"); });
+              btn.classList.add("active");
+              agendaState.type = btn.getAttribute("data-val");
+              renderPlatforms();
+            });
+          });
+        }
+        // Rappels (multi-select chips)
+        var alarmGrp = document.querySelector(".agenda-chips[data-group=alarms]");
+        if (alarmGrp) {
+          alarmGrp.querySelectorAll("input[type=checkbox]").forEach(function(cb) {
+            cb.addEventListener("change", function() {
+              var label = cb.closest(".agenda-chip");
+              if (cb.checked) { if (label) label.classList.add("active"); }
+              else { if (label) label.classList.remove("active"); }
+              var checked = [];
+              alarmGrp.querySelectorAll("input[type=checkbox]:checked").forEach(function(x){ checked.push(x.value); });
+              agendaState.alarms = checked;
+              refreshAgendaUrl();
+            });
+          });
+        }
+        // Toggle confirmé
+        var confBtn = document.getElementById("agendaConfirmed");
+        if (confBtn) {
+          confBtn.addEventListener("click", function() {
+            var on = confBtn.getAttribute("data-on") === "1";
+            on = !on;
+            confBtn.setAttribute("data-on", on ? "1" : "0");
+            if (on) confBtn.classList.add("on"); else confBtn.classList.remove("on");
+            agendaState.confirmed = on;
+            refreshAgendaUrl();
+          });
+        }
+      }
+
       async function loadAgenda() {
         var loading = document.getElementById("agendaLoading");
         var controls = document.getElementById("agendaControls");
         var urlInput = document.getElementById("agendaUrl");
         var copyBtn = document.getElementById("agendaCopyBtn");
-        var msg = document.getElementById("agendaMsg");
+        var advanced = document.getElementById("agendaAdvanced");
         try {
           var res = await fetch(apiBase + "/api/me/calendar-token", { credentials: "include" });
           if (!res.ok) throw new Error("not_auth");
           var data = await res.json();
-          if (urlInput) urlInput.value = data.webcal || data.url || "";
+          agendaBaseWebcal = data.webcal || data.url || "";
+          if (urlInput) urlInput.value = agendaBaseWebcal;
           if (loading) loading.classList.add("hidden");
           if (controls) controls.classList.remove("hidden");
+
+          // Détecter Premium : options avancées (Premium) OU encart invite (Free)
+          var freeInvite = document.getElementById("agendaFreeInvite");
+          try {
+            var meRes = await fetch(apiBase + "/api/auth/me", { credentials: "include" });
+            if (meRes.ok) {
+              var me = await meRes.json();
+              var u = me.user || me;
+              if (u && u.isPremium) {
+                if (advanced) {
+                  advanced.classList.remove("hidden");
+                  var syncZone = document.getElementById("agendaSyncZone");
+                  if (syncZone) syncZone.classList.remove("hidden");
+                  wireAgendaAdvanced();
+                  // Affichage initial des plateformes (etat par defaut "Tout")
+                  renderPlatforms();
+                  // Brancher le bouton de synchronisation
+                  var saveBtn = document.getElementById("agendaSaveBtn");
+                  if (saveBtn) saveBtn.addEventListener("click", saveAgenda);
+                  // Charger les filtres sauvegardés et les restaurer (ecrase l'etat par defaut)
+                  try {
+                    var prefRes = await fetch(apiBase + "/api/premium/preferences", { credentials: "include" });
+                    if (prefRes.ok) {
+                      var prefs = await prefRes.json();
+                      applySavedAgenda(prefs);
+                    }
+                  } catch (e3) {}
+                }
+                if (freeInvite) freeInvite.classList.add("hidden");
+              } else {
+                if (freeInvite) freeInvite.classList.remove("hidden");
+              }
+            } else {
+              if (freeInvite) freeInvite.classList.remove("hidden");
+            }
+          } catch (e2) {
+            if (freeInvite) freeInvite.classList.remove("hidden");
+          }
+
           if (copyBtn) {
             copyBtn.addEventListener("click", function() {
               var val = urlInput ? urlInput.value : "";
@@ -242,8 +506,9 @@ import HeroHeader from "../../components/HeroHeader.astro";
             return;
           }
           if (res.status === 403) {
+            // Full gratuit : on affiche quand meme le form (plus de gating Premium)
             if (loadingEl) loadingEl.classList.add("hidden");
-            if (notPremEl) notPremEl.classList.remove("hidden");
+            if (formEl) formEl.classList.remove("hidden");
             return;
           }
           if (!res.ok) throw new Error("HTTP " + res.status);
