@@ -3490,3 +3490,78 @@ body.is-authenticated .fav-heart {
   color: #c9b8a8;
   line-height: 1.5;
 }
+
+/* ═══ PREFERENCES : pills Contenu + chips style agenda ═══ */
+.prefs-pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.prefs-pill {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 170, 100, 0.25);
+  color: #d4c0b0;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.prefs-pill:hover { border-color: rgba(255, 170, 100, 0.45); }
+.prefs-pill.active {
+  background: linear-gradient(135deg, #ff9c4c, #ff7a3c);
+  border-color: #ffb877;
+  color: #1a0d08;
+  font-weight: 700;
+}
+/* Sous-titre de groupe (Anime / Jeux) */
+.prefs-grp-sub {
+  font-size: 11px;
+  color: #ff9c4c;
+  font-weight: 700;
+  margin: 14px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.prefs-grp-sub:first-child { margin-top: 0; }
+/* Conteneur de chips */
+.prefs-chips2 {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Chip avec dot lumineux (style agenda avancé) */
+.prefs-chip2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 170, 100, 0.22);
+  color: #d4c0b0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 150ms;
+  user-select: none;
+}
+.prefs-chip2:hover { border-color: rgba(255, 170, 100, 0.4); }
+.prefs-chip2 input { display: none; }
+.prefs-chip2__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 170, 100, 0.3);
+  transition: all 150ms;
+  flex-shrink: 0;
+}
+.prefs-chip2.active {
+  background: linear-gradient(135deg, rgba(255, 156, 76, 0.18), rgba(255, 107, 44, 0.12));
+  border-color: #ffb877;
+  color: #ffe4cc;
+}
+.prefs-chip2.active .prefs-chip2__dot {
+  background: #ff9c4c;
+  box-shadow: 0 0 8px #ff9c4c, 0 0 4px #ffb877;
+}

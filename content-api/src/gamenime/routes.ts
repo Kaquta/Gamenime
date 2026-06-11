@@ -236,7 +236,56 @@ const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
   status: z.enum(["released", "upcoming", "all"]).default("all"),
   orderBy: z.enum(["score", "date"]).default("score"),
+  genre: z.string().max(300).optional(),
+  platform: z.string().max(300).optional(),
+  search: z.string().max(200).optional(),
+  releasedAfter: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  releasedBefore: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
+
+// Filtre en memoire : genre/platform (OR, insensible casse, substring), search (titre), dates
+function applyFeedFilters(items: GameNimeItem[], q: any): GameNimeItem[] {
+  let out = items;
+  // Genre : au moins un des genres demandes present dans la liste de l'item
+  if (q.genre) {
+    const wanted = String(q.genre).split(",").map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+    if (wanted.length) {
+      out = out.filter((it) => {
+        const g = ((it as any).genre || "").toLowerCase();
+        return wanted.some((w: string) => g.includes(w));
+      });
+    }
+  }
+  // Platform : au moins une des plateformes demandees (substring -> "PlayStation" matche "PlayStation 5")
+  if (q.platform) {
+    const wanted = String(q.platform).split(",").map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+    if (wanted.length) {
+      out = out.filter((it) => {
+        const p = ((it as any).platform || "").toLowerCase();
+        return wanted.some((w: string) => p.includes(w));
+      });
+    }
+  }
+  // Search : texte dans le titre (romaji ou anglais)
+  if (q.search) {
+    const needle = String(q.search).trim().toLowerCase();
+    if (needle) {
+      out = out.filter((it) => {
+        const t1 = ((it as any).title || "").toLowerCase();
+        const t2 = ((it as any).titleEnglish || "").toLowerCase();
+        return t1.includes(needle) || t2.includes(needle);
+      });
+    }
+  }
+  // Dates (sur release_date au format YYYY-MM-DD)
+  if (q.releasedAfter) {
+    out = out.filter((it) => { const d = (it as any).releaseDate; return d && d >= q.releasedAfter; });
+  }
+  if (q.releasedBefore) {
+    out = out.filter((it) => { const d = (it as any).releaseDate; return d && d <= q.releasedBefore; });
+  }
+  return out;
+}
 
 // ============================================================
 // Routes
@@ -520,7 +569,8 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
     const now = new Date();
     const wide = buildWideDateFilter(now);
     const allRows: GameNimeItem[] = await pool.query(SELECT_ANIME, [wide.start, wide.end, MAX_DB_FETCH]);
-    const filtered = filterByStatus(allRows, status, now);
+    const statusFiltered = filterByStatus(allRows, status, now);
+    const filtered = parsed.success ? applyFeedFilters(statusFiltered, parsed.data) : statusFiltered;
     const itemsRaw = orderBy === "date"
       ? sortByDate(filtered, limit, now, status === "upcoming")
       : sortForGameNimeTop(filtered, limit, now);
@@ -550,7 +600,8 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
     const now = new Date();
     const wide = buildWideDateFilter(now);
     const allRows: GameNimeItem[] = await pool.query(SELECT_GAMES, [wide.start, wide.end, MAX_DB_FETCH]);
-    const filtered = filterByStatus(allRows, status, now);
+    const statusFiltered = filterByStatus(allRows, status, now);
+    const filtered = parsed.success ? applyFeedFilters(statusFiltered, parsed.data) : statusFiltered;
     const itemsRaw = orderBy === "date"
       ? sortByDate(filtered, limit, now, status === "upcoming")
       : sortForGameNimeTop(filtered, limit, now);

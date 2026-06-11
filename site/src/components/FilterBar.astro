@@ -8,15 +8,15 @@ const months = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
 ];
 const genres = domain === "games"
-  ? ["Action", "Adventure", "RPG", "Shooter", "Strategy", "Puzzle", "Racing", "Sports", "Simulation", "Platformer", "Fighting", "Horror"]
+  ? ["Action", "Adventure", "RPG", "Strategy", "Simulation", "Puzzle", "Shooter", "Platformer", "Indie", "Sports", "Racing", "Arcade", "Visual Novel", "Tactical", "Fighting"]
   : domain === "anime"
-  ? ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance", "Sci-Fi", "Slice of Life", "Horror", "Mecha", "Sports", "Psychological"]
-  : ["Action", "Adventure", "Comedy", "Drama", "Fantasy", "RPG", "Shooter", "Romance", "Sci-Fi", "Horror", "Strategy", "Sports"];
+  ? ["Action", "Fantasy", "Comedy", "Drama", "Romance", "Adventure", "Supernatural", "Slice of Life", "Sci-Fi", "Mystery", "School", "Psychological", "Isekai", "Sports", "Horror"]
+  : ["Action", "Adventure", "Fantasy", "Comedy", "Drama", "Romance", "Sci-Fi", "RPG", "Strategy", "Simulation", "Shooter", "Puzzle", "Supernatural", "Slice of Life", "Mystery", "Indie", "Platformer", "Sports", "Horror", "Isekai"];
 const platforms = domain === "games"
-  ? ["PC", "PlayStation", "Xbox", "Nintendo", "Mobile"]
+  ? ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android"]
   : domain === "anime"
-  ? ["Crunchyroll", "Netflix", "Disney Plus", "Hulu", "HIDIVE", "Bilibili", "YouTube", "Tencent Video", "iQIYI"]
-  : ["PC", "PlayStation", "Xbox", "Nintendo", "Crunchyroll", "Netflix", "Disney Plus"];
+  ? ["Crunchyroll", "Netflix", "YouTube", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"]
+  : ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android", "Crunchyroll", "Netflix", "YouTube", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"];
 ---
 <div class="filter-bar container" data-domain={domain}>
   <div class="filter-row">

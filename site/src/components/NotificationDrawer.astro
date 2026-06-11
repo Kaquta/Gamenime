@@ -247,6 +247,8 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       await fetchNotifications();
     }
 
+    // Expose l'ouverture du drawer pour le re-ouvrir apres fermeture d'un modal
+    (window).__openNotifDrawer = function () { openDrawer(); };
     function closeDrawer() {
       if (!drawer || !overlay) return;
       isOpen = false;
@@ -297,6 +299,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         var itemId = card.dataset.itemId;
         if (itemType && itemId) {
           var domain = itemType === "game" ? "games" : "anime";
+          (window).__reopenNotifDrawer = true;
           closeDrawer();
           if (typeof (window).__openItemModal === "function") {
             (window).__openItemModal(domain, itemId);

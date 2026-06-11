@@ -133,6 +133,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     if(favDrawerContent)favDrawerContent.innerHTML=items.map(function(f){var info=simplifyPlatform(f.platform)||f.genre||"";var tb=f.itemType==="anime"?"🎌":"🎮";return'<div class="drawer-card" data-type="'+f.itemType+'" data-id="'+f.itemId+'" data-release-date="'+(f.releaseDate||"")+'" style="cursor:pointer"><div class="drawer-card__thumb">'+(f.cover?'<img src="'+f.cover+'" alt="" />':'')+'</div><div class="drawer-card__body"><div class="drawer-card__title">'+tb+' '+escapeHtml(f.title)+'</div><div class="drawer-card__sub">'+escapeHtml(info)+'</div></div><button class="drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer">✕</button></div>';}).join("");
     }catch(e){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
+  (window).__openFavDrawer=function(){openFavDrawerFn();};
   if(favDrawerClose)favDrawerClose.addEventListener("click",closeFavDrawer);
   if(favOverlay)favOverlay.addEventListener("click",closeFavDrawer);
   document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();});
@@ -150,6 +151,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var itemType=card.dataset.type;
     var itemId=card.dataset.id;
     var domain=itemType==="game"?"games":"anime";
+    (window).__reopenFavDrawer=true;
     closeFavDrawer();
     if(typeof window.__openItemModal==="function"){
       window.__openItemModal(domain,itemId);
@@ -327,6 +329,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.payload||{};var title=p.title||"Mise à jour";var label=p.label||item.eventType;var detail=p.newValue||"";var icon=evIcon(item.eventType);var uc=item.isRead?"":" notif-card--unread";var thumb=p.cover?'<img src="'+p.cover+'" alt="" />':'<span style="font-size:1.3rem;display:flex;align-items:center;justify-content:center;height:100%">'+icon+'</span>';return'<div class="notif-card'+uc+'" data-id="'+item.id+'" data-item-type="'+(item.itemType||"")+'" data-item-id="'+(item.itemId||"")+'" style="cursor:pointer;position:relative"><div class="notif-card__thumb">'+thumb+'</div><div class="notif-card__content"><div class="notif-card__title">'+escapeHtml(label)+' — '+escapeHtml(title)+'</div>'+(detail?'<div class="notif-card__text">'+escapeHtml(detail)+'</div>':'')+'<div class="notif-card__time">'+timeAgo(item.eventAt||item.createdAt)+'</div></div><button class="notif-card__remove" data-notif-id="'+item.id+'" title="Supprimer" type="button">✕</button></div>';}).join("");
     }catch(e){if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
+  (window).__openNotifPageDrawer=function(){openNotifPageDrawer();};
   if(notifPClose)notifPClose.addEventListener("click",closeNotifPageDrawer);
   if(notifPOverlay)notifPOverlay.addEventListener("click",closeNotifPageDrawer);
   document.getElementById("openNotifPage")?.addEventListener("click",function(){openNotifPageDrawer();});
@@ -352,6 +355,7 @@ if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.pay
     // Ouvrir modal de l'item si on a les infos
     if(itemType&&itemId){
       var domain=itemType==="game"?"games":"anime";
+      (window).__reopenNotifPageDrawer=true;
       closeNotifPageDrawer();
       if(typeof window.__openItemModal==="function"){
         window.__openItemModal(domain,itemId);

@@ -1172,29 +1172,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
     }
     const userId = users[0].id;
 
-    // === AGENDA AVANCE (Premium) : filtres lus en DB (1 requete fusionnee) ===
-    const prefRows = await pool.query(
-      `SELECT u.is_premium, u.premium_expires_at,
-              p.agenda_type, p.agenda_platforms, p.agenda_confirmed, p.agenda_alarms
-       FROM users u
-       LEFT JOIN user_alert_preferences p ON p.user_id = u.id
-       WHERE u.id = ? LIMIT 1`,
-      [userId]
-    );
-    const pr = prefRows?.[0] || {};
-    const isPremium = !!(pr.is_premium === 1 && (pr.premium_expires_at == null || new Date(pr.premium_expires_at) > new Date()));
-    const dbType = (pr.agenda_type === "anime" || pr.agenda_type === "game") ? pr.agenda_type : null;
-    let dbPlatforms: string[] = [];
-    try { const arr = JSON.parse(pr.agenda_platforms || "[]"); if (Array.isArray(arr)) dbPlatforms = arr.map((x: any) => String(x).toLowerCase()); } catch {}
-    const dbConfirmed = pr.agenda_confirmed === 1;
-    let dbAlarms: number[] = [];
-    try { const arr = JSON.parse(pr.agenda_alarms || "[]"); if (Array.isArray(arr)) dbAlarms = arr.map((x: any) => Number(x)).filter((x: number) => !isNaN(x) && x >= 0 && x <= 30); } catch {}
-    const applyType = isPremium ? dbType : null;
-    const applyPlatforms = isPremium ? dbPlatforms : [];
-    const applyConfirmed = isPremium ? dbConfirmed : false;
-    const applyAlarms = isPremium ? dbAlarms : [];
-
-    // Favoris avec vraie date (exclut precision=year — Q3)
+    // Agenda simple : tous les favoris avec vraie date (exclut precision=year — Q3)
     const rows = await pool.query(
       `SELECT f.item_type, i.title, i.title_english AS titleEnglish, i.platform,
               i.release_precision AS releasePrecision,
@@ -1216,16 +1194,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
       [userId, userId]
     );
 
-    // Appliquer les filtres Premium en memoire
-    let filtered = rows as any[];
-    if (applyType) filtered = filtered.filter((it) => it.item_type === applyType);
-    if (applyPlatforms.length > 0) {
-      filtered = filtered.filter((it) => {
-        const p = (it.platform || "").toLowerCase();
-        return applyPlatforms.some((pf: string) => p.includes(pf));
-      });
-    }
-    if (applyConfirmed) filtered = filtered.filter((it) => it.releasePrecision === "day");
+    const favorites = rows as any[];
 
     const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
     const now = new Date();
@@ -1239,7 +1208,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
     ics += "X-WR-CALNAME:GameNime — Mes sorties\r\n";
     ics += "X-WR-TIMEZONE:Europe/Paris\r\n";
 
-    for (const it of filtered) {
+    for (const it of favorites) {
       const title = it.titleEnglish || it.title || "Sortie";
       const emoji = it.item_type === "anime" ? "📺" : "🎮";
       const platform = it.platform ? ` — ${it.platform}` : "";
@@ -1251,13 +1220,6 @@ app.get("/cal/:token.ics", async (req, reply) => {
       ics += `DTEND;VALUE=DATE:${icsDateNextDay(it.releaseDate)}\r\n`;
       ics += `SUMMARY:${emoji} ${icsEscape(title)}\r\n`;
       ics += `DESCRIPTION:${icsEscape("Sortie" + platform + " · via GameNime " + base)}\r\n`;
-      for (const ad of applyAlarms) {
-        ics += "BEGIN:VALARM\r\n";
-        ics += `TRIGGER:-P${ad}D\r\n`;
-        ics += "ACTION:DISPLAY\r\n";
-        ics += `DESCRIPTION:${icsEscape("Rappel : " + title)}\r\n`;
-        ics += "END:VALARM\r\n";
-      }
       ics += "END:VEVENT\r\n";
     }
 

@@ -42,8 +42,16 @@ function formatDate(v) {
 function dateLabel(item) {
   // precision=year: ne jamais afficher le 01-01 fictif, montrer "Prevu AAAA"
   if (item && item.releasePrecision === "year" && item.releaseDate) {
-    return "🟢PRÉVU " + String(item.releaseDate).slice(0, 4);
+    return "Prévu " + String(item.releaseDate).slice(0, 4);
   }
+  // precision=month: on connait que le mois -> "Prevu MOIS AAAA" (pas de jour fictif 01)
+  if (item && item.releasePrecision === "month" && item.releaseDate) {
+    var moisFr = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+    var parts = String(item.releaseDate).split("-");
+    var moisIdx = parseInt(parts[1], 10) - 1;
+    if (moisIdx >= 0 && moisIdx < 12) return "Prévu " + moisFr[moisIdx] + " " + parts[0];
+  }
+  // precision=day (ou inconnue avec label API): vraie date precise
   if (item && item.releaseDateLabel) return item.releaseDateLabel;
   return formatDate(item ? item.releaseDate : null);
 }
@@ -62,6 +70,8 @@ function getStatusLabel(item) {
 }
 
 function getCountdownHtml(item) {
+  // Countdown UNIQUEMENT si date precise (day). Sinon (month/year), date approximative -> pas de compte a rebours trompeur
+  if (item.releasePrecision && item.releasePrecision !== "day") return "";
   var dt = item.releaseDatetime || item.releaseDate;
   if (!dt) return "";
   var rel = new Date(dt);
@@ -248,6 +258,18 @@ function setupDetailModal() {
     inner.innerHTML = "";
     modal.classList.remove("active");
     document.body.style.overflow = "";
+    // Re-ouvrir le drawer d'ou on venait (notif cloche, favoris, ou notif menu)
+    var w = (window as any);
+    if (w.__reopenNotifDrawer) {
+      w.__reopenNotifDrawer = false;
+      if (typeof w.__openNotifDrawer === "function") w.__openNotifDrawer();
+    } else if (w.__reopenFavDrawer) {
+      w.__reopenFavDrawer = false;
+      if (typeof w.__openFavDrawer === "function") w.__openFavDrawer();
+    } else if (w.__reopenNotifPageDrawer) {
+      w.__reopenNotifPageDrawer = false;
+      if (typeof w.__openNotifPageDrawer === "function") w.__openNotifPageDrawer();
+    }
   }
 
   if (backdrop) backdrop.addEventListener("click", close);
