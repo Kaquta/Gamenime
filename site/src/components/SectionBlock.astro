@@ -480,12 +480,21 @@ document.addEventListener("applyFilters", async function(e) {
     if (!row) continue;
     var items;
     var domain = "anime";
-    var params = extra ? extra + "&limit=100&order=desc" : "limit=100&order=desc";
+    // Parse les filtres de la string extra (genre/platform/search/dates)
+    var fp = new URLSearchParams(extra || "");
+    var fo = {
+      genre: fp.get("genre") || undefined,
+      platform: fp.get("platform") || undefined,
+      search: fp.get("search") || undefined,
+      releasedAfter: fp.get("releasedAfter") || undefined,
+      releasedBefore: fp.get("releasedBefore") || undefined,
+    };
     try {
-      if (source === "anime") { items = await getAnimeItems("released=1&releasedAfter=2026-01-01&" + params); domain = "anime"; }
-      else if (source === "games") { items = await getGameItems("released=1&releasedAfter=2026-01-01&" + params); domain = "games"; }
-      else if (source === "anime-upcoming") { items = await getAnimeItems("upcoming=1&" + params); domain = "anime"; }
-      else if (source === "games-upcoming") { items = await getGameItems("upcoming=1&" + params); domain = "games"; }
+      // Utilise /feed/* (fenetre glissante 2 ans + applyFeedFilters) comme le chargement normal
+      if (source === "anime") { items = await getFeedAnime(Object.assign({ status: "released", limit: 100, orderBy: "date" }, fo)); domain = "anime"; }
+      else if (source === "games") { items = await getFeedGames(Object.assign({ status: "released", limit: 100, orderBy: "date" }, fo)); domain = "games"; }
+      else if (source === "anime-upcoming") { items = await getFeedAnime(Object.assign({ status: "upcoming", limit: 100, orderBy: "date" }, fo)); domain = "anime"; }
+      else if (source === "games-upcoming") { items = await getFeedGames(Object.assign({ status: "upcoming", limit: 100, orderBy: "date" }, fo)); domain = "games"; }
       else { continue; }
       row.innerHTML = items.length
         ? items.map(function(it) { return renderCard(it, domain); }).join("")

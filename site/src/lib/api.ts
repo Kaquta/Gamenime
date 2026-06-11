@@ -78,22 +78,32 @@ export type FeedStatus = "released" | "upcoming" | "all";
 
 export type FeedOrderBy = "score" | "date";
 
-export async function getFeedAnime(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy } = {}): Promise<FeedItem[]> {
+export async function getFeedAnime(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy; genre?: string; platform?: string; search?: string; releasedAfter?: string; releasedBefore?: string } = {}): Promise<FeedItem[]> {
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
   if (opts.limit != null) params.set("limit", String(opts.limit));
   if (opts.orderBy) params.set("orderBy", opts.orderBy);
+  if (opts.genre) params.set("genre", opts.genre);
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.search) params.set("search", opts.search);
+  if (opts.releasedAfter) params.set("releasedAfter", opts.releasedAfter);
+  if (opts.releasedBefore) params.set("releasedBefore", opts.releasedBefore);
   const qs = params.toString();
   const url = qs ? `/api/feed/anime?${qs}` : "/api/feed/anime";
   const data = await fetchJson<{ items: FeedItem[] }>(url);
   return data.items;
 }
 
-export async function getFeedGames(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy } = {}): Promise<FeedItem[]> {
+export async function getFeedGames(opts: { status?: FeedStatus; limit?: number; orderBy?: FeedOrderBy; genre?: string; platform?: string; search?: string; releasedAfter?: string; releasedBefore?: string } = {}): Promise<FeedItem[]> {
   const params = new URLSearchParams();
   if (opts.status) params.set("status", opts.status);
   if (opts.limit != null) params.set("limit", String(opts.limit));
   if (opts.orderBy) params.set("orderBy", opts.orderBy);
+  if (opts.genre) params.set("genre", opts.genre);
+  if (opts.platform) params.set("platform", opts.platform);
+  if (opts.search) params.set("search", opts.search);
+  if (opts.releasedAfter) params.set("releasedAfter", opts.releasedAfter);
+  if (opts.releasedBefore) params.set("releasedBefore", opts.releasedBefore);
   const qs = params.toString();
   const url = qs ? `/api/feed/games?${qs}` : "/api/feed/games";
   const data = await fetchJson<{ items: FeedItem[] }>(url);
