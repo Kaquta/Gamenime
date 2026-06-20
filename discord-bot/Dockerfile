@@ -3,4 +3,5 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY bot.js setup-structure.js ./
+RUN mkdir -p /app/data
 CMD ["node", "bot.js"]

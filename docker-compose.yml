@@ -50,6 +50,7 @@ services:
       - N8N_PORT=5678
       - N8N_PATH=/n8n/
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ANIME_API_KEY=${ANIME_API_KEY}
       - GAMES_API_KEY=${GAMES_API_KEY}
       - ANIMESCHEDULE_TOKEN=${ANIMESCHEDULE_TOKEN}
@@ -101,6 +102,8 @@ services:
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL}
+    volumes:
+      - ./discord-bot/data:/app/data
     depends_on: [content-api]
     networks: [internal, public]
 

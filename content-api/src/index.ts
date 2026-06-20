@@ -14,7 +14,7 @@ import { startRefetchCron, adminRefetchHandler } from "./gamenime/refetch-cron.j
 import { startRefetchGamesCron } from "./gamenime/refetch-games-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
-import { startDashboard, pushActivity, trackLastRun } from "./gamenime/dashboard.js";
+import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setStatsPool } from "./gamenime/dashboard.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -1882,6 +1882,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         // on redirige vers le winner au lieu de recréer le doublon.
         // Critères ABSOLUS (zéro faux positif possible) : anilist_id / mal_id / cover / title exact
         let blocklistRedirect: any = null;
+        let blocklistReject = false;
         try {
           const blRows: any = await conn.query(
             `SELECT redirect_to_id FROM merge_blocklist
@@ -1896,6 +1897,16 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
             [itemType, b.anilistId, b.anilistId, b.malId, b.malId, lookupCover, lookupCover, b.title]
           );
           if (blRows.length > 0) {
+            if (blRows[0].redirect_to_id <= 0) {
+              blocklistReject = true;
+              app.log.info({ title: b.title, type: itemType }, "blocklist REJECT (redirect_to_id<=0), item skipped");
+              pushActivity({
+                type: "blocklist_hit",
+                message: `Blocklist REJET : ${b.title}`,
+                detail: `Item indesirable bloque (${itemType})`,
+                level: "warn",
+              });
+            } else {
             const winRows: any = await conn.query(
               `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute${itemType === "game" ? ", rawg_id AS rawgId, igdb_id AS igdbId" : ""}, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
                FROM ${table} WHERE id = ? LIMIT 1`,
@@ -1913,10 +1924,12 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
             } else {
               app.log.warn({ redirectId: blRows[0].redirect_to_id, title: b.title }, "blocklist winner not found, falling back to normal flow");
             }
+            }
           }
         } catch (e: any) {
           app.log.error({ err: e?.message, title: b.title }, "blocklist check failed, falling back");
         }
+        if (blocklistReject) { continue; }
 
         const beforeRows: any = blocklistRedirect ? [blocklistRedirect] : await conn.query(
           `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute${itemType === "game" ? ", rawg_id AS rawgId, igdb_id AS igdbId" : ""}, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
@@ -2175,6 +2188,24 @@ await registerGameNimeRoutes(app, pool, {
   adminApiKey: process.env.ANIME_API_KEY,
 });
 
+// Tracking visiteurs (trafic du site) — alimente le dashboard
+app.post("/track", async (req, reply) => {
+  try {
+    const body: any = req.body || {};
+    const xff = (req.headers["x-forwarded-for"] as string) || "";
+    const ip = (req.headers["x-real-ip"] as string) || xff.split(",")[0]?.trim() || req.ip || "unknown";
+    const ua = (req.headers["user-agent"] as string) || "";
+    const vid = hashIp(ip + ua);
+    if (body.ping === true) {
+      trackPing(vid);
+    } else {
+      trackVisit(String(body.path || "/"), String(body.ref || ""), vid);
+    }
+  } catch {}
+  reply.send({ ok: true });
+});
+
+setStatsPool(pool);
 startDashboard(app, pool);
 startRefetchGamesCron(app);
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });

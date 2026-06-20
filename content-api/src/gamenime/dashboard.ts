@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as tls from "node:tls";
 
 const __dirname_esm = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,6 +52,140 @@ export function trackRequest() {
   }
 }
 function getRequestsPerMinute(): number { return REQUEST_TIMESTAMPS.length; }
+
+// ════════════════════════════════════════════════════════
+// Tracking visiteurs (trafic du site) — 24h glissantes
+// ════════════════════════════════════════════════════════
+interface Visit { ts: number; path: string; source: string; vid: string; }
+const VISITS: Visit[] = [];
+const VISITS_MAX = 50000;
+const LIVE_PINGS = new Map<string, number>();
+
+// Pool DB pour persistance des stats (mois/année)
+let STATS_POOL: any = null;
+export function setStatsPool(pool: any) { STATS_POOL = pool; }
+
+// Suivi des visiteurs uniques du jour (reset auto à minuit)
+let TODAY_VISITORS = new Set<string>();
+let TODAY_DATE = new Date().toDateString();
+function isNewVisitorToday(vid: string): boolean {
+  const now = new Date().toDateString();
+  if (now !== TODAY_DATE) { TODAY_VISITORS.clear(); TODAY_DATE = now; }
+  if (TODAY_VISITORS.has(vid)) return false;
+  TODAY_VISITORS.add(vid);
+  return true;
+}
+
+// Enregistre la visite en DB (daily_stats) — fire-and-forget
+function recordVisitDB(source: string, isNewVisitor: boolean) {
+  if (!STATS_POOL) return;
+  const today = new Date().toISOString().split("T")[0];
+  STATS_POOL.query(
+    `INSERT INTO daily_stats (stat_date, source, visits, unique_visitors, page_views)
+     VALUES (?, ?, 1, ?, 1)
+     ON DUPLICATE KEY UPDATE visits = visits + 1, page_views = page_views + 1, unique_visitors = unique_visitors + ?`,
+    [today, source, isNewVisitor ? 1 : 0, isNewVisitor ? 1 : 0]
+  ).catch(() => {});
+}
+
+// Stats agrégées par période (mois/année) — requêtes dynamiques
+async function getPeriodStats() {
+  if (!STATS_POOL) return { month: [], year: [], month_total: 0, year_total: 0 };
+  try {
+    const monthRows: any = await STATS_POOL.query(
+      `SELECT source, SUM(visits) AS visits, SUM(unique_visitors) AS uniques
+       FROM daily_stats WHERE stat_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')
+       GROUP BY source ORDER BY visits DESC`
+    );
+    const yearRows: any = await STATS_POOL.query(
+      `SELECT source, SUM(visits) AS visits, SUM(unique_visitors) AS uniques
+       FROM daily_stats WHERE stat_date >= DATE_FORMAT(CURDATE(), '%Y-01-01')
+       GROUP BY source ORDER BY visits DESC`
+    );
+    const mTotal = monthRows.reduce((s: number, r: any) => s + Number(r.visits), 0);
+    const yTotal = yearRows.reduce((s: number, r: any) => s + Number(r.visits), 0);
+    return {
+      month: monthRows.map((r: any) => [r.source, Number(r.visits)]),
+      year: yearRows.map((r: any) => [r.source, Number(r.visits)]),
+      month_total: mTotal,
+      year_total: yTotal,
+    };
+  } catch {
+    return { month: [], year: [], month_total: 0, year_total: 0 };
+  }
+}
+
+function purgeOldVisits() {
+  const cutoff = Date.now() - 24 * 3600 * 1000;
+  while (VISITS.length > 0 && VISITS[0].ts < cutoff) VISITS.shift();
+}
+
+function parseSource(ref: string): string {
+  if (!ref) return "Direct";
+  try {
+    const h = new URL(ref).hostname.replace(/^www\./, "");
+    if (h.includes("tiktok")) return "TikTok";
+    if (h.includes("discord")) return "Discord";
+    if (h.includes("google")) return "Google";
+    if (h.includes("youtube")) return "YouTube";
+    if (h.includes("twitter") || h === "t.co" || h.includes("x.com")) return "Twitter/X";
+    if (h.includes("reddit")) return "Reddit";
+    if (h.includes("instagram")) return "Instagram";
+    if (h.includes("teams.") || h.includes("microsoft")) return "Teams";
+    if (h.includes("facebook") || h === "fb.com" || h.includes("fb.me")) return "Facebook";
+    if (h.includes("linkedin") || h === "lnkd.in") return "LinkedIn";
+    if (h.includes("twitch")) return "Twitch";
+    if (h.includes("bing")) return "Bing";
+    if (h.includes("gamenime.fr")) return "Direct";
+    return h;
+  } catch { return "Direct"; }
+}
+
+export function trackVisit(path: string, ref: string, vid: string) {
+  const now = Date.now();
+  LIVE_PINGS.set(vid, now);
+  const source = parseSource(ref);
+  VISITS.push({ ts: now, path: path || "/", source, vid });
+  if (VISITS.length > VISITS_MAX) VISITS.shift();
+  // Persistance DB (mois/année)
+  recordVisitDB(source, isNewVisitorToday(vid));
+}
+
+export function trackPing(vid: string) {
+  LIVE_PINGS.set(vid, Date.now());
+}
+
+async function getTrafficMetrics() {
+  purgeOldVisits();
+  const now = Date.now();
+  let live = 0;
+  for (const [vid, ts] of LIVE_PINGS) {
+    if (ts > now - 60000) live++;
+    else LIVE_PINGS.delete(vid);
+  }
+  const uniqueVids = new Set<string>();
+  const sources: Record<string, number> = {};
+  const pages: Record<string, number> = {};
+  for (const v of VISITS) {
+    uniqueVids.add(v.vid);
+    sources[v.source] = (sources[v.source] || 0) + 1;
+    pages[v.path] = (pages[v.path] || 0) + 1;
+  }
+  const topSources = Object.entries(sources).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const topPages = Object.entries(pages).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const periods = await getPeriodStats();
+  return {
+    live,
+    visits_24h: VISITS.length,
+    unique_24h: uniqueVids.size,
+    sources: topSources,
+    top_pages: topPages,
+    month: periods.month,
+    year: periods.year,
+    month_total: periods.month_total,
+    year_total: periods.year_total,
+  };
+}
 
 // SSE actifs counter
 let SSE_ACTIVE = 0;
@@ -176,6 +311,43 @@ async function readWorkflowMetrics(pool: any) {
 // ════════════════════════════════════════════════════════
 // Snapshot
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// Vérification SSL (certificat) — cache 1h
+// ════════════════════════════════════════════════════════
+let SSL_CACHE: { daysLeft: number | null; validTo: string | null; checkedAt: number } = { daysLeft: null, validTo: null, checkedAt: 0 };
+
+function checkSSL(): Promise<{ daysLeft: number | null; validTo: string | null }> {
+  return new Promise((resolve) => {
+    try {
+      const socket = tls.connect(443, "gamenime.fr", { servername: "gamenime.fr", timeout: 5000 }, () => {
+        const cert = socket.getPeerCertificate();
+        socket.end();
+        if (cert && cert.valid_to) {
+          const expiry = new Date(cert.valid_to).getTime();
+          const daysLeft = Math.floor((expiry - Date.now()) / (1000 * 3600 * 24));
+          resolve({ daysLeft, validTo: cert.valid_to });
+        } else {
+          resolve({ daysLeft: null, validTo: null });
+        }
+      });
+      socket.on("error", () => resolve({ daysLeft: null, validTo: null }));
+      socket.on("timeout", () => { socket.destroy(); resolve({ daysLeft: null, validTo: null }); });
+    } catch {
+      resolve({ daysLeft: null, validTo: null });
+    }
+  });
+}
+
+async function getSSLStatus(): Promise<{ daysLeft: number | null; validTo: string | null }> {
+  const now = Date.now();
+  if (now - SSL_CACHE.checkedAt < 3600000 && SSL_CACHE.checkedAt > 0) {
+    return { daysLeft: SSL_CACHE.daysLeft, validTo: SSL_CACHE.validTo };
+  }
+  const result = await checkSSL();
+  SSL_CACHE = { ...result, checkedAt: now };
+  return result;
+}
+
 export async function collectMetrics(pool: any) {
   const [system, catalog, workflows] = await Promise.all([
     readSystemMetrics(), readCatalogMetrics(pool), readWorkflowMetrics(pool)
@@ -186,6 +358,8 @@ export async function collectMetrics(pool: any) {
     cache: { hits: CACHE_HITS, misses: CACHE_MISSES, hit_rate: getCacheHitRate() },
     requests_per_min: getRequestsPerMinute(),
     sse_active: SSE_ACTIVE,
+    traffic: await getTrafficMetrics(),
+    ssl: await getSSLStatus(),
     activity: ACTIVITY_BUFFER.slice(0, 20),
   };
 }

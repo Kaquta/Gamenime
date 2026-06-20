@@ -3,274 +3,525 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>GameNime API · Dashboard</title>
+<title>GameNime · Monitoring</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
-  body { min-height: 100vh; background: radial-gradient(ellipse at top, #2a0e08 0%, #150705 60%, #0a0301 100%); color: #fff4e8; padding: 24px; }
-  .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid rgba(255, 170, 90, 0.18); }
-  .header h1 { font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: clamp(1.6rem, 3vw, 2.4rem); background: linear-gradient(135deg, #fff3e0, #ffb366, #e85a20); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-  .live { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 999px; background: #44c46614; border: 1px solid rgba(68, 196, 102, 0.4); color: #44c466; font-size: 0.85rem; font-weight: 700; }
-  .live.disconnected { background: #ff3c3c14; border-color: rgba(255, 60, 60, 0.4); color: #ff6b6b; }
-  .pulse { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.5s ease-in-out infinite; }
-  @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-  .section { padding: 22px; border-radius: 18px; background: linear-gradient(180deg, #2a120eeb, #170a09f2); border: 1px solid rgba(255, 170, 90, 0.18); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
-  .section h2 { font-size: 0.9rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #ffc896b3; margin-bottom: 18px; }
-  .metric { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255, 170, 90, 0.08); }
-  .metric:last-child { border-bottom: none; }
-  .metric .label { color: #ffe2cdcc; font-size: 0.92rem; }
-  .metric .value { color: #fff4ea; font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; }
-  .gauge { margin: 14px 0; }
-  .gauge-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.88rem; color: #ffe2cdcc; }
-  .gauge-label .val { font-weight: 800; color: #fff4ea; font-variant-numeric: tabular-nums; }
-  .gauge-bar { height: 8px; border-radius: 999px; background: #1e0c0a; overflow: hidden; }
-  .gauge-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
-  .gauge-fill.ok { background: linear-gradient(90deg, #44c466, #88dc88); }
-  .gauge-fill.warn { background: linear-gradient(90deg, #ffb366, #e85a20); }
-  .gauge-fill.crit { background: linear-gradient(90deg, #e85a20, #ff3c3c); }
-  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
-  .badge-ok { background: rgba(68, 196, 102, 0.15); color: #44c466; border: 1px solid rgba(68, 196, 102, 0.3); }
-  .badge-warn { background: rgba(255, 180, 60, 0.15); color: #ffb43c; border: 1px solid rgba(255, 180, 60, 0.3); }
-  .badge-crit { background: rgba(255, 60, 60, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 60, 60, 0.3); }
-  .cron-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255, 170, 90, 0.08); }
-  .cron-row:last-child { border-bottom: none; }
-  .cron-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255, 140, 60, 0.2), rgba(255, 100, 30, 0.1)); flex-shrink: 0; font-size: 1.05rem; }
-  .cron-info { flex: 1; min-width: 0; }
-  .cron-name { font-weight: 700; font-size: 0.93rem; color: #fff4ea; }
-  .cron-meta { color: #ffe2cd99; font-size: 0.8rem; margin-top: 2px; line-height: 1.4; }
-  .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255, 170, 90, 0.18); text-align: center; color: #ffc89699; font-size: 0.85rem; }
-  .span-2 { grid-column: span 2; }
-  @media (max-width: 720px) { .span-2 { grid-column: span 1; } }
-  .activity-icon-ok { background: rgba(68, 196, 102, 0.18) !important; }
-  .activity-icon-merge { background: rgba(255, 140, 60, 0.18) !important; }
-  .activity-icon-block { background: rgba(255, 60, 60, 0.18) !important; }
-  .activity-icon-mail { background: rgba(120, 180, 255, 0.18) !important; }
-  .activity-icon-warn { background: rgba(255, 180, 60, 0.18) !important; }
+  body { min-height: 100vh; background: #000; color: #f5f2ee; padding: 20px; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+
+  /* Header + toggle */
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
+  .brand { font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: 1.5rem; background: linear-gradient(135deg, #ffe8c0, #d9a978); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .top-right { display: flex; align-items: center; gap: 14px; }
+  .live-tag { display: inline-flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 600; color: #30d16c; }
+  .live-tag.down { color: #ff453a; }
+  .live-tag .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .toggle-btn { display: inline-flex; align-items: center; gap: 9px; padding: 10px 20px; border-radius: 14px; background: linear-gradient(135deg, #16161c, #0f0f14); border: 1px solid #2c2c34; color: #ffe8c0; font-size: 0.85rem; font-weight: 700; cursor: pointer; transition: all 0.25s ease; font-family: inherit; position: relative; overflow: hidden; }
+  .toggle-btn::before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(217,169,120,0.12), transparent); opacity: 0; transition: opacity 0.25s ease; }
+  .toggle-btn:hover { border-color: #d9a978; box-shadow: 0 0 22px rgba(217,169,120,0.22); transform: translateY(-1px) scale(1.03); }
+  .toggle-btn:hover::before { opacity: 1; }
+  .toggle-btn:active { transform: translateY(0) scale(0.99); }
+  .toggle-btn .swap-icon { width: 16px; height: 16px; transition: transform 0.45s cubic-bezier(0.4,0,0.2,1); flex-shrink: 0; position: relative; z-index: 1; }
+  .toggle-btn:hover .swap-icon { transform: rotate(180deg); }
+  .toggle-btn #toggle-label { position: relative; z-index: 1; }
+
+  /* Pages */
+  .page { display: none; }
+  .page.active { display: block; animation: fade 0.3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Bandeau statut global */
+  .status-banner { display: flex; align-items: center; gap: 18px; padding: 22px 24px; border-radius: 20px; margin-bottom: 16px; position: relative; overflow: hidden; border: 1px solid; transition: all 0.4s ease; }
+  .status-banner.ok { background: #0a140d; border-color: rgba(48,209,108,0.35); box-shadow: 0 0 40px rgba(48,209,108,0.12); }
+  .status-banner.warn { background: #16120a; border-color: rgba(255,159,10,0.4); box-shadow: 0 0 40px rgba(255,159,10,0.14); }
+  .status-banner.crit { background: #160809; border-color: rgba(255,69,58,0.45); box-shadow: 0 0 50px rgba(255,69,58,0.18); }
+  .status-icon { width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; color: #000; }
+  .status-banner.ok .status-icon { background: #30d16c; box-shadow: 0 0 20px rgba(48,209,108,0.5); }
+  .status-banner.warn .status-icon { background: #ff9f0a; box-shadow: 0 0 20px rgba(255,159,10,0.5); }
+  .status-banner.crit .status-icon { background: #ff453a; box-shadow: 0 0 20px rgba(255,69,58,0.5); }
+  .status-text { flex: 1; }
+  .status-title { font-size: 1.4rem; font-weight: 700; line-height: 1.2; }
+  .status-sub { font-size: 0.85rem; color: #8c8c92; margin-top: 4px; }
+  .status-badge { padding: 7px 16px; border-radius: 14px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.5px; }
+  .status-banner.ok .status-badge { background: rgba(48,209,108,0.18); color: #30d16c; }
+  .status-banner.warn .status-badge { background: rgba(255,159,10,0.18); color: #ff9f0a; }
+  .status-banner.crit .status-badge { background: rgba(255,69,58,0.18); color: #ff453a; }
+
+  /* Section titre */
+  .sec-title { display: flex; align-items: center; gap: 14px; font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; color: #73737a; text-transform: uppercase; margin: 24px 0 16px; }
+  .sec-title::after { content: ""; flex: 1; height: 1px; background: #232328; }
+
+  /* Grille alertes santé */
+  .health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .hcard { border-radius: 16px; background: #0d0d0f; border: 1px solid #232328; padding: 0; overflow: hidden; position: relative; transition: all 0.3s ease; }
+  .hcard.alert { grid-column: 1 / -1; }
+  .hcard-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 2px; }
+  .hcard.ok .hcard-stripe { background: #30d16c; }
+  .hcard.warn .hcard-stripe { background: #ff9f0a; }
+  .hcard.crit .hcard-stripe { background: #ff453a; }
+  .hcard.ok { border-color: rgba(48,209,108,0.22); }
+  .hcard.warn { border-color: rgba(255,159,10,0.4); background: #16120a; }
+  .hcard.crit { border-color: rgba(255,69,58,0.45); background: #160809; }
+  .hcard-main { display: flex; align-items: center; gap: 14px; padding: 16px 18px 16px 22px; }
+  .hcard-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .hcard.ok .hcard-dot { background: #30d16c; }
+  .hcard.warn .hcard-dot { background: #ff9f0a; }
+  .hcard.crit .hcard-dot { background: #ff453a; }
+  .hcard-info { flex: 1; min-width: 0; }
+  .hcard-name { font-size: 0.95rem; font-weight: 700; color: #f5f2ee; }
+  .hcard-detail { font-size: 0.78rem; color: #8c8c92; margin-top: 2px; }
+  .hcard.warn .hcard-detail { color: #ffc88c; }
+  .hcard.crit .hcard-detail { color: #ff9696; }
+  .hcard-badge { padding: 5px 12px; border-radius: 11px; font-size: 0.66rem; font-weight: 800; flex-shrink: 0; }
+  .hcard.ok .hcard-badge { background: rgba(48,209,108,0.18); color: #30d16c; }
+  .hcard.warn .hcard-badge { background: rgba(255,159,10,0.18); color: #ff9f0a; }
+  .hcard.crit .hcard-badge { background: rgba(255,69,58,0.18); color: #ff453a; }
+  .hcard-diag { border-top: 1px solid rgba(255,255,255,0.06); padding: 14px 18px 16px 22px; display: none; }
+  .hcard.alert .hcard-diag { display: block; }
+  .diag-row { display: flex; gap: 10px; font-size: 0.8rem; line-height: 1.5; margin-bottom: 6px; }
+  .diag-row:last-child { margin-bottom: 0; }
+  .diag-key { font-weight: 800; flex-shrink: 0; font-size: 0.72rem; padding-top: 1px; }
+  .diag-key.cause { color: #ff9f0a; }
+  .diag-key.fix { color: #30d16c; }
+  .diag-val { color: #d5d2ce; }
+  .diag-val.fix { color: #8c8c92; font-style: italic; }
 </style>
 </head>
+<style>
+  /* Mini stats trafic */
+  .mini-traffic { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
+  .mini-card { padding: 16px 18px; border-radius: 16px; background: #0d0d0f; border: 1px solid #28282e; }
+  .mini-label { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.5px; color: #73737a; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .mini-label .dot { width: 8px; height: 8px; border-radius: 50%; background: #30d16c; }
+  .mini-value { font-size: 1.7rem; font-weight: 800; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .mini-sub { font-size: 0.72rem; color: #5a5a62; margin-top: 2px; }
+
+  /* Panel + 3 donuts */
+  .panel-box { border-radius: 16px; background: #0d0d0f; border: 1px solid #232328; padding: 20px 22px; }
+  .donuts-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 8px; }
+  .donut-card { border-radius: 16px; background: #0d0d0f; border: 1px solid #232328; padding: 20px 18px; }
+  .donut-card-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: #8c8c92; text-align: center; margin-bottom: 16px; }
+  .donut-mini { width: 130px; height: 130px; margin: 0 auto 16px; position: relative; }
+  .donut-svg { width: 130px; height: 130px; transform: rotate(-90deg); }
+  .donut-svg circle { transition: stroke-dasharray 0.6s ease, stroke-dashoffset 0.6s ease; }
+  .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .donut-total { font-size: 1.7rem; font-weight: 800; color: #f5f2ee; line-height: 1; font-variant-numeric: tabular-nums; }
+  .donut-cap { font-size: 0.68rem; color: #8c8c92; margin-top: 2px; }
+  .donut-leg { font-size: 0.78rem; }
+  .donut-leg .lr { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+  .donut-leg .ln { display: flex; align-items: center; gap: 6px; color: #d5d2ce; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .donut-leg .ld { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .donut-leg .lv { font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; padding-left: 8px; }
+  .donut-leg .empty { font-size: 0.76rem; text-align: center; }
+
+  /* Top pages barres */
+  .bar-row { margin-bottom: 12px; }
+  .bar-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+  .bar-name { font-size: 0.85rem; color: #d5d2ce; }
+  .bar-val { font-size: 0.82rem; font-weight: 800; color: #d9a978; font-variant-numeric: tabular-nums; }
+  .bar-track { height: 7px; border-radius: 999px; background: #1a1a1f; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #ffd28c, #d9a978); transition: width 0.5s ease; }
+  .empty { color: #5a5a62; font-size: 0.82rem; padding: 8px 0; }
+
+  .foot { text-align: center; color: #5a5a62; font-size: 0.78rem; margin-top: 28px; padding-top: 16px; border-top: 1px solid #1a1a1f; }
+
+  @media (max-width: 760px) {
+    .health-grid { grid-template-columns: 1fr; }
+    .mini-traffic { grid-template-columns: 1fr; }
+    .donuts-row { grid-template-columns: 1fr; }
+  }
+</style>
 <body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">GameNime</div>
+    <div class="top-right">
+      <div class="live-tag" id="live-tag"><span class="dot"></span> connexion...</div>
+      <button class="toggle-btn" id="toggle-btn" onclick="switchView()">
+        <svg class="swap-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H7"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h14"/></svg><span id="toggle-label">Trafic</span>
+      </button>
+    </div>
+  </div>
 
-<div class="header">
-  <h1>GameNime API · Dashboard</h1>
-  <div class="live" id="status"><span class="pulse"></span> <span id="status-text">Connexion...</span></div>
+  <!-- ═══ PAGE SURVEILLANCE ═══ -->
+  <div class="page active" id="page-surveillance">
+    <div class="status-banner ok" id="status-banner">
+      <div class="status-icon" id="status-icon">✓</div>
+      <div class="status-text">
+        <div class="status-title" id="status-title">Vérification en cours...</div>
+        <div class="status-sub" id="status-sub">Connexion au système</div>
+      </div>
+      <div class="status-badge" id="status-badge">—</div>
+    </div>
+    <div class="sec-title">Systèmes surveillés</div>
+    <div class="health-grid" id="health-grid">
+      <div class="empty">Chargement...</div>
+    </div>
+  </div>
+
+  <!-- ═══ PAGE TRAFIC ═══ -->
+  <div class="page" id="page-traffic">
+    <div class="mini-traffic">
+      <div class="mini-card">
+        <div class="mini-label"><span class="dot"></span> EN DIRECT</div>
+        <div class="mini-value" id="mini-live" style="color:#30d16c">—</div>
+        <div class="mini-sub">visiteurs actifs</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">VISITES 24H</div>
+        <div class="mini-value" id="mini-24h">—</div>
+        <div class="mini-sub" id="mini-24h-sub">— uniques</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">SOURCE TOP</div>
+        <div class="mini-value" id="mini-source" style="color:#d9a978;font-size:1.4rem">—</div>
+        <div class="mini-sub" id="mini-source-sub">—</div>
+      </div>
+    </div>
+
+    <div class="sec-title">Sources par période</div>
+    <div class="donuts-row">
+      <div class="donut-card">
+        <div class="donut-card-title">24 heures</div>
+        <div class="donut-mini">
+          <svg viewBox="0 0 120 120" class="donut-svg"><circle cx="60" cy="60" r="48" fill="none" stroke="#1a1a1f" stroke-width="15"/><g id="donut-24h"></g></svg>
+          <div class="donut-center"><div class="donut-total" id="total-24h">—</div><div class="donut-cap">visites</div></div>
+        </div>
+        <div class="donut-leg" id="leg-24h"></div>
+      </div>
+      <div class="donut-card">
+        <div class="donut-card-title">Ce mois</div>
+        <div class="donut-mini">
+          <svg viewBox="0 0 120 120" class="donut-svg"><circle cx="60" cy="60" r="48" fill="none" stroke="#1a1a1f" stroke-width="15"/><g id="donut-month"></g></svg>
+          <div class="donut-center"><div class="donut-total" id="total-month">—</div><div class="donut-cap">visites</div></div>
+        </div>
+        <div class="donut-leg" id="leg-month"></div>
+      </div>
+      <div class="donut-card">
+        <div class="donut-card-title">Cette année</div>
+        <div class="donut-mini">
+          <svg viewBox="0 0 120 120" class="donut-svg"><circle cx="60" cy="60" r="48" fill="none" stroke="#1a1a1f" stroke-width="15"/><g id="donut-year"></g></svg>
+          <div class="donut-center"><div class="donut-total" id="total-year">—</div><div class="donut-cap">visites</div></div>
+        </div>
+        <div class="donut-leg" id="leg-year"></div>
+      </div>
+    </div>
+
+    <div class="sec-title">Pages les plus vues (24h)</div>
+    <div class="panel-box">
+      <div id="pages-bars"><div class="empty">—</div></div>
+    </div>
+  </div>
+
+  <div class="foot">GameNime · monitoring · mise à jour temps réel</div>
 </div>
-
-<div class="grid">
-  <div class="section">
-    <h2>🖥️ Système</h2>
-    <div class="gauge"><div class="gauge-label"><span>CPU (load 1min)</span><span class="val" id="cpu-load">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="cpu-bar" style="width:0%"></div></div></div>
-    <div class="gauge"><div class="gauge-label"><span>RAM</span><span class="val" id="ram-text">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="ram-bar" style="width:0%"></div></div></div>
-    <div class="gauge"><div class="gauge-label"><span>Disque /</span><span class="val" id="disk-text">—</span></div><div class="gauge-bar"><div class="gauge-fill ok" id="disk-bar" style="width:0%"></div></div></div>
-    <div class="metric"><span class="label">📡 Réseau ↓</span><span class="value" id="net-rx">—</span></div>
-    <div class="metric"><span class="label">📡 Réseau ↑</span><span class="value" id="net-tx">—</span></div>
-    <div class="metric"><span class="label">Load 5 / 15min</span><span class="value" id="load-others">—</span></div>
-    <div class="metric"><span class="label">⏱️ Uptime</span><span class="value" id="uptime">—</span></div>
-  </div>
-
-  <div class="section">
-    <h2>📚 Catalogue</h2>
-    <div class="metric"><span class="label">🎌 Anime</span><span class="value" id="anime-total">—</span></div>
-    <div class="metric"><span class="label">🎮 Games</span><span class="value" id="game-total">—</span></div>
-    <div class="metric"><span class="label">❌ Anime sans cover</span><span class="value" id="anime-nocover">—</span></div>
-    <div class="metric"><span class="label">⚠️ Cover hotlink</span><span class="value" id="anime-hotlink">—</span></div>
-    <div class="metric"><span class="label">❌ Games sans cover</span><span class="value" id="game-nocover">—</span></div>
-    <div class="metric"><span class="label">🚫 Sans plateforme</span><span class="value" id="anime-noplatform">—</span></div>
-    <div class="metric"><span class="label">⛔ Blocklist active</span><span class="value" id="blocklist">—</span></div>
-  </div>
-
-  <div class="section">
-    <h2>⭐ Utilisateurs</h2>
-    <div class="metric"><span class="label">👥 Comptes totaux</span><span class="value" id="user-total">—</span></div>
-    <div class="metric"><span class="label">✨ Premium actifs</span><span class="value" id="user-premium">—</span></div>
-    <div class="metric"><span class="label">✓ Emails vérifiés</span><span class="value" id="user-verified">—</span></div>
-    <div class="metric"><span class="label">❤️ Favoris totaux</span><span class="value" id="favorites">—</span></div>
-    <div class="metric"><span class="label">🔔 Notifs unread</span><span class="value" id="notif-unread">—</span></div>
-    <div class="metric"><span class="label">📨 Reminders 24h</span><span class="value" id="reminders-24h">—</span></div>
-    <div class="metric"><span class="label">📡 SSE connectés</span><span class="value" id="sse-active">—</span></div>
-  </div>
-
-  <div class="section span-2">
-    <h2>🔄 Crons GameNime API</h2>
-    <div id="crons-list">
-      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">En attente de données...</div></div></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>🗄️ Database & Cache</h2>
-    <div class="metric"><span class="label">⚡ Latence DB</span><span class="value" id="db-latency">—</span></div>
-    <div class="metric"><span class="label">📊 Connexions DB</span><span class="value" id="db-conn">—</span></div>
-    <div class="metric"><span class="label">📦 Taille DB</span><span class="value" id="db-size">—</span></div>
-    <div class="metric"><span class="label">🎯 Cache hit rate</span><span class="value" id="cache-rate">—</span></div>
-    <div class="metric"><span class="label">🔄 Requêtes /min</span><span class="value" id="req-min">—</span></div>
-    <div class="metric"><span class="label">✓ Hits / ✗ Misses</span><span class="value" id="cache-hm">—</span></div>
-  </div>
-
-  <div class="section span-2">
-    <h2>⚡ Workflows externes (sources)</h2>
-    <div id="workflows-list">
-      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">En attente...</div></div></div>
-    </div>
-  </div>
-
-  <div class="section span-2">
-    <h2>📡 Activité live (20 derniers événements)</h2>
-    <div id="activity-list">
-      <div class="cron-row"><div class="cron-icon">⏳</div><div class="cron-info"><div class="cron-name">Aucun événement encore...</div></div></div>
-    </div>
-  </div>
-</div>
-
-<div class="footer">GameNime API · SSE update toutes les 2s · Session 13</div>
-
 <script>
-  function fmtBytes(b) { if (!b && b !== 0) return "—"; const u=["B","KB","MB","GB","TB"]; let i=0; while (b>=1024 && i<u.length-1) { b/=1024; i++; } return b.toFixed(b<10&&i>0?1:0)+" "+u[i]; }
-  function fmtBps(b) { return fmtBytes(b) + "/s"; }
-  function fmtUptime(s) { if(!s) return "—"; const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60); return (d?d+"j ":"")+h+"h "+m+"min"; }
-  function fmtAgo(ts) { if(!ts) return "jamais"; const s=Math.floor((Date.now()-ts)/1000); if(s<60) return "il y a "+s+"s"; const m=Math.floor(s/60); if(m<60) return "il y a "+m+"min"; const h=Math.floor(m/60); if(h<24) return "il y a "+h+"h "+(m%60)+"min"; const d=Math.floor(h/24); return "il y a "+d+"j "+(h%24)+"h"; }
-  function fmtIn(ms) { if(ms<=0) return "imminent"; const s=Math.floor(ms/1000); if(s<60) return "dans "+s+"s"; const m=Math.floor(s/60); if(m<60) return "dans "+m+"min"; const h=Math.floor(m/60); return "dans "+h+"h "+(m%60)+"min"; }
-  function gaugeClass(p) { return p<60?"ok":(p<85?"warn":"crit"); }
+  // ═══ Helpers ═══
+  function fmtAgo(ts) {
+    if (!ts) return "jamais";
+    var s = Math.floor((Date.now() - ts) / 1000);
+    if (s < 60) return "il y a " + s + "s";
+    if (s < 3600) return "il y a " + Math.floor(s/60) + "min";
+    if (s < 86400) return "il y a " + Math.floor(s/3600) + "h";
+    return "il y a " + Math.floor(s/86400) + "j";
+  }
+  var SRC_COLORS = { TikTok:"#ff2d55", Direct:"#30d16c", Discord:"#7b8cff", Google:"#ffd28c", YouTube:"#ff453a", "Twitter/X":"#5bb8ff", Reddit:"#ff8a4c", Instagram:"#d96aff" };
+  var PALETTE = ["#ff2d55","#30d16c","#ff9f0a","#7b8cff","#ffd28c","#ff8a4c"];
+  function srcColor(name, i) { return SRC_COLORS[name] || PALETTE[i % PALETTE.length]; }
 
-  // Type → icon class
-  const ACT_ICONS = {
-    refetch: { icon: "✓", cls: "activity-icon-ok" },
-    lookup: { icon: "🔍", cls: "activity-icon-ok" },
-    quality: { icon: "🎯", cls: "activity-icon-warn" },
-    push: { icon: "⚡", cls: "activity-icon-merge" },
-    merge: { icon: "🧹", cls: "activity-icon-merge" },
-    blocklist_hit: { icon: "⛔", cls: "activity-icon-block" },
-    reminder: { icon: "📧", cls: "activity-icon-mail" },
-    error: { icon: "❌", cls: "activity-icon-block" },
+  // Noms lisibles des pages
+  var PAGE_NAMES = {
+    "/": "Accueil",
+    "/anime": "Animes",
+    "/games": "Jeux",
+    "/upcoming": "À venir",
+    "/premium": "Premium",
+    "/signin": "Connexion",
+    "/register": "Inscription",
+    "/favorites": "Favoris",
+    "/notifications": "Notifications",
+    "/account": "Mon compte",
+    "/account/preferences": "Préférences",
+    "/cgu": "CGU",
+    "/confidentialite": "Confidentialité",
+    "/cookies": "Cookies",
+    "/mentions-legales": "Mentions légales"
   };
+  function pageName(p) {
+    if (PAGE_NAMES[p]) return PAGE_NAMES[p];
+    // Retire un éventuel slash final puis réessaie
+    var clean = p.replace(/\/$/, "");
+    if (PAGE_NAMES[clean]) return PAGE_NAMES[clean];
+    return p;
+  }
 
-  function update(m) {
-    document.getElementById("status").className = "live";
-    document.getElementById("status-text").textContent = "Temps réel";
-
-    // System
-    if (m.system && !m.system.error) {
-      const cpuPercent = Math.min(100, Math.round(m.system.load["1min"] * 25));
-      document.getElementById("cpu-load").textContent = m.system.load["1min"].toFixed(2);
-      const cpuBar = document.getElementById("cpu-bar");
-      cpuBar.style.width = cpuPercent + "%";
-      cpuBar.className = "gauge-fill " + gaugeClass(cpuPercent);
-
-      document.getElementById("ram-text").textContent = fmtBytes(m.system.mem.used) + " / " + fmtBytes(m.system.mem.total) + " (" + m.system.mem.percent + "%)";
-      const ramBar = document.getElementById("ram-bar");
-      ramBar.style.width = m.system.mem.percent + "%";
-      ramBar.className = "gauge-fill " + gaugeClass(m.system.mem.percent);
-
-      document.getElementById("disk-text").textContent = fmtBytes(m.system.disk.used) + " / " + fmtBytes(m.system.disk.total) + " (" + m.system.disk.percent + "%)";
-      const diskBar = document.getElementById("disk-bar");
-      diskBar.style.width = m.system.disk.percent + "%";
-      diskBar.className = "gauge-fill " + gaugeClass(m.system.disk.percent);
-
-      document.getElementById("net-rx").textContent = fmtBps(m.system.net?.rx_per_sec || 0);
-      document.getElementById("net-tx").textContent = fmtBps(m.system.net?.tx_per_sec || 0);
-      document.getElementById("load-others").textContent = m.system.load["5min"].toFixed(2) + " / " + m.system.load["15min"].toFixed(2);
-      document.getElementById("uptime").textContent = fmtUptime(m.system.uptime);
-    }
-
-    // Catalog
-    if (m.catalog && !m.catalog.error) {
-      document.getElementById("anime-total").textContent = m.catalog.anime.total;
-      document.getElementById("game-total").textContent = m.catalog.games.total;
-      const aNoCov = m.catalog.anime.no_cover;
-      document.getElementById("anime-nocover").innerHTML = aNoCov + (aNoCov>0 ? ' <span class="badge badge-warn">Manquant</span>' : ' <span class="badge badge-ok">✓ Clean</span>');
-      const hotlink = m.catalog.anime.hotlink;
-      document.getElementById("anime-hotlink").innerHTML = hotlink + (hotlink>0 ? ' <span class="badge badge-warn">Phase B</span>' : ' <span class="badge badge-ok">✓ Clean</span>');
-      document.getElementById("game-nocover").textContent = m.catalog.games.no_cover;
-      document.getElementById("anime-noplatform").textContent = m.catalog.anime.no_platform;
-      document.getElementById("blocklist").innerHTML = m.catalog.blocklist + ' <span class="badge badge-ok">Actif</span>';
-
-      document.getElementById("user-total").textContent = m.catalog.users.total;
-      document.getElementById("user-premium").textContent = m.catalog.users.premium;
-      document.getElementById("user-verified").textContent = m.catalog.users.verified;
-      document.getElementById("favorites").textContent = m.catalog.favorites;
-      document.getElementById("notif-unread").textContent = m.catalog.notif_unread;
-      document.getElementById("reminders-24h").textContent = m.catalog.reminders_24h;
-
-      // DB
-      document.getElementById("db-latency").innerHTML = m.catalog.db.latency_ms + " ms" + (m.catalog.db.latency_ms<50 ? ' <span class="badge badge-ok">Fast</span>' : '');
-      document.getElementById("db-conn").textContent = m.catalog.db.connections;
-      document.getElementById("db-size").textContent = fmtBytes(m.catalog.db.size_bytes);
-    }
-
-    document.getElementById("sse-active").innerHTML = (m.sse_active||0) + ' <span class="badge badge-ok">Live</span>';
-    document.getElementById("req-min").textContent = m.requests_per_min || 0;
-
-    // Cache
-    if (m.cache) {
-      document.getElementById("cache-rate").innerHTML = m.cache.hit_rate + "%" + (m.cache.hit_rate>70 ? ' <span class="badge badge-ok">Bon</span>' : '');
-      document.getElementById("cache-hm").textContent = m.cache.hits + " / " + m.cache.misses;
-    }
-
-    // Crons avec prochain run
-    const cronInfo = {
-      "refetch-cron": { icon: "🔄", name: "Phase B · Refetch enrichment", interval: 3600000 },
-      "lookup-cron": { icon: "🔍", name: "Phase C · Lookup AniList", interval: 3600000 },
-      "quality-cron": { icon: "🎯", name: "Quality Check J-7", interval: 86400000 },
-      "auto-merge": { icon: "🧹", name: "Auto-Merge n8n", interval: 300000 }
-    };
-    const cronsHtml = Object.entries(cronInfo).map(([key, info]) => {
-      const run = m.crons[key];
-      let meta = "Jamais exécuté";
-      let badge = '<span class="badge badge-warn">⏳ Attente</span>';
-      if (run) {
-        const detailParts = run.details ? Object.entries(run.details).map(([k,v])=>`${k}: ${v}`).join(" · ") : "";
-        const nextIn = (run.ts + info.interval) - Date.now();
-        const nextText = nextIn > 0 ? "prochain " + fmtIn(nextIn) : "imminent";
-        meta = fmtAgo(run.ts) + " · " + detailParts + " · " + nextText;
-        badge = '<span class="badge badge-ok">✓ OK</span>';
-      }
-      return `<div class="cron-row"><div class="cron-icon">${info.icon}</div><div class="cron-info"><div class="cron-name">${info.name}</div><div class="cron-meta">${meta}</div></div>${badge}</div>`;
-    }).join("");
-    document.getElementById("crons-list").innerHTML = cronsHtml;
-
-    // Workflows (enriched : items pushed + next run)
-    if (m.workflows && !m.workflows.error) {
-      const wfNames = {
-        anilist: { icon: "🎌", name: "Anime FULL v2 · AniList" },
-        jikan: { icon: "📺", name: "Jikan (MAL complement)" },
-        animeschedule: { icon: "📅", name: "AnimeSchedule" },
-        rawg: { icon: "🎮", name: "Games FULL v2 · RAWG" }
-      };
-      const wfHtml = Object.entries(wfNames).map(([key, info]) => {
-        const wf = m.workflows[key] || {};
-        const ts = wf.last_push ? new Date(wf.last_push).getTime() : null;
-        const ago = ts ? fmtAgo(ts) : "jamais";
-        const ageMin = ts ? (Date.now() - ts) / 60000 : 99999;
-        const badge = ageMin < 240 ? '<span class="badge badge-ok">✓ Healthy</span>' : (ageMin < 480 ? '<span class="badge badge-warn">⚠ Slow</span>' : '<span class="badge badge-crit">❌ Stale</span>');
-        const parts = [ago];
-        if (wf.items_pushed != null) parts.push(`${wf.items_pushed} items pushed`);
-        if (wf.next_run) {
-          const nextIn = wf.next_run - Date.now();
-          parts.push(nextIn > 0 ? "prochain run " + fmtIn(nextIn) : "imminent");
-        }
-        return `<div class="cron-row"><div class="cron-icon">${info.icon}</div><div class="cron-info"><div class="cron-name">${info.name}</div><div class="cron-meta">${parts.join(" · ")}</div></div>${badge}</div>`;
-      }).join("");
-      document.getElementById("workflows-list").innerHTML = wfHtml;
-    }
-
-    // Activity avec icônes & couleurs typées
-    if (m.activity && m.activity.length > 0) {
-      const actHtml = m.activity.map(a => {
-        const cfg = ACT_ICONS[a.type] || ACT_ICONS["refetch"];
-        const lvlClass = a.level === "error" ? "activity-icon-block" : (a.level === "warn" ? "activity-icon-warn" : cfg.cls);
-        return `<div class="cron-row" style="padding:8px 0"><div class="cron-icon ${lvlClass}">${cfg.icon}</div><div class="cron-info"><div class="cron-name" style="font-size:0.88rem">${a.message}</div><div class="cron-meta">${a.detail||""} · ${fmtAgo(a.ts)}</div></div></div>`;
-      }).join("");
-      document.getElementById("activity-list").innerHTML = actHtml;
+  // ═══ Toggle vues (Surveillance <-> Trafic) ═══
+  var currentView = "surveillance";
+  function switchView() {
+    if (currentView === "surveillance") {
+      currentView = "traffic";
+      document.getElementById("page-surveillance").className = "page";
+      document.getElementById("page-traffic").className = "page active";
+      document.getElementById("toggle-label").textContent = "Surveillance";
+    } else {
+      currentView = "surveillance";
+      document.getElementById("page-traffic").className = "page";
+      document.getElementById("page-surveillance").className = "page active";
+      document.getElementById("toggle-label").textContent = "Trafic";
     }
   }
 
-  let es;
+  // ═══ Sous-onglets périodes ═══
+  // Dessine un donut (réutilisable pour les 3 périodes)
+  function drawDonut(segId, totalId, legId, sources) {
+    var total = sources.reduce(function(s,x){return s+x[1];}, 0);
+    document.getElementById(totalId).textContent = total;
+    var totSrc = total || 1;
+    var circ = 2 * Math.PI * 48;
+    var offset = 0, segHtml = "";
+    sources.forEach(function(s, i) {
+      var frac = s[1] / totSrc;
+      var color = srcColor(s[0], i);
+      var dash = (frac * circ).toFixed(2);
+      var gap = (circ - frac * circ).toFixed(2);
+      segHtml += '<circle cx="60" cy="60" r="48" fill="none" stroke="'+color+'" stroke-width="15" stroke-dasharray="'+dash+' '+gap+'" stroke-dashoffset="'+(-offset).toFixed(2)+'"></circle>';
+      offset += frac * circ;
+    });
+    document.getElementById(segId).innerHTML = segHtml;
+    var legHtml = "";
+    if (sources.length === 0) {
+      legHtml = '<div class="empty">Aucune donnée</div>';
+    } else {
+      sources.slice(0, 5).forEach(function(s, i) {
+        var pct = Math.round(s[1]/totSrc*100);
+        var color = srcColor(s[0], i);
+        legHtml += '<div class="lr"><span class="ln"><span class="ld" style="background:'+color+'"></span>'+s[0]+'</span><span class="lv" style="color:'+color+'">'+pct+'%</span></div>';
+      });
+    }
+    document.getElementById(legId).innerHTML = legHtml;
+  }
+
+  // ═══ Diagnostic santé ═══
+  function buildHealthChecks(m) {
+    var checks = [];
+    var sys = m.system || {};
+    var cat = m.catalog || {};
+    var db = cat.db || {};
+    var wf = m.workflows || {};
+    var ssl = m.ssl || {};
+
+    checks.push({ name: "API content-api", level: "ok", detail: "Opérationnelle · répond normalement", cause: "", fix: "" });
+
+    var lat = db.latency_ms != null ? db.latency_ms : 0;
+    var conn = db.connections != null ? db.connections : 0;
+    if (lat > 500) {
+      checks.push({ name: "Base de données", level: "crit", detail: "Latence " + lat + "ms · " + conn + " connexions",
+        cause: "Latence très élevée (" + lat + "ms). La DB répond trop lentement, le site peut ralentir ou timeout.",
+        fix: "Vérifier les requêtes lentes : SHOW FULL PROCESSLIST. Si pool saturé, redémarrer content-api." });
+    } else if (lat > 100) {
+      checks.push({ name: "Base de données", level: "warn", detail: "Latence " + lat + "ms · " + conn + " connexions",
+        cause: "Latence un peu élevée (" + lat + "ms). Surveiller si ça monte.",
+        fix: "Surveiller. Si ça dépasse 500ms, vérifier les requêtes en cours." });
+    } else {
+      checks.push({ name: "Base de données", level: "ok", detail: "Latence " + lat + "ms · " + conn + " connexions", cause: "", fix: "" });
+    }
+
+    var disk = sys.disk ? sys.disk.percent : 0;
+    var diskFree = sys.disk ? ((sys.disk.total - sys.disk.used) / 1e9).toFixed(1) : "?";
+    if (disk > 90) {
+      checks.push({ name: "Espace disque", level: "crit", detail: disk + "% utilisé · " + diskFree + " Go libres",
+        cause: "Disque presque plein (" + disk + "%). Risque de crash : plus d'écriture DB, logs, backups impossibles.",
+        fix: "Libérer de l'espace : docker system prune, supprimer vieux backups/logs. URGENT." });
+    } else if (disk > 80) {
+      checks.push({ name: "Espace disque", level: "warn", detail: disk + "% utilisé · " + diskFree + " Go libres",
+        cause: "Disque se remplit (" + disk + "%). Anticiper avant saturation.",
+        fix: "Nettoyer : docker system prune, vérifier les gros fichiers (du -sh /*)." });
+    } else {
+      checks.push({ name: "Espace disque", level: "ok", detail: disk + "% utilisé · " + diskFree + " Go libres", cause: "", fix: "" });
+    }
+
+    var ram = sys.mem ? sys.mem.percent : 0;
+    var ramTxt = sys.mem ? (sys.mem.used/1e9).toFixed(1) + "/" + (sys.mem.total/1e9).toFixed(1) + " Go" : "?";
+    if (ram > 95) {
+      checks.push({ name: "Mémoire RAM", level: "crit", detail: ram + "% · " + ramTxt,
+        cause: "RAM quasi saturée (" + ram + "%). Risque d'OOM kill : un container peut être tué par le système.",
+        fix: "Identifier le gros consommateur : docker stats. Redémarrer le container fautif." });
+    } else if (ram > 85) {
+      checks.push({ name: "Mémoire RAM", level: "warn", detail: ram + "% · " + ramTxt,
+        cause: "RAM élevée (" + ram + "%). Surveiller.",
+        fix: "Vérifier docker stats. Si ça monte encore, prévoir un redémarrage." });
+    } else {
+      checks.push({ name: "Mémoire RAM", level: "ok", detail: ram + "% · " + ramTxt, cause: "", fix: "" });
+    }
+
+    var ssld = ssl.daysLeft;
+    if (ssld != null) {
+      if (ssld < 7) {
+        checks.push({ name: "Certificat SSL", level: "crit", detail: "Expire dans " + ssld + " jours",
+          cause: "Certificat expire très bientôt (" + ssld + "j). Si non renouvelé, le site deviendra inaccessible.",
+          fix: "Forcer : docker exec certbot certbot renew --force-renewal, puis reload nginx." });
+      } else if (ssld < 14) {
+        checks.push({ name: "Certificat SSL", level: "warn", detail: "Expire dans " + ssld + " jours",
+          cause: "Certificat expire dans " + ssld + " jours. Certbot devrait renouveler auto, mais vérifier.",
+          fix: "Vérifier certbot : docker logs certbot. Renouvellement auto normalement à 30j." });
+      } else {
+        checks.push({ name: "Certificat SSL", level: "ok", detail: "Valide · expire dans " + ssld + " jours", cause: "", fix: "" });
+      }
+    }
+
+    var wfKeys = [["anilist","AniList"],["jikan","Jikan"],["animeschedule","AnimeSchedule"],["rawg","RAWG"]];
+    var oldestAge = 0, oldestName = "";
+    wfKeys.forEach(function(wk) {
+      var w = wf[wk[0]];
+      if (w && w.last_push) {
+        var age = (Date.now() - new Date(w.last_push).getTime()) / 3600000;
+        if (age > oldestAge) { oldestAge = age; oldestName = wk[1]; }
+      }
+    });
+    if (oldestAge > 12) {
+      checks.push({ name: "Workflows n8n", level: "crit", detail: oldestName + " : dernier push il y a " + oldestAge.toFixed(0) + "h",
+        cause: "Workflow " + oldestName + " silencieux depuis " + oldestAge.toFixed(0) + "h. Le catalogue ne se met plus à jour.",
+        fix: "Vérifier n8n : le workflow tourne-t-il ? Regarder les logs dans l'interface n8n." });
+    } else if (oldestAge > 6) {
+      checks.push({ name: "Workflows n8n", level: "warn", detail: oldestName + " : dernier push il y a " + oldestAge.toFixed(0) + "h",
+        cause: "Workflow " + oldestName + " un peu lent (" + oldestAge.toFixed(0) + "h). À surveiller.",
+        fix: "Vérifier dans n8n que le workflow " + oldestName + " s'exécute à son intervalle." });
+    } else {
+      checks.push({ name: "Workflows n8n", level: "ok", detail: "Tous actifs · dernier push " + (oldestAge < 1 ? "<1h" : oldestAge.toFixed(0)+"h"), cause: "", fix: "" });
+    }
+
+    // Covers ANIME (hotlink + sans cover)
+    var animeHotlink = (cat.anime ? cat.anime.hotlink : 0) || 0;
+    var animeNoCover = (cat.anime ? cat.anime.no_cover : 0) || 0;
+    var animeBroken = animeHotlink + animeNoCover;
+    if (animeBroken > 35) {
+      checks.push({ name: "Covers anime", level: "warn", detail: animeBroken + " à corriger (" + animeHotlink + " hotlink, " + animeNoCover + " manquantes)",
+        cause: "Beaucoup de covers anime cassées/manquantes (" + animeBroken + "). Certaines fiches sans image.",
+        fix: "Phase B Anime répare les hotlink via AniList. Forcer : POST /admin/refetch-incomplete." });
+    } else {
+      checks.push({ name: "Covers anime", level: "ok", detail: animeBroken === 0 ? "Toutes présentes" : animeBroken + " en cours (Phase B)", cause: "", fix: "" });
+    }
+    // Covers JEUX (sans cover, souvent limite externe RAWG/IGDB)
+    var gamesNoCover = (cat.games ? cat.games.no_cover : 0) || 0;
+    if (gamesNoCover > 35) {
+      checks.push({ name: "Covers jeux", level: "warn", detail: gamesNoCover + " jeux sans cover",
+        cause: "Beaucoup de jeux sans cover (" + gamesNoCover + "). Souvent limite externe (RAWG/IGDB n'ont pas l'image).",
+        fix: "Phase B Games refetch RAWG/IGDB. Si la cover n'existe pas à la source, rien à faire." });
+    } else {
+      checks.push({ name: "Covers jeux", level: "ok", detail: gamesNoCover === 0 ? "Toutes présentes" : gamesNoCover + " en cours (Phase B)", cause: "", fix: "" });
+    }
+
+    return checks;
+  }
+</script>
+<script>
+  var lastMetrics = null;
+
+  function render(m) {
+    lastMetrics = m;
+    document.getElementById("live-tag").innerHTML = '<span class="dot"></span> live';
+    document.getElementById("live-tag").className = "live-tag";
+
+    // Santé
+    var checks = buildHealthChecks(m);
+    var worst = "ok";
+    checks.forEach(function(c) {
+      if (c.level === "crit") worst = "crit";
+      else if (c.level === "warn" && worst !== "crit") worst = "warn";
+    });
+
+    var nCrit = checks.filter(function(c){return c.level==="crit";}).length;
+    var nWarn = checks.filter(function(c){return c.level==="warn";}).length;
+    var nOk = checks.filter(function(c){return c.level==="ok";}).length;
+    document.getElementById("status-banner").className = "status-banner " + worst;
+    if (worst === "ok") {
+      document.getElementById("status-icon").textContent = "✓";
+      document.getElementById("status-title").textContent = "Tous les systèmes sont opérationnels";
+      document.getElementById("status-sub").textContent = checks.length + " services surveillés · 0 alerte · maj " + fmtAgo(m.ts);
+      document.getElementById("status-badge").textContent = "HEALTHY";
+    } else if (worst === "warn") {
+      document.getElementById("status-icon").textContent = "!";
+      document.getElementById("status-title").textContent = nWarn + (nWarn>1?" points":" point") + " d'attention";
+      document.getElementById("status-sub").textContent = nWarn + " à surveiller · " + nOk + " OK · maj " + fmtAgo(m.ts);
+      document.getElementById("status-badge").textContent = "ATTENTION";
+    } else {
+      document.getElementById("status-icon").textContent = "!";
+      document.getElementById("status-title").textContent = nCrit + (nCrit>1?" problèmes critiques":" problème critique") + " détecté" + (nCrit>1?"s":"");
+      document.getElementById("status-sub").textContent = "Action requise · " + nCrit + " critique" + (nCrit>1?"s":"") + " · " + nOk + " OK";
+      document.getElementById("status-badge").textContent = "CRITICAL";
+    }
+
+    var sorted = checks.slice().sort(function(a, b) {
+      var order = { crit: 0, warn: 1, ok: 2 };
+      return order[a.level] - order[b.level];
+    });
+    var html = "";
+    sorted.forEach(function(c) {
+      var isAlert = c.level !== "ok";
+      var badge = c.level === "ok" ? "OK" : (c.level === "warn" ? "ATTENTION" : "CRITIQUE");
+      html += '<div class="hcard ' + c.level + (isAlert ? ' alert' : '') + '">';
+      html += '<div class="hcard-stripe"></div>';
+      html += '<div class="hcard-main"><div class="hcard-dot"></div><div class="hcard-info"><div class="hcard-name">' + c.name + '</div><div class="hcard-detail">' + c.detail + '</div></div><div class="hcard-badge">' + badge + '</div></div>';
+      if (isAlert && c.cause) {
+        html += '<div class="hcard-diag"><div class="diag-row"><span class="diag-key cause">CAUSE</span><span class="diag-val">' + c.cause + '</span></div>';
+        if (c.fix) html += '<div class="diag-row"><span class="diag-key fix">FIX</span><span class="diag-val fix">' + c.fix + '</span></div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    document.getElementById("health-grid").innerHTML = html;
+
+    // Mini trafic
+    var tf = m.traffic || {};
+    document.getElementById("mini-live").textContent = tf.live != null ? tf.live : 0;
+    document.getElementById("mini-24h").textContent = tf.visits_24h != null ? tf.visits_24h : 0;
+    document.getElementById("mini-24h-sub").textContent = (tf.unique_24h != null ? tf.unique_24h : 0) + " uniques";
+    var topSrc = (tf.sources && tf.sources.length > 0) ? tf.sources[0] : null;
+    if (topSrc) {
+      document.getElementById("mini-source").textContent = topSrc[0];
+      var totS = tf.sources.reduce(function(s,x){return s+x[1];},0) || 1;
+      document.getElementById("mini-source-sub").textContent = Math.round(topSrc[1]/totS*100) + "% du trafic";
+    } else {
+      document.getElementById("mini-source").textContent = "—";
+      document.getElementById("mini-source-sub").textContent = "aucune visite";
+    }
+
+    renderTraffic();
+  }
+
+  function renderTraffic() {
+    if (!lastMetrics) return;
+    var tf = lastMetrics.traffic || {};
+    drawDonut("donut-24h", "total-24h", "leg-24h", tf.sources || []);
+    drawDonut("donut-month", "total-month", "leg-month", tf.month || []);
+    drawDonut("donut-year", "total-year", "leg-year", tf.year || []);
+
+    // Top pages (24h, mémoire)
+    var pages = tf.top_pages || [];
+    var maxP = pages.length > 0 ? pages[0][1] : 1;
+    var pHtml = "";
+    if (pages.length === 0) {
+      pHtml = '<div class="empty">Aucune page vue</div>';
+    } else {
+      pages.forEach(function(p) {
+        var w = Math.round(p[1]/maxP*100);
+        pHtml += '<div class="bar-row"><div class="bar-head"><span class="bar-name">'+pageName(p[0])+'</span><span class="bar-val">'+p[1]+'</span></div><div class="bar-track"><div class="bar-fill" style="width:'+w+'%"></div></div></div>';
+      });
+    }
+    document.getElementById("pages-bars").innerHTML = pHtml;
+  }
+
+  // ═══ SSE ═══
   function connect() {
-    es = new EventSource("/dashboard/stream");
-    es.addEventListener("metrics", e => { try { update(JSON.parse(e.data)); } catch(err) { console.error(err); } });
-    es.onerror = () => {
-      document.getElementById("status").className = "live disconnected";
-      document.getElementById("status-text").textContent = "Reconnexion...";
+    var es = new EventSource("/dashboard/stream");
+    es.addEventListener("metrics", function(e) {
+      try { render(JSON.parse(e.data)); } catch (err) {}
+    });
+    es.onerror = function() {
+      document.getElementById("live-tag").innerHTML = '<span class="dot"></span> reconnexion...';
+      document.getElementById("live-tag").className = "live-tag down";
       es.close();
       setTimeout(connect, 3000);
     };

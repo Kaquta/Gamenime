@@ -2368,7 +2368,7 @@ body.is-authenticated .fav-heart {
 
 .avatar-pick:hover {
   transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 16px rgba(255, 138, 42, 0.8), 0 0 24px rgba(255, 138, 42, 0.4);
 }
 
 .avatar-pick--selected {
@@ -2523,18 +2523,29 @@ body.is-authenticated .fav-heart {
   border: 2px solid transparent;
   background: transparent;
   cursor: pointer;
-  padding: 2px;
-  transition: transform 180ms ease, border-color 180ms ease;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(255, 138, 42, 0.45);
+  transition: transform 180ms ease, box-shadow 180ms ease;
 }
 
 .avatar-pick svg {
   width: 100%;
   height: 100%;
 }
+.avatar-pick img,
+.avatar-pick .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+  display: block;
+  transform: scale(1.22);
+}
 
 .avatar-pick:hover {
   transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 16px rgba(255, 138, 42, 0.8), 0 0 24px rgba(255, 138, 42, 0.4);
 }
 
 .avatar-pick--selected {
@@ -2546,8 +2557,19 @@ body.is-authenticated .fav-heart {
   width: 54px;
   height: 54px;
   flex: 0 0 auto;
+  overflow: hidden;
+  box-shadow: 0 0 16px rgba(255, 138, 42, 0.6), 0 0 28px rgba(255, 138, 42, 0.3);
 }
 
+.account-info__avatar img,
+.account-info__avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+  display: block;
+  transform: scale(1.22);
+}
 .account-info__avatar svg {
   width: 100%;
   height: 100%;
@@ -2560,11 +2582,22 @@ body.is-authenticated .fav-heart {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(255, 138, 42, 0.65), 0 0 14px rgba(255, 138, 42, 0.35);
 }
 
 .auth-user-menu__avatar svg {
   width: 100%;
   height: 100%;
+}
+.auth-user-menu__avatar img,
+.auth-user-menu__avatar .avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 999px;
+  display: block;
+  transform: scale(1.22);
 }
 
 /* ── Premium page ──────────────────────────────────── */

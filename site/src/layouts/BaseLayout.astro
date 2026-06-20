@@ -19,10 +19,42 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="https://gamenime.fr/og-image.jpg?v=2" />
+    <meta property="og:url" content="https://gamenime.fr" />
+    <meta property="og:site_name" content="GameNime" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content="https://gamenime.fr/og-image.jpg?v=2" />
+    <link rel="canonical" href="https://gamenime.fr" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png" />
   </head>
   <body>
     <div class="page-shell">
       <slot />
     </div>
+    <script>
+      // Tracking visiteurs GameNime (anonyme, sans cookie)
+      (function () {
+        function track(isPing) {
+          fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(isPing ? { ping: true } : { path: location.pathname, ref: document.referrer }),
+            keepalive: true
+          }).catch(function () {});
+        }
+        track(false);
+        setInterval(function () { track(true); }, 30000);
+      })();
+    </script>
   </body>
 </html>

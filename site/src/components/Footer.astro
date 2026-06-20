@@ -1,3 +1,8 @@
+---
+const startYear = 2026;
+const currentYear = new Date().getFullYear();
+const yearLabel = currentYear > startYear ? `${startYear} - ${currentYear}` : `${startYear}`;
+---
 <footer class="site-footer container">
   <nav class="site-footer__links">
     <a href="/mentions-legales">Mentions légales</a>
@@ -5,4 +10,5 @@
     <a href="/cgu">CGU</a>
     <a href="/cookies">Cookies</a>
   </nav>
+  <p class="site-footer__credit">© {yearLabel} GameNime — Tous droits réservés</p>
 </footer>
