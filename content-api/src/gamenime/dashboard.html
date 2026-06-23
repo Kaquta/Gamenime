@@ -27,6 +27,14 @@
   .toggle-btn:hover .swap-icon { transform: rotate(180deg); }
   .toggle-btn #toggle-label { position: relative; z-index: 1; }
 
+  /* Bouton Administration (a gauche, a droite du brand) */
+  .brand-row { display: flex; align-items: center; gap: 18px; }
+  .admin-btn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: 13px; background: linear-gradient(135deg, #1a1410, #14100c); border: 1px solid #3a2e1f; color: #ffe8c0; font-size: 0.82rem; font-weight: 700; cursor: pointer; transition: all 0.25s ease; font-family: inherit; }
+  .admin-btn:hover { border-color: #d9a978; box-shadow: 0 0 18px rgba(217,169,120,0.25); transform: translateY(-1px); }
+  .admin-btn .gear { width: 16px; height: 16px; flex-shrink: 0; transition: transform 0.5s ease; }
+  .admin-btn:hover .gear { transform: rotate(90deg); }
+  .admin-btn.active { background: linear-gradient(135deg, #2a2018, #1f1810); border-color: #d9a978; }
+
   /* Pages */
   .page { display: none; }
   .page.active { display: block; animation: fade 0.3s ease; }
@@ -133,10 +141,179 @@
     .donuts-row { grid-template-columns: 1fr; }
   }
 </style>
+<style>
+  /* ═══ ADMINISTRATION ═══ */
+  /* Accordéon sections */
+  .adm-section { margin-bottom: 14px; }
+  .adm-head { display: flex; align-items: center; gap: 12px; padding: 6px 2px 12px; border-bottom: 1px solid #1c1c20; margin-bottom: 4px; }
+  .adm-chevron { display: none; }
+  .adm-title { font-size: 1rem; font-weight: 700; flex: 1; color: #f5f2ee; }
+  .adm-count { padding: 3px 11px; border-radius: 9px; background: #1a1a1f; color: #ffe8c0; font-size: 0.7rem; font-weight: 700; }
+  .adm-body { padding: 16px 2px 4px; }
+  .adm-section.collapsed .adm-body { display: none; }
+
+  /* Boutons process (grille 3 col) */
+  .proc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .proc-grid { grid-template-columns: 1fr; } }
+  .proc-card { border-radius: 12px; background: #0d0d0f; border: 1px solid #232328; padding: 16px; position: relative; overflow: hidden; }
+  .proc-stripe { position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 2px; }
+  .proc-name { font-size: 0.95rem; font-weight: 700; color: #f5f2ee; margin-left: 10px; margin-bottom: 4px; }
+  .proc-desc { font-size: 0.72rem; color: #8c8c92; margin-left: 10px; margin-bottom: 12px; line-height: 1.4; }
+  .proc-launch { margin-left: 10px; display: inline-flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: 9px; border: none; color: #000; font-size: 0.78rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
+  .proc-launch:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .proc-launch:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* Réparer par ID */
+  .repair-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 16px; border-radius: 12px; background: #0d0d0f; border: 1px solid #232328; }
+  .adm-input { padding: 9px 14px; border-radius: 8px; background: #000; border: 1px solid #33333a; color: #f5f2ee; font-size: 0.88rem; font-family: inherit; width: 120px; }
+  .adm-input:focus { outline: none; border-color: #d9a978; }
+  .adm-select { padding: 9px 14px; border-radius: 8px; background: #000; border: 1px solid #33333a; color: #f5f2ee; font-size: 0.88rem; font-family: inherit; cursor: pointer; }
+  .adm-action-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 9px; background: #30d16c; border: none; color: #000; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
+  .adm-action-btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+  .adm-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Console terminal */
+  .console { border-radius: 12px; background: #050507; border: 1px solid #1a1a1f; overflow: hidden; }
+  .console-bar { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: #0d0d0f; border-bottom: 1px solid #1a1a1f; }
+  .console-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .console-title { font-size: 0.72rem; color: #8c8c92; margin-left: 8px; flex: 1; }
+  .console-clear { padding: 4px 12px; border-radius: 7px; background: #1a1a1f; border: 1px solid #232328; color: #8c8c92; font-size: 0.68rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
+  .console-clear:hover { color: #f5f2ee; border-color: #3a3a42; }
+  .console-body { padding: 14px 16px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.78rem; line-height: 1.6; height: 300px; overflow-y: auto; }
+  .console-body::-webkit-scrollbar { width: 8px; }
+  .console-body::-webkit-scrollbar-thumb { background: #232328; border-radius: 4px; }
+
+  /* ── Console FLOTTANTE (bas-droite) ── */
+  .console-fab { position: fixed; bottom: 22px; left: 22px; z-index: 1000; display: none; align-items: center; gap: 9px; padding: 11px 20px; border-radius: 24px; background: #0d0d0f; border: 2px solid #d9a978; color: #ffe8c0; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 6px 24px rgba(0,0,0,0.5); transition: all 0.2s ease; }
+  .console-fab:hover { box-shadow: 0 6px 28px rgba(217,169,120,0.35); transform: translateY(-2px); }
+  .console-fab.visible { display: inline-flex; }
+  .console-fab .fab-ic { font-family: ui-monospace, monospace; color: #30d16c; font-weight: 800; }
+  .console-float { position: fixed; bottom: 84px; left: 22px; z-index: 1001; width: 480px; max-width: calc(100vw - 44px); border-radius: 14px; background: #050507; border: 1px solid #d9a978; box-shadow: 0 12px 48px rgba(0,0,0,0.7); overflow: hidden; opacity: 0; transform: translateY(20px) scale(0.98); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+  .console-float.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  .console-float .console-body { height: 320px; }
+  .console-x { background: none; border: none; color: #8c8c92; font-size: 0.85rem; cursor: pointer; padding: 2px 4px; transition: color 0.2s ease; }
+  .console-x:hover { color: #ff453a; }
+  @media (max-width: 600px) { .console-float { width: calc(100vw - 24px); left: 12px; bottom: 80px; } .console-fab { left: 12px; bottom: 14px; } }
+
+  /* ── Recherche globale FLOTTANTE (bas-gauche, split) ── */
+  .search-fab { position: fixed; bottom: 22px; right: 22px; z-index: 1000; display: none; align-items: center; gap: 9px; padding: 11px 20px; border-radius: 24px; background: #0d0b09; border: 2px solid #d9a978; color: #ffe8c0; font-size: 0.85rem; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 6px 24px rgba(0,0,0,0.5); transition: all 0.2s ease; }
+  .search-fab:hover { box-shadow: 0 6px 28px rgba(217,169,120,0.35); transform: translateY(-2px); }
+  .search-fab.visible { display: inline-flex; }
+  .search-fab-ic { font-size: 1rem; }
+  .search-float { position: fixed; bottom: 84px; right: 22px; z-index: 1001; width: 640px; max-width: calc(100vw - 44px); border-radius: 16px; background: #0c0a08; border: 1px solid #d9a978; box-shadow: 0 12px 48px rgba(0,0,0,0.7); overflow: hidden; opacity: 0; transform: translateY(20px) scale(0.98); pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease; }
+  .search-float.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+  /* barre de recherche */
+  .search-bar-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #1c1610; }
+  .search-bar-ic { font-size: 1rem; opacity: 0.7; }
+  .search-bar-input { flex: 1; background: #16130f; border: 1px solid #2a2218; border-radius: 10px; padding: 9px 14px; color: #f0e6d8; font-size: 0.9rem; font-family: inherit; outline: none; }
+  .search-bar-input:focus { border-color: #d9a978; }
+  .search-x { background: none; border: none; color: #8c8c92; font-size: 0.9rem; cursor: pointer; padding: 2px 6px; transition: color 0.2s ease; }
+  .search-x:hover { color: #e0564a; }
+  /* pills type */
+  .search-pills { display: flex; gap: 8px; padding: 12px 16px 0; }
+  .search-pill { padding: 6px 16px; border-radius: 14px; background: #16130f; border: 1px solid #2a2218; color: #d9a978; font-size: 0.78rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
+  .search-pill:hover { border-color: #d9a978; }
+  .search-pill.active { background: #d9a978; color: #1a140c; border-color: #d9a978; }
+  /* split liste / détail */
+  .search-split { display: flex; gap: 0; height: 380px; padding: 12px 16px 16px; }
+  .search-list { width: 44%; overflow-y: auto; padding-right: 10px; border-right: 1px solid #1c1610; }
+  .search-detail { width: 56%; overflow-y: auto; padding-left: 14px; }
+  .search-list::-webkit-scrollbar, .search-detail::-webkit-scrollbar { width: 6px; }
+  .search-list::-webkit-scrollbar-thumb, .search-detail::-webkit-scrollbar-thumb { background: #2a2218; border-radius: 3px; }
+  .search-empty { color: #5a5048; font-size: 0.82rem; text-align: center; padding: 30px 10px; }
+  /* item de liste */
+  .sr-item { display: flex; align-items: center; gap: 10px; padding: 9px; border-radius: 10px; background: #100e0c; border: 1px solid #241c14; cursor: pointer; margin-bottom: 8px; transition: all 0.15s ease; }
+  .sr-item:hover { border-color: #3a2e1e; }
+  .sr-item.selected { border-color: #d9a978; background: #16130f; }
+  .sr-cover { width: 40px; height: 52px; border-radius: 6px; object-fit: cover; background: #1a160f; flex-shrink: 0; }
+  .sr-cover-ph { display: flex; align-items: center; justify-content: center; color: #4a4038; font-size: 1rem; }
+  .sr-info { min-width: 0; }
+  .sr-type { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.5px; }
+  .sr-type.anime { color: #7a8cc9; } .sr-type.game { color: #c99a6a; }
+  .sr-title { font-size: 0.82rem; color: #e8ddd0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* détail */
+  .sd-head { display: flex; gap: 14px; margin-bottom: 14px; }
+  .sd-cover { width: 90px; height: 124px; border-radius: 8px; object-fit: cover; background: #1a3a5a; flex-shrink: 0; }
+  .sd-meta { min-width: 0; }
+  .sd-type { font-size: 0.68rem; font-weight: 700; color: #7a8cc9; }
+  .sd-title { font-size: 1rem; color: #f0e6d8; font-weight: 700; margin: 2px 0; }
+  .sd-id { font-size: 0.72rem; color: #8a7050; font-family: ui-monospace, monospace; }
+  .sd-sub { font-size: 0.76rem; color: #7a6e60; margin-top: 6px; line-height: 1.4; }
+  .sd-section-label { font-size: 0.66rem; font-weight: 700; color: #8a7050; letter-spacing: 0.5px; margin: 14px 0 8px; }
+  .sd-checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .sd-check { font-size: 0.8rem; }
+  .sd-check.ok { color: #5fb88a; } .sd-check.no { color: #c97a5a; }
+  /* actions */
+  .sd-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .sd-btn { padding: 9px; border-radius: 8px; font-size: 0.82rem; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid transparent; transition: all 0.15s ease; }
+  .sd-btn-repair { background: #d9a978; color: #1a140c; }
+  .sd-btn-repair:hover { background: #e8c89a; }
+  .sd-btn-row { display: flex; gap: 8px; }
+  .sd-btn-raw { flex: 1; background: #13110d; color: #d9a978; border-color: #2a2218; }
+  .sd-btn-raw:hover { border-color: #d9a978; }
+  .sd-btn-delete { flex: 1; background: #1f1310; color: #e0564a; border-color: #5a2a22; }
+  .sd-btn-delete:hover { background: #2a1814; border-color: #e0564a; }
+  .sd-raw-box { margin-top: 10px; background: #080706; border: 1px solid #1c1610; border-radius: 8px; padding: 10px; font-family: ui-monospace, monospace; font-size: 0.72rem; color: #a89878; max-height: 160px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+  @media (max-width: 700px) {
+    .search-float { width: calc(100vw - 24px); right: 12px; bottom: 80px; }
+    .search-fab { right: 12px; bottom: 14px; }
+    .search-split { flex-direction: column; height: auto; max-height: 60vh; }
+    .search-list, .search-detail { width: 100%; border-right: none; padding: 0; }
+    .search-list { max-height: 200px; border-bottom: 1px solid #1c1610; padding-bottom: 10px; margin-bottom: 10px; }
+  }
+  .cline { display: flex; gap: 10px; margin-bottom: 2px; white-space: pre-wrap; word-break: break-word; }
+  .cline-ts { color: #555; flex-shrink: 0; }
+  .cline-txt { flex: 1; }
+  .cline.cmd .cline-txt { color: #ffe8c0; font-weight: 700; }
+  .cline.ok .cline-txt { color: #30d16c; }
+  .cline.warn .cline-txt { color: #ff9f0a; }
+  .cline.err .cline-txt { color: #ff453a; }
+  .cline.info .cline-txt { color: #8c9cb8; }
+  .cline.sep .cline-txt { color: #33333a; }
+  .console-cursor { display: inline-block; width: 8px; height: 14px; background: #30d16c; animation: blink 1.1s step-end infinite; vertical-align: middle; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Liste items incomplets */
+  .inc-controls { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .inc-search-input { flex: 1; min-width: 200px; width: auto; }
+  .inc-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .inc-filter { padding: 7px 14px; border-radius: 9px; background: #0d0d0f; border: 1px solid #232328; color: #8c8c92; font-size: 0.74rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
+  .inc-filter.active { background: #1a1a1f; border-color: #d9a978; color: #ffe8c0; }
+  .inc-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+  .inc-list::-webkit-scrollbar { width: 8px; }
+  .inc-list::-webkit-scrollbar-thumb { background: #232328; border-radius: 4px; }
+  .inc-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 10px; background: #0d0d0f; border: 1px solid #232328; }
+  .inc-id { padding: 4px 10px; border-radius: 6px; background: #1a1a1f; color: #ffe8c0; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; font-family: monospace; }
+  .inc-info { flex: 1; min-width: 0; }
+  .inc-type { font-size: 0.66rem; font-weight: 700; text-transform: uppercase; }
+  .inc-type.anime { color: #7b8cff; }
+  .inc-type.game { color: #ff8a4c; }
+  .inc-title { font-size: 0.84rem; color: #f5f2ee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .inc-problem { padding: 4px 10px; border-radius: 7px; background: #000; font-size: 0.68rem; font-weight: 600; flex-shrink: 0; }
+  .inc-repair { padding: 6px 12px; border-radius: 7px; background: #30d16c; border: none; color: #000; font-size: 0.7rem; font-weight: 800; cursor: pointer; font-family: inherit; flex-shrink: 0; transition: all 0.2s ease; }
+  .inc-repair:hover { filter: brightness(1.1); }
+  .inc-repair:disabled { opacity: 0.5; cursor: not-allowed; }
+  .inc-empty { text-align: center; padding: 24px; color: #5a5a62; font-size: 0.82rem; }
+
+  /* Outils diagnostic */
+  .tools-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .tools-grid { grid-template-columns: 1fr 1fr; } }
+  .tool-card { border-radius: 12px; background: #0d0d0f; border: 1px solid #232328; padding: 14px; }
+  .tool-name { font-size: 0.85rem; font-weight: 700; color: #f5f2ee; margin-bottom: 3px; }
+  .tool-desc { font-size: 0.68rem; color: #8c8c92; margin-bottom: 10px; }
+  .tool-btn { width: 100%; padding: 7px; border-radius: 7px; background: #1a1a1f; border: 1px solid #232328; color: #d9a978; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
+  .tool-btn:hover { border-color: #d9a978; }
+</style>
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="brand">GameNime</div>
+    <div class="brand-row">
+      <div class="brand">GameNime</div>
+      <button class="admin-btn" id="admin-btn" onclick="toggleAdmin()">
+        <svg class="gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span id="admin-label">Administration</span>
+      </button>
+    </div>
     <div class="top-right">
       <div class="live-tag" id="live-tag"><span class="dot"></span> connexion...</div>
       <button class="toggle-btn" id="toggle-btn" onclick="switchView()">
@@ -215,6 +392,184 @@
     </div>
   </div>
 
+
+  <!-- ═══ PAGE ADMINISTRATION ═══ -->
+  <div class="page" id="page-admin">
+
+    <!-- SECTION 1 : PROCESS -->
+    <div class="adm-section" id="sec-process">
+      <div class="adm-head">
+        <span class="adm-chevron">▼</span>
+        <span class="adm-title">Process — Lancement manuel</span>
+        <span class="adm-count">6</span>
+      </div>
+      <div class="adm-body">
+        <div class="proc-grid">
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#30d16c"></div>
+            <div class="proc-name">Phase B Anime</div>
+            <div class="proc-desc">Refetch cover, plateforme, trailer, description</div>
+            <button class="proc-launch" style="background:#30d16c" onclick="lancerProcess(this,'refetch-incomplete','Phase B Anime')">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#30d16c"></div>
+            <div class="proc-name">Phase B Jeux</div>
+            <div class="proc-desc">Refetch cover, description, rating (RAWG/IGDB)</div>
+            <button class="proc-launch" style="background:#30d16c" onclick="lancerProcess(this,'refetch-incomplete-games','Phase B Jeux')">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#7b8cff"></div>
+            <div class="proc-name">Phase C Anime</div>
+            <div class="proc-desc">Lookup AniList par titre (IDs manquants)</div>
+            <button class="proc-launch" style="background:#7b8cff" onclick="lancerProcess(this,'lookup-anilist-ids','Phase C Anime')">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#ff9f0a"></div>
+            <div class="proc-name">Quality Check J-7</div>
+            <div class="proc-desc">Scan agressif des sorties imminentes</div>
+            <button class="proc-launch" style="background:#ff9f0a" onclick="lancerProcess(this,'quality-check-j7','Quality Check J-7')">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#d96aff"></div>
+            <div class="proc-name">Auto-Merge</div>
+            <div class="proc-desc">Détecte + fusionne les doublons</div>
+            <button class="proc-launch" style="background:#d96aff" onclick="lancerMerge(this)">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#ff453a"></div>
+            <div class="proc-name">Cleanup niches</div>
+            <div class="proc-desc">Retire les jeux niches (dry-run d'abord)</div>
+            <button class="proc-launch" style="background:#ff453a" onclick="lancerCleanup(this)">▶ Dry-run</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2 : RÉPARER PAR ID -->
+    <div class="adm-section" id="sec-repair">
+      <div class="adm-head">
+        <span class="adm-chevron">▼</span>
+        <span class="adm-title">Réparer un item par ID</span>
+      </div>
+      <div class="adm-body">
+        <div class="repair-row">
+          <input type="number" class="adm-input" id="repair-id" placeholder="ID" />
+          <select class="adm-select" id="repair-type">
+            <option value="anime">Anime</option>
+            <option value="game">Jeux</option>
+          </select>
+          <button class="adm-action-btn" id="repair-btn" onclick="repairById()">⟳ Forcer refetch</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3 : ITEMS INCOMPLETS -->
+    <div class="adm-section" id="sec-incomplete">
+      <div class="adm-head">
+        <span class="adm-chevron">▼</span>
+        <span class="adm-title">Items incomplets</span>
+        <span class="adm-count" id="inc-count">—</span>
+      </div>
+      <div class="adm-body">
+        <div class="inc-controls">
+          <select class="adm-select" id="inc-type" onchange="loadIncomplete()">
+            <option value="all">Tous types</option>
+            <option value="anime">Anime</option>
+            <option value="game">Jeux</option>
+          </select>
+          <input type="text" class="adm-input inc-search-input" id="inc-search" placeholder="Rechercher par titre..." oninput="renderIncomplete()" />
+        </div>
+        <div class="inc-filters">
+          <button class="inc-filter active" data-filter="all" onclick="filterIncomplete('all')">Tous</button>
+          <button class="inc-filter" data-filter="no-cover" onclick="filterIncomplete('no-cover')">Sans cover</button>
+          <button class="inc-filter" data-filter="no-platform" onclick="filterIncomplete('no-platform')">Sans plateforme</button>
+          <button class="inc-filter" data-filter="orphan" onclick="filterIncomplete('orphan')">Orphelins</button>
+        </div>
+        <div class="inc-list" id="inc-list">
+          <div class="inc-empty">Clique sur "Rafraîchir" pour charger la liste</div>
+        </div>
+        <button class="adm-action-btn" style="margin-top:12px;background:#1a1a1f;color:#d9a978;border:1px solid #232328" onclick="loadIncomplete()">↻ Rafraîchir la liste</button>
+      </div>
+    </div>
+
+    <!-- SECTION 5 : OUTILS -->
+    <div class="adm-section" id="sec-tools">
+      <div class="adm-head">
+        <span class="adm-chevron">▼</span>
+        <span class="adm-title">Diagnostic et outils</span>
+        <span class="adm-count">4</span>
+      </div>
+      <div class="adm-body">
+        <div class="tools-grid">
+          <div class="tool-card">
+            <div class="tool-name">Doublons</div>
+            <div class="tool-desc">Liste sans fusionner (dry-run)</div>
+            <button class="tool-btn" onclick="outilDoublons()">Ouvrir</button>
+          </div>
+          <div class="tool-card">
+            <div class="tool-name">Test email</div>
+            <div class="tool-desc">Envoie un email de test</div>
+            <button class="tool-btn" onclick="outilTestEmail()">Ouvrir</button>
+          </div>
+          <div class="tool-card">
+            <div class="tool-name">Stats catalogue</div>
+            <div class="tool-desc">Compteurs temps réel</div>
+            <button class="tool-btn" onclick="outilStats()">Ouvrir</button>
+          </div>
+          <div class="tool-card">
+            <div class="tool-name">Sanitize plateformes</div>
+            <div class="tool-desc">Nettoie les plateformes</div>
+            <button class="tool-btn" onclick="outilSanitize()">Ouvrir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══ CONSOLE FLOTTANTE (admin) ═══ -->
+  <button class="console-fab" id="console-fab" onclick="toggleConsole()">
+    <span class="fab-ic">&gt;_</span><span>Console</span>
+  </button>
+  <div class="console-float" id="console-float">
+    <div class="console-bar">
+      <span class="console-dot" style="background:#ff5f56"></span>
+      <span class="console-dot" style="background:#ffbd2e"></span>
+      <span class="console-dot" style="background:#27c93f"></span>
+      <span class="console-title">gamenime &mdash; console</span>
+      <button class="console-clear" onclick="clearConsole()">Effacer</button>
+      <button class="console-x" onclick="toggleConsole()">&#10005;</button>
+    </div>
+    <div class="console-body" id="console-body">
+      <div class="cline info"><span class="cline-ts"></span><span class="cline-txt">Console prête. Lance un process pour voir l'exécution.</span></div>
+    </div>
+  </div>
+
+  <!-- ═══ RECHERCHE GLOBALE FLOTTANTE (bas-gauche) ═══ -->
+  <button class="search-fab" id="search-fab" onclick="toggleSearch()">
+    <span class="search-fab-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></svg></span><span>Recherche</span>
+  </button>
+  <div class="search-float" id="search-float">
+    <div class="search-bar-row">
+      <span class="search-bar-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></svg></span>
+      <input type="text" class="search-bar-input" id="search-input" placeholder="Rechercher dans toute la base..." onkeydown="if(event.key==='Enter')doGlobalSearch()" />
+      <button class="search-x" onclick="toggleSearch()">&#10005;</button>
+    </div>
+    <div class="search-pills">
+      <button class="search-pill active" data-type="all" onclick="setSearchType('all')">Tous</button>
+      <button class="search-pill" data-type="anime" onclick="setSearchType('anime')">Anime</button>
+      <button class="search-pill" data-type="game" onclick="setSearchType('game')">Jeux</button>
+    </div>
+    <div class="search-split">
+      <div class="search-list" id="search-results">
+        <div class="search-empty">Tape un titre et lance la recherche</div>
+      </div>
+      <div class="search-detail" id="search-detail">
+        <div class="search-empty">Sélectionne un résultat</div>
+      </div>
+    </div>
+  </div>
+
   <div class="foot">GameNime · monitoring · mise à jour temps réel</div>
 </div>
 <script>
@@ -270,6 +625,39 @@
       document.getElementById("page-traffic").className = "page";
       document.getElementById("page-surveillance").className = "page active";
       document.getElementById("toggle-label").textContent = "Trafic";
+    }
+  }
+
+  // ═══ Navigation Administration ═══
+  var adminOpen = false;
+  function toggleAdmin() {
+    if (!adminOpen) {
+      adminOpen = true;
+      document.getElementById("page-surveillance").className = "page";
+      document.getElementById("page-traffic").className = "page";
+      document.getElementById("page-admin").className = "page active";
+      document.getElementById("admin-label").textContent = "← Retour";
+      document.getElementById("admin-btn").classList.add("active");
+      document.getElementById("toggle-btn").style.display = "none";
+      document.getElementById("console-fab").classList.add("visible");
+      document.getElementById("search-fab").classList.add("visible");
+    } else {
+      adminOpen = false;
+      document.getElementById("console-fab").classList.remove("visible");
+      document.getElementById("search-fab").classList.remove("visible");
+      var sf = document.getElementById("search-float");
+      if (sf) sf.classList.remove("open");
+      var fl = document.getElementById("console-float");
+      if (fl) fl.classList.remove("open");
+      document.getElementById("page-admin").className = "page";
+      if (currentView === "traffic") {
+        document.getElementById("page-traffic").className = "page active";
+      } else {
+        document.getElementById("page-surveillance").className = "page active";
+      }
+      document.getElementById("admin-label").textContent = "Administration";
+      document.getElementById("admin-btn").classList.remove("active");
+      document.getElementById("toggle-btn").style.display = "";
     }
   }
 
@@ -514,6 +902,529 @@
   }
 
   // ═══ SSE ═══
+  // ═══════════════════════════════════════
+  // ADMINISTRATION
+  // ═══════════════════════════════════════
+
+  // Accordéon : plier/déplier une section
+  function toggleSection(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle("collapsed");
+  }
+
+  // Console : écrit une ligne
+  function consoleLine(text, type) {
+    var body = document.getElementById("console-body");
+    if (!body) return;
+    var now = new Date();
+    var p2 = function(n) { return String(n).padStart(2, "0"); };
+    var ts = "[" + p2(now.getHours()) + ":" + p2(now.getMinutes()) + ":" + p2(now.getSeconds()) + "]";
+    var line = document.createElement("div");
+    line.className = "cline " + (type || "info");
+    var tsSpan = document.createElement("span");
+    tsSpan.className = "cline-ts";
+    tsSpan.textContent = ts;
+    var txtSpan = document.createElement("span");
+    txtSpan.className = "cline-txt";
+    txtSpan.textContent = text;
+    line.appendChild(tsSpan);
+    line.appendChild(txtSpan);
+    body.appendChild(line);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  // Console : effacer
+  function clearConsole() {
+    var body = document.getElementById("console-body");
+    if (body) body.innerHTML = "";
+    consoleLine("Console effacée.", "info");
+  }
+
+  // Console : écrit plusieurs lignes avec effet défilement
+  function consoleLines(lines, done) {
+    var i = 0;
+    function next() {
+      if (i >= lines.length) { if (done) done(); return; }
+      consoleLine(lines[i].text, lines[i].type);
+      i++;
+      setTimeout(next, 100);
+    }
+    next();
+  }
+
+  // Ouvre la console flottante (pour voir le résultat)
+  function ensureConsoleOpen() {
+    var fl = document.getElementById("console-float");
+    if (fl) fl.classList.add("open");
+  }
+
+  // Ouvre/ferme la console flottante
+  function toggleConsole() {
+    var fl = document.getElementById("console-float");
+    if (fl) fl.classList.toggle("open");
+  }
+
+  // Lance un process simple (refetch, refetch-games, lookup, quality)
+  async function lancerProcess(btn, endpoint, label) {
+    ensureConsoleOpen();
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "⏳ En cours...";
+    consoleLine("$ " + label + " — lancement...", "cmd");
+    var t0 = Date.now();
+    try {
+      var res = await fetch("/dashboard/admin/" + endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      var secs = ((Date.now() - t0) / 1000).toFixed(1);
+      if (!res.ok || data.ok === false) {
+        consoleLine("  ✗ Échec : " + (data.msg || data.error || ("HTTP " + res.status)), "err");
+      } else {
+        // Construire les lignes de détail selon ce que renvoie l'endpoint
+        var lines = [];
+        // Phase B : scanned, enriched, errors, changes[]
+        if (data.changes && data.changes.length) {
+          data.changes.slice(0, 30).forEach(function(ch) {
+            var detail = [];
+            if (ch.cover) detail.push("cover");
+            if (ch.platform) detail.push("plateforme");
+            if (ch.trailerUrl || ch.trailer_url) detail.push("trailer");
+            if (ch.description) detail.push("description");
+            var what = detail.length ? detail.join(" + ") + " ajouté(s)" : "mis à jour";
+            lines.push({ text: "  ✓ #" + ch.id + " " + (ch.title ? ch.title.slice(0,30) : "") + " → " + what, type: "ok" });
+          });
+        }
+        // Ligne de bilan (selon les champs disponibles)
+        var bilan = "  ✓ TERMINÉ";
+        if (data.scanned != null) bilan += " — " + data.scanned + " scannés";
+        if (data.enriched != null) bilan += " · " + data.enriched + " enrichis";
+        if (data.found != null) bilan += " · " + data.found + " trouvés";
+        if (data.updated != null) bilan += " · " + data.updated + " mis à jour";
+        if (data.errors != null && data.errors > 0) bilan += " · " + data.errors + " erreur(s)";
+        bilan += " · " + secs + "s";
+        // Afficher les détails avec effet défilement, puis le bilan
+        if (lines.length) {
+          consoleLines(lines, function() {
+            consoleLine("  ─────────────────────", "sep");
+            consoleLine(bilan, "ok");
+          });
+        } else {
+          consoleLine(bilan, "ok");
+        }
+      }
+    } catch (err) {
+      consoleLine("  ✗ Erreur réseau : " + err.message, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  // Auto-Merge et Cleanup (fonction commune avec dryRun)
+  async function callMergeCleanup(btn, endpoint, label, dryRun, type) {
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "⏳...";
+    consoleLine("$ " + label + " — lancement...", "cmd");
+    try {
+      var url = "/dashboard/admin/" + endpoint + "?dryRun=" + dryRun + (type ? "&type=" + type : "");
+      var res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      if (!res.ok || data.ok === false) {
+        consoleLine("  ✗ " + (data.msg || data.error || ("HTTP " + res.status)), "err");
+      } else {
+        var prefix = (dryRun === "true") ? "  ✓ DRY-RUN — " : "  ✓ EXÉCUTÉ — ";
+        // merge renvoie souvent groups/merged, cleanup renvoie deleted/count
+        var summary = "";
+        if (data.merged != null) summary += data.merged + " fusionnés";
+        if (data.groups != null) summary += (summary?" · ":"") + data.groups + " groupes";
+        if (data.deleted != null) summary += (summary?" · ":"") + data.deleted + " supprimés";
+        if (data.count != null) summary += (summary?" · ":"") + data.count + " concernés";
+        if (data.candidates != null) summary += (summary?" · ":"") + data.candidates + " candidats";
+        if (!summary) summary = JSON.stringify(data).slice(0, 160);
+        consoleLine(prefix + summary, "ok");
+      }
+    } catch (err) {
+      consoleLine("  ✗ Erreur réseau : " + err.message, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  // Auto-Merge : demande confirmation pour le mode réel
+  async function lancerMerge(btn) {
+    ensureConsoleOpen();
+    var real = confirm("Lancer Auto-Merge en mode RÉEL ? (fusionne vraiment les doublons)\n\nOK = RÉEL · Annuler = dry-run (essai sans danger)");
+    await callMergeCleanup(btn, "merge-duplicates", real ? "Auto-Merge (RÉEL)" : "Auto-Merge (dry-run)", real ? "false" : "true", "all");
+  }
+
+  // Cleanup niches : type=game, confirmation pour le réel
+  async function lancerCleanup(btn) {
+    ensureConsoleOpen();
+    var real = confirm("Lancer Cleanup niches en mode RÉEL ? (supprime vraiment des jeux niches)\n\nOK = RÉEL · Annuler = dry-run");
+    await callMergeCleanup(btn, "cleanup-niches", real ? "Cleanup niches (RÉEL)" : "Cleanup niches (dry-run)", real ? "false" : "true", "game");
+  }
+
+  // Réparer un item précis par ID
+  async function repairById() {
+    ensureConsoleOpen();
+    var id = document.getElementById("repair-id").value;
+    var type = document.getElementById("repair-type").value;
+    if (!id) { consoleLine("  ⚠ Entre un ID d'abord.", "warn"); return; }
+    var btn = document.getElementById("repair-btn");
+    var original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "⏳...";
+    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/refetch-one?id=" + encodeURIComponent(id) + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      if (data.ok === false) {
+        consoleLine("  ✗ " + (data.msg || "erreur"), "err");
+      } else if (!data.found) {
+        consoleLine("  ⚠ Item #" + id + " introuvable.", "warn");
+      } else if (data.enriched) {
+        consoleLine("  ✓ #" + id + " " + (data.title || "") + " → réparé : " + data.fields.join(" + "), "ok");
+      } else {
+        consoleLine("  ℹ #" + id + " " + (data.title || "") + " déjà complet (rien à réparer).", "info");
+      }
+    } catch (err) {
+      consoleLine("  ✗ Erreur réseau : " + err.message, "err");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  // ── Liste des items incomplets ──
+  var incompleteData = [];
+  var incompleteFilter = "all";
+
+  async function loadIncomplete() {
+    var list = document.getElementById("inc-list");
+    list.innerHTML = '<div class="inc-empty">Chargement...</div>';
+    try {
+      var typeEl = document.getElementById("inc-type");
+      var selType = typeEl ? typeEl.value : "all";
+      var res = await fetch("/dashboard/admin/incomplete-items?type=" + selType + "&limit=500");
+      var data = await res.json();
+      incompleteData = data.items || [];
+      document.getElementById("inc-count").textContent = incompleteData.length;
+      renderIncomplete();
+    } catch (err) {
+      list.innerHTML = '<div class="inc-empty">Erreur : ' + err.message + '</div>';
+    }
+  }
+
+  function matchFilter(item, f) {
+    if (f === "all") return true;
+    var miss = item.missing || [];
+    if (f === "no-cover") return miss.indexOf("cover") !== -1;
+    if (f === "no-platform") return miss.indexOf("platform") !== -1;
+    if (f === "orphan") return miss.indexOf("ids") !== -1 || miss.indexOf("orphan") !== -1;
+    return true;
+  }
+
+  function priColor(p) {
+    if (p === "critical") return "#ff453a";
+    if (p === "high") return "#ff9f0a";
+    if (p === "medium") return "#d9a978";
+    return "#8c8c92";
+  }
+
+  function renderIncomplete() {
+    var list = document.getElementById("inc-list");
+    var searchEl = document.getElementById("inc-search");
+    var q = searchEl ? searchEl.value.trim().toLowerCase() : "";
+    var filtered = incompleteData.filter(function(it) {
+      if (!matchFilter(it, incompleteFilter)) return false;
+      if (q && (!it.title || it.title.toLowerCase().indexOf(q) === -1)) return false;
+      return true;
+    });
+    if (!filtered.length) {
+      list.innerHTML = '<div class="inc-empty">Aucun item dans ce filtre ✓</div>';
+      return;
+    }
+    list.innerHTML = "";
+    filtered.forEach(function(item) {
+      var row = document.createElement("div");
+      row.className = "inc-item";
+      var miss = (item.missing || []).join(", ") || "incomplet";
+      var pc = priColor(item.priority);
+
+      var idEl = document.createElement("span");
+      idEl.className = "inc-id"; idEl.textContent = "#" + item.id;
+      var info = document.createElement("div"); info.className = "inc-info";
+      var typeEl = document.createElement("div"); typeEl.className = "inc-type " + item.type; typeEl.textContent = item.type;
+      var titleEl = document.createElement("div"); titleEl.className = "inc-title"; titleEl.textContent = item.title || "";
+      info.appendChild(typeEl); info.appendChild(titleEl);
+      var probEl = document.createElement("span");
+      probEl.className = "inc-problem"; probEl.style.color = pc; probEl.textContent = miss;
+      var btn = document.createElement("button");
+      btn.className = "inc-repair"; btn.textContent = "⟳ Réparer";
+      btn.onclick = function() { repairFromList(btn, item.id, item.type); };
+
+      row.appendChild(idEl); row.appendChild(info); row.appendChild(probEl); row.appendChild(btn);
+      list.appendChild(row);
+    });
+  }
+
+  function filterIncomplete(f) {
+    incompleteFilter = f;
+    var btns = document.querySelectorAll(".inc-filter");
+    btns.forEach(function(b) { b.classList.toggle("active", b.getAttribute("data-filter") === f); });
+    renderIncomplete();
+  }
+
+  async function repairFromList(btn, id, type) {
+    ensureConsoleOpen();
+    btn.disabled = true; btn.textContent = "⏳";
+    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      if (data.ok === false) consoleLine("  ✗ " + (data.msg || "erreur"), "err");
+      else if (!data.found) consoleLine("  ⚠ #" + id + " introuvable", "warn");
+      else if (data.enriched) consoleLine("  ✓ #" + id + " réparé : " + data.fields.join(" + "), "ok");
+      else consoleLine("  ℹ #" + id + " déjà complet (sources sans nouvelle donnée)", "info");
+    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
+    finally { btn.disabled = false; btn.textContent = "⟳ Réparer"; }
+  }
+
+  // ── SESSION 18 : Recherche globale FLOTTANTE (split + actions) ──
+  var searchType = "all";
+  var searchSelected = null;
+
+  function toggleSearch() {
+    var fl = document.getElementById("search-float");
+    if (fl) fl.classList.toggle("open");
+  }
+
+  function setSearchType(t) {
+    searchType = t;
+    var pills = document.querySelectorAll(".search-pill");
+    pills.forEach(function(p) { p.classList.toggle("active", p.getAttribute("data-type") === t); });
+    var input = document.getElementById("search-input");
+    if (input && input.value.trim()) doGlobalSearch();
+  }
+
+  function escHtml(s) {
+    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  async function doGlobalSearch() {
+    var input = document.getElementById("search-input");
+    var q = input ? input.value.trim() : "";
+    if (!q) return;
+    var list = document.getElementById("search-results");
+    var detail = document.getElementById("search-detail");
+    list.innerHTML = '<div class="search-empty">Recherche...</div>';
+    detail.innerHTML = '<div class="search-empty">Sélectionne un résultat</div>';
+    searchSelected = null;
+    try {
+      var res = await fetch("/api/feed/search?q=" + encodeURIComponent(q) + "&type=" + searchType);
+      var data = await res.json();
+      var items = data.items || [];
+      if (!items.length) {
+        list.innerHTML = '<div class="search-empty">Aucun résultat pour « ' + escHtml(q) + ' »</div>';
+        return;
+      }
+      list.innerHTML = "";
+      items.forEach(function(item, idx) {
+        var row = document.createElement("div");
+        row.className = "sr-item";
+        row.id = "sr-" + idx;
+        // cover ou placeholder
+        if (item.cover) {
+          var img = document.createElement("img");
+          img.className = "sr-cover"; img.src = item.cover; img.loading = "lazy";
+          row.appendChild(img);
+        } else {
+          var ph = document.createElement("div");
+          ph.className = "sr-cover sr-cover-ph"; ph.textContent = "?";
+          row.appendChild(ph);
+        }
+        var info = document.createElement("div"); info.className = "sr-info";
+        var typeEl = document.createElement("div"); typeEl.className = "sr-type " + item.type; typeEl.textContent = item.type === "anime" ? "ANIME" : "JEU";
+        var titleEl = document.createElement("div"); titleEl.className = "sr-title"; titleEl.textContent = item.title || "";
+        info.appendChild(typeEl); info.appendChild(titleEl);
+        row.appendChild(info);
+        row.onclick = function() { selectSearchItem(item, row); };
+        list.appendChild(row);
+      });
+    } catch (err) {
+      list.innerHTML = '<div class="search-empty">Erreur : ' + escHtml(err.message) + '</div>';
+    }
+  }
+
+  function selectSearchItem(item, el) {
+    searchSelected = item;
+    document.querySelectorAll(".sr-item").forEach(function(r) { r.classList.remove("selected"); });
+    if (el) el.classList.add("selected");
+    renderDetail(item);
+  }
+
+  function renderDetail(item) {
+    var detail = document.getElementById("search-detail");
+    var checks = [
+      { lbl: "Cover", ok: !!(item.cover && item.cover !== "") },
+      { lbl: "Description", ok: !!(item.description && item.description !== "") },
+      { lbl: "Plateforme", ok: !!(item.platform && item.platform !== "") },
+      { lbl: "Trailer", ok: !!(item.trailerUrl && item.trailerUrl !== "") },
+    ];
+    var checksHtml = checks.map(function(c) {
+      return '<span class="sd-check ' + (c.ok ? "ok" : "no") + '">' + (c.ok ? "\u2713 " : "\u2717 ") + c.lbl + '</span>';
+    }).join("");
+    var coverHtml = item.cover
+      ? '<img class="sd-cover" src="' + escHtml(item.cover) + '" />'
+      : '<div class="sd-cover" style="display:flex;align-items:center;justify-content:center;color:#4a4038;font-size:1.6rem">?</div>';
+    var typeLabel = item.type === "anime" ? "ANIME" : "JEU";
+    var date = item.releaseDate || "—";
+    var plat = item.platform || "—";
+    var genre = item.genre || "";
+    detail.innerHTML =
+      '<div class="sd-head">' +
+        coverHtml +
+        '<div class="sd-meta">' +
+          '<div class="sd-type">' + typeLabel + '</div>' +
+          '<div class="sd-title">' + escHtml(item.title || "") + '</div>' +
+          '<div class="sd-id">#' + item.id + ' \u00b7 ' + escHtml(date) + '</div>' +
+          '<div class="sd-sub">\ud83d\udcfa ' + escHtml(plat) + '</div>' +
+          (genre ? '<div class="sd-sub" style="color:#5a5048">' + escHtml(genre) + '</div>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div class="sd-section-label">ÉTAT DU CONTENU</div>' +
+      '<div class="sd-checks">' + checksHtml + '</div>' +
+      '<div class="sd-actions">' +
+        '<button class="sd-btn sd-btn-repair" onclick="searchRepair(' + item.id + ',\'' + item.type + '\')">\u27f3 Forcer le refetch</button>' +
+        '<div class="sd-btn-row">' +
+          '<button class="sd-btn sd-btn-raw" onclick="searchRawSources(' + item.id + ',\'' + item.type + '\')">\ud83d\udc41 Donnée brute</button>' +
+          '<button class="sd-btn sd-btn-delete" onclick="searchDelete(' + item.id + ',\'' + item.type + '\',\'' + escHtml((item.title||"").replace(/\'/g,"")) + '\')">\ud83d\uddd1 Supprimer</button>' +
+        '</div>' +
+        '<div id="sd-raw" style="display:none"></div>' +
+      '</div>';
+  }
+
+  async function searchRepair(id, type) {
+    ensureConsoleOpen();
+    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      if (data.ok === false) consoleLine("  \u2717 " + (data.msg || "erreur"), "err");
+      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable", "warn");
+      else if (data.enriched) consoleLine("  \u2713 #" + id + " réparé : " + data.fields.join(" + "), "ok");
+      else consoleLine("  \u2139 #" + id + " déjà complet", "info");
+    } catch (err) { consoleLine("  \u2717 " + err.message, "err"); }
+  }
+
+  async function searchRawSources(id, type) {
+    var box = document.getElementById("sd-raw");
+    if (!box) return;
+    box.style.display = "block";
+    box.className = "sd-raw-box";
+    box.textContent = "Récupération des sources...";
+    try {
+      var res = await fetch("/dashboard/admin/item-raw-sources?id=" + id + "&type=" + type);
+      var data = await res.json();
+      if (!data.found) { box.textContent = "Item introuvable."; return; }
+      var lines = [];
+      var src = data.sources || {};
+      Object.keys(src).forEach(function(name) {
+        var s = src[name];
+        lines.push("── " + name.toUpperCase() + " ──");
+        if (!s) { lines.push("  (pas d'ID externe ou aucune réponse)"); return; }
+        lines.push("  cover: " + (s.cover ? "\u2713 " + s.cover.slice(0, 50) : "\u2717 vide"));
+        lines.push("  trailer: " + (s.trailerUrl ? "\u2713 " + s.trailerUrl.slice(0, 40) : "\u2717 vide"));
+        lines.push("  platform: " + (s.platform ? "\u2713 " + s.platform.slice(0, 50) : "\u2717 vide"));
+        lines.push("  desc: " + (s.description ? "\u2713 (" + s.description.length + " car.)" : "\u2717 vide"));
+      });
+      box.textContent = lines.join("\n");
+    } catch (err) { box.textContent = "Erreur : " + err.message; }
+  }
+
+  async function searchDelete(id, type, title) {
+    if (!confirm("Supprimer définitivement « " + title + " » (#" + id + ") ?\n\nL'item sera supprimé ET ajouté à la blocklist (ne pourra plus revenir).")) return;
+    ensureConsoleOpen();
+    consoleLine("$ Suppression #" + id + " (" + type + ")...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/items/" + type + "/" + id, { method: "DELETE", headers: { "Content-Type": "application/json" } });
+      var data = await res.json();
+      if (data.ok === false) consoleLine("  \u2717 " + (data.msg || "erreur"), "err");
+      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable", "warn");
+      else {
+        consoleLine("  \u2713 #" + id + " supprimé + blocklisté", "ok");
+        // retirer de la liste affichée
+        var detail = document.getElementById("search-detail");
+        detail.innerHTML = '<div class="search-empty">Item supprimé \u2713</div>';
+        doGlobalSearch();
+      }
+    } catch (err) { consoleLine("  \u2717 " + err.message, "err"); }
+  }
+
+  // ── Outils diagnostic ──
+  async function outilDoublons() {
+    ensureConsoleOpen();
+    consoleLine("$ Recherche de doublons (lecture seule)...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/find-duplicates");
+      var data = await res.json();
+      var groups = data.groups || data.duplicates || [];
+      var n = Array.isArray(groups) ? groups.length : (data.count || data.total || 0);
+      if (!n) { consoleLine("  ✓ Aucun doublon détecté", "ok"); return; }
+      consoleLine("  ⚠ " + n + " groupe(s) de doublons :", "warn");
+      if (Array.isArray(groups)) {
+        groups.slice(0, 12).forEach(function(g) {
+          var ids = (g.ids || g.items || g.members || []);
+          var idStr = Array.isArray(ids) ? ids.map(function(x){return (typeof x==="object"?x.id:x);}).join(", ") : "";
+          consoleLine("    • " + (g.title || g.normalizedTitle || "groupe") + " → #" + idStr, "info");
+        });
+      }
+    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
+  }
+
+  async function outilTestEmail() {
+    ensureConsoleOpen();
+    var addr = prompt("Adresse email pour le test :");
+    if (!addr) { consoleLine("  ⚠ Test email annulé.", "warn"); return; }
+    consoleLine("$ Envoi email test à " + addr + "...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/test-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: addr })
+      });
+      var data = await res.json();
+      if (res.ok && data.ok) consoleLine("  ✓ Email envoyé à " + addr + " (vérifie ta boîte)", "ok");
+      else consoleLine("  ✗ " + (data.error || data.msg || "échec envoi"), "err");
+    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
+  }
+
+  async function outilStats() {
+    ensureConsoleOpen();
+    consoleLine("$ Stats catalogue...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/feed/stats");
+      var data = await res.json();
+      if (data.anime) consoleLine("  ✓ Anime : " + data.anime.count + " items (" + data.anime.inWindow + " dans la fenêtre)", "ok");
+      if (data.games) consoleLine("  ✓ Jeux : " + data.games.count + " items (" + data.games.inWindow + " dans la fenêtre)", "ok");
+      if (data.window) consoleLine("  ℹ Fenêtre : " + data.window.start + " → " + data.window.end, "info");
+    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
+  }
+
+  async function outilSanitize() {
+    ensureConsoleOpen();
+    consoleLine("$ Sanitize plateformes...", "cmd");
+    try {
+      var res = await fetch("/dashboard/admin/sanitize-platforms", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var data = await res.json();
+      if (res.ok && data.ok !== false) {
+        var n = (data.updated != null ? data.updated : (data.cleaned != null ? data.cleaned : null));
+        consoleLine("  ✓ " + (n != null ? n + " plateformes nettoyées" : "Terminé"), "ok");
+      } else consoleLine("  ✗ " + (data.error || data.msg || "échec"), "err");
+    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
+  }
+
   function connect() {
     var es = new EventSource("/dashboard/stream");
     es.addEventListener("metrics", function(e) {

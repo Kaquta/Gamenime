@@ -10,8 +10,8 @@ import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, se
 import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
 import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
-import { startRefetchCron, adminRefetchHandler } from "./gamenime/refetch-cron.js";
-import { startRefetchGamesCron } from "./gamenime/refetch-games-cron.js";
+import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
+import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb } from "./gamenime/refetch-games-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
 import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setStatsPool } from "./gamenime/dashboard.js";
@@ -299,6 +299,38 @@ function requireApiKey(expected: string | undefined, provided: unknown) {
   if (!expected) return { ok: false as const, code: 500, msg: "API key not configured" };
   if (typeof provided !== "string" || provided !== expected) return { ok: false as const, code: 401, msg: "Unauthorized" };
   return { ok: true as const };
+}
+
+// SESSION 18 : Notification Discord pour les process admin (lancements manuels)
+const DISCORD_GREEN = 3066993;   // succès
+const DISCORD_RED = 15158332;    // erreur
+async function notifyDiscord(webhookUrl: string | undefined, title: string, description: string, color: number): Promise<void> {
+  if (!webhookUrl) return;
+  try {
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title,
+          description,
+          color,
+          footer: { text: "GameNime · Panneau admin" },
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+    });
+  } catch (e) {
+    app.log.warn({ err: (e as any)?.message }, "Discord notify failed");
+  }
+}
+// Helper : notifie succès (workflows) ou erreur (erreurs) selon le résultat
+async function notifyProcessResult(label: string, ok: boolean, summary: string): Promise<void> {
+  if (ok) {
+    await notifyDiscord(process.env.DISCORD_WEBHOOK_WORKFLOWS, "✅ " + label, summary, DISCORD_GREEN);
+  } else {
+    await notifyDiscord(process.env.DISCORD_WEBHOOK_ERRORS, "❌ " + label, summary, DISCORD_RED);
+  }
 }
 
 // ── Auth routes ────────────────────────────────────
@@ -1655,6 +1687,109 @@ app.post("/admin/refetch-incomplete", async (req, reply) => {
   const auth = requireApiKey(expected, provided);
   if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
   return adminRefetchHandler(app, req, reply);
+});
+
+// SESSION 18 : Refetch UN item precis par ID (bouton "Reparer" admin)
+app.post("/admin/refetch-one", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const q = req.query as any;
+  const id = Number(q.id);
+  const type = q.type;
+  if (!id || !Number.isInteger(id) || id <= 0) {
+    return reply.code(400).send({ ok: false, msg: "id invalide" });
+  }
+  if (type !== "anime" && type !== "game") {
+    return reply.code(400).send({ ok: false, msg: "type doit etre 'anime' ou 'game'" });
+  }
+  const result = type === "anime"
+    ? await refetchOneAnimeItem(app, id)
+    : await refetchOneGameItem(app, id);
+  return reply.send(result);
+});
+
+// SESSION 18 : Supprimer un item + l'ajouter à la blocklist (rejet pur, empêche le retour)
+app.delete("/admin/items/:type/:id", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const params = req.params as any;
+  const type = String(params.type || "");
+  const id = parseInt(String(params.id || ""), 10);
+  if ((type !== "anime" && type !== "game") || !id || isNaN(id)) {
+    return reply.code(400).send({ ok: false, msg: "type (anime|game) et id requis" });
+  }
+  const pool = (app as any).pool;
+  const table = type === "anime" ? "anime_items" : "game_items";
+  try {
+    // 1. Récupérer l'item AVANT suppression (pour memo blocklist)
+    const rows = await pool.query(
+      `SELECT id, title, title_normalized_strict AS normalized, cover, anilist_id, mal_id FROM ${table} WHERE id = ?`,
+      [id]
+    );
+    if (!rows.length) return reply.send({ ok: true, found: false, msg: "Item introuvable" });
+    const it = rows[0];
+    // 2. Ajouter à merge_blocklist avec redirect_to_id = -1 (rejet pur)
+    await pool.query(
+      `INSERT INTO merge_blocklist
+       (item_type, blocked_title, blocked_normalized, blocked_cover, blocked_anilist_id, blocked_mal_id, redirect_to_id, reason)
+       VALUES (?, ?, ?, ?, ?, ?, -1, ?)`,
+      [type, it.title || "", it.normalized || null, it.cover || null, it.anilist_id || null, it.mal_id || null, "Supprime manuellement via admin"]
+    );
+    // 3. DELETE l'item
+    await pool.query(`DELETE FROM ${table} WHERE id = ?`, [id]);
+    app.log.info({ id, type, title: it.title }, "admin.delete-item + blocklist");
+    return reply.send({ ok: true, found: true, deleted: true, blocklisted: true, title: it.title });
+  } catch (e) {
+    app.log.error({ err: (e as any)?.message, id, type }, "admin.delete-item failed");
+    return reply.code(500).send({ ok: false, msg: (e as any)?.message || "erreur" });
+  }
+});
+
+// SESSION 18 : Voir la donnée brute des sources externes pour un item
+app.get("/admin/item-raw-sources", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const q = req.query as any;
+  const id = parseInt(String(q.id || ""), 10);
+  const type = String(q.type || "");
+  if ((type !== "anime" && type !== "game") || !id || isNaN(id)) {
+    return reply.code(400).send({ ok: false, msg: "type (anime|game) et id requis" });
+  }
+  const pool = (app as any).pool;
+  try {
+    if (type === "anime") {
+      const rows = await pool.query(`SELECT id, title, anilist_id, mal_id FROM anime_items WHERE id = ?`, [id]);
+      if (!rows.length) return reply.send({ ok: true, found: false });
+      const it = rows[0];
+      const [anilist, jikan] = await Promise.all([
+        it.anilist_id ? fetchAniList(it.anilist_id) : Promise.resolve(null),
+        it.mal_id ? fetchJikan(it.mal_id) : Promise.resolve(null),
+      ]);
+      return reply.send({ ok: true, found: true, type, id, title: it.title,
+        ids: { anilist_id: it.anilist_id, mal_id: it.mal_id },
+        sources: { anilist, jikan } });
+    } else {
+      const rows = await pool.query(`SELECT id, title, rawg_id, igdb_id FROM game_items WHERE id = ?`, [id]);
+      if (!rows.length) return reply.send({ ok: true, found: false });
+      const it = rows[0];
+      const [rawg, igdb] = await Promise.all([
+        it.rawg_id ? fetchRawg(it.rawg_id) : Promise.resolve(null),
+        it.igdb_id ? fetchIgdb(it.igdb_id) : Promise.resolve(null),
+      ]);
+      return reply.send({ ok: true, found: true, type, id, title: it.title,
+        ids: { rawg_id: it.rawg_id, igdb_id: it.igdb_id },
+        sources: { rawg, igdb } });
+    }
+  } catch (e) {
+    app.log.error({ err: (e as any)?.message, id, type }, "admin.item-raw-sources failed");
+    return reply.code(500).send({ ok: false, msg: (e as any)?.message || "erreur" });
+  }
 });
 
 

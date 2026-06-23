@@ -271,10 +271,71 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
   return { scanned, enriched, errors, changes };
 }
 
+// SESSION 18: Refetch UN seul jeu par ID (pour le bouton "Réparer" admin)
+export async function refetchOneGameItem(app: FastifyInstance, id: number): Promise<{
+  ok: boolean; found: boolean; enriched: boolean; title?: string; fields: string[]; error?: string;
+}> {
+  const pool = (app as any).pool;
+  if (!pool) return { ok: false, found: false, enriched: false, fields: [], error: "pool DB introuvable" };
+  const conn = await pool.getConnection();
+  try {
+    const rows: IncompleteGame[] = await conn.query(
+      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type FROM game_items WHERE id = ? LIMIT 1",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      return { ok: true, found: false, enriched: false, fields: [] };
+    }
+    const item = rows[0];
+    const [rawg, igdb] = await Promise.all([
+      item.rawg_id ? fetchRawg(item.rawg_id) : null,
+      item.igdb_id ? fetchIgdb(item.igdb_id) : null,
+    ]);
+    const merged = mergeSources(rawg, igdb);
+    const updates: string[] = [];
+    const params: any[] = [];
+    const fields: string[] = [];
+    const coverIsEmpty = !item.cover || item.cover === "";
+    const coverFromTrustedCdn = item.cover && (item.cover.includes("media.rawg.io") || item.cover.includes("images.igdb.com"));
+    if (merged.cover && (coverIsEmpty || coverFromTrustedCdn)) {
+      if (merged.cover !== item.cover) {
+        updates.push("cover = ?"); params.push(merged.cover); fields.push("cover");
+      }
+    }
+    if ((!item.platform || item.platform === "") && merged.platform) {
+      updates.push("platform = ?"); params.push(merged.platform); fields.push("plateforme");
+    }
+    const descIsMissing = !item.description || item.description === "" || (typeof item.description === "string" && item.description.trim().length < 10);
+    if (descIsMissing && merged.description) {
+      updates.push("description = ?"); params.push(merged.description); fields.push("description");
+    }
+    if (item.rating_score == null && merged.ratingScore != null) {
+      updates.push("rating_score = ?"); params.push(merged.ratingScore); fields.push("rating");
+    }
+    if ((item.game_type == null || item.game_type === "") && merged.gameType) {
+      updates.push("game_type = ?"); params.push(merged.gameType); fields.push("type");
+    }
+    if (updates.length > 0) {
+      params.push(item.id);
+      await conn.query("UPDATE game_items SET " + updates.join(", ") + " WHERE id = ?", params);
+      app.log.info({ id: item.id, fields }, "refetchOne game enriched");
+      return { ok: true, found: true, enriched: true, title: item.title, fields };
+    }
+    return { ok: true, found: true, enriched: false, title: item.title, fields: [] };
+  } catch (e) {
+    return { ok: false, found: true, enriched: false, fields: [], error: (e as any)?.message || "erreur" };
+  } finally {
+    conn.release();
+  }
+}
+
 export async function adminRefetchGamesHandler(req: any, reply: any) {
-  const expected = process.env.GAMES_API_KEY || process.env.ANIME_API_KEY;
+  const k1 = process.env.ADMIN_API_KEY;
+  const k2 = process.env.ANIME_API_KEY;
+  const k3 = process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
-  if (!expected || provided !== expected) {
+  const valid = (k1 && provided === k1) || (k2 && provided === k2) || (k3 && provided === k3);
+  if (!valid) {
     return reply.code(401).send({ error: "unauthorized" });
   }
   const result = await refetchIncompleteGamesCycle(req.server);

@@ -37,3 +37,4 @@ backup-*.sql
 
 # SESSION 13.4 : backups frontend
 site/public/backup/
+nginx/conf.d/site.conf

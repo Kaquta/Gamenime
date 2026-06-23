@@ -35,6 +35,8 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME}
       PUBLIC_SITE_URL: ${PUBLIC_SITE_URL}
+      DISCORD_WEBHOOK_WORKFLOWS: ${DISCORD_WEBHOOK_WORKFLOWS}
+      DISCORD_WEBHOOK_ERRORS: ${DISCORD_WEBHOOK_ERRORS}
       PORT: 3000
     depends_on: [mariadb]
     networks: [internal, public]

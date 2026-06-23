@@ -317,6 +317,70 @@ export function startRefetchCron(app: FastifyInstance): NodeJS.Timeout {
   }, REFETCH_INTERVAL_MS);
 }
 
+// SESSION 18: Refetch UN seul item anime par ID (pour le bouton "Réparer" admin)
+export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Promise<{
+  ok: boolean; found: boolean; enriched: boolean; title?: string; fields: string[]; error?: string;
+}> {
+  const animeScheduleToken = process.env.ANIMESCHEDULE_TOKEN || "";
+  const pool = (app as any).pool;
+  if (!pool) return { ok: false, found: false, enriched: false, fields: [], error: "pool DB introuvable" };
+  const conn = await pool.getConnection();
+  try {
+    const rows: IncompleteItem[] = await conn.query(
+      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format FROM anime_items WHERE id = ? LIMIT 1",
+      [id]
+    );
+    if (!rows || rows.length === 0) {
+      return { ok: true, found: false, enriched: false, fields: [] };
+    }
+    const item = rows[0];
+    const [aniList, jikan, animeSchedule] = await Promise.all([
+      item.anilist_id ? fetchAniList(item.anilist_id) : null,
+      item.mal_id ? fetchJikan(item.mal_id) : null,
+      item.anime_schedule_route && animeScheduleToken
+        ? fetchAnimeSchedule(item.anime_schedule_route, animeScheduleToken)
+        : null,
+    ]);
+    const merged = mergeSources(aniList, jikan, animeSchedule);
+    const updates: string[] = [];
+    const params: any[] = [];
+    const fields: string[] = [];
+    const coverIsEmpty = !item.cover || item.cover === "";
+    const coverIsHotlinkProtected = isHotlinkProtectedCover(item.cover);
+    const newCoverFromAniList = aniList?.cover && isAniListCover(aniList.cover);
+    if (coverIsEmpty && merged.cover) {
+      updates.push("cover = ?"); params.push(merged.cover); fields.push("cover");
+    } else if (coverIsHotlinkProtected && newCoverFromAniList) {
+      updates.push("cover = ?"); params.push(aniList!.cover); fields.push("cover");
+    }
+    if ((!item.platform || item.platform === "") && merged.platform) {
+      updates.push("platform = ?"); params.push(merged.platform); fields.push("plateforme");
+    }
+    if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
+      updates.push("trailer_url = ?"); params.push(merged.trailerUrl); fields.push("trailer");
+    }
+    const descIsMissing = !item.description || item.description === "" || (typeof item.description === "string" && item.description.trim().length < 10);
+    if (descIsMissing && merged.description) {
+      updates.push("description = ?"); params.push(merged.description); fields.push("description");
+    }
+    const formatIsMissing = !item.format || item.format === "";
+    if (formatIsMissing && merged.format) {
+      updates.push("format = ?"); params.push(merged.format); fields.push("format");
+    }
+    if (updates.length > 0) {
+      params.push(item.id);
+      await conn.query("UPDATE anime_items SET " + updates.join(", ") + " WHERE id = ?", params);
+      app.log.info({ id: item.id, fields }, "refetchOne anime enriched");
+      return { ok: true, found: true, enriched: true, title: item.title, fields };
+    }
+    return { ok: true, found: true, enriched: false, title: item.title, fields: [] };
+  } catch (e) {
+    return { ok: false, found: true, enriched: false, fields: [], error: (e as any)?.message || "erreur" };
+  } finally {
+    conn.release();
+  }
+}
+
 export async function adminRefetchHandler(app: FastifyInstance, _req: any, reply: any) {
   const result = await refetchIncompleteCycle(app);
   return reply.send({
