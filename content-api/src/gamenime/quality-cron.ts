@@ -21,6 +21,7 @@ import {
   isHotlinkProtectedCover,
   isAniListCover,
 } from "./refetch-cron.js";
+import { lookupAniListByTitle } from "./lookup-cron.js";
 
 const QUALITY_DELAY_MS = 800;
 
@@ -93,6 +94,24 @@ export async function qualityCheckCycle(
 
     for (const item of items) {
       try {
+        // SESSION 18 : orphelin proche de sa sortie -> lookup AniList par titre d'abord (comme Phase C)
+        if (!item.anilist_id && !item.mal_id) {
+          try {
+            const { match } = await lookupAniListByTitle(item.title, item.release_date, null);
+            if (match && match.anilistId) {
+              await conn.query(
+                "UPDATE anime_items SET anilist_id = IF(anilist_id IS NULL, ?, anilist_id), " +
+                  "mal_id = IF(mal_id IS NULL AND ? IS NOT NULL, ?, mal_id) WHERE id = ?",
+                [match.anilistId, match.malId, match.malId, item.id]
+              );
+              item.anilist_id = match.anilistId;
+              item.mal_id = match.malId;
+              app.log.info({ id: item.id, title: item.title, anilistId: match.anilistId }, "QualityCheck: orphelin rattache via lookup");
+            }
+          } catch (lookupErr) {
+            app.log.warn({ id: item.id, err: (lookupErr as any)?.message }, "QualityCheck: lookup orphelin echoue");
+          }
+        }
         const [aniList, jikan, animeSchedule] = await Promise.all([
           item.anilist_id ? fetchAniList(item.anilist_id) : null,
           item.mal_id ? fetchJikan(item.mal_id) : null,

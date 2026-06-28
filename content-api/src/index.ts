@@ -1792,6 +1792,44 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
   }
 });
 
+// SESSION 18 : Editer le trailer d'un item manuellement (force le remplacement, contourne lossless volontairement)
+app.patch("/admin/item-trailer", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const body = req.body as any;
+  const id = parseInt(String(body?.id || ""), 10);
+  const type = String(body?.type || "");
+  let trailerUrl = String(body?.trailerUrl || "").trim();
+  if ((type !== "anime" && type !== "game") || !id || isNaN(id)) {
+    return reply.code(400).send({ ok: false, msg: "type (anime|game) et id requis" });
+  }
+  // Validation : URL YouTube valide OU vide (pour effacer)
+  if (trailerUrl !== "") {
+    const isYouTube = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]+/.test(trailerUrl);
+    if (!isYouTube) {
+      return reply.code(400).send({ ok: false, msg: "URL YouTube invalide (attendu: youtube.com/watch?v=... ou youtu.be/...)" });
+    }
+  }
+  const pool = (app as any).pool;
+  const table = type === "anime" ? "anime_items" : "game_items";
+  try {
+    const finalValue = trailerUrl === "" ? null : trailerUrl;
+    const result = await pool.query(
+      `UPDATE ${table} SET trailer_url = ?, updated_at = NOW() WHERE id = ?`,
+      [finalValue, id]
+    );
+    const affected = result?.affectedRows ?? 0;
+    if (affected === 0) return reply.send({ ok: true, found: false, msg: "Item introuvable" });
+    app.log.info({ id, type, trailerUrl: finalValue }, "admin.edit-trailer");
+    return reply.send({ ok: true, found: true, updated: true, trailerUrl: finalValue });
+  } catch (e) {
+    app.log.error({ err: (e as any)?.message, id, type }, "admin.edit-trailer failed");
+    return reply.code(500).send({ ok: false, msg: (e as any)?.message || "erreur" });
+  }
+});
+
 
 // Phase C : Lookup AniList IDs par titre (pour items legacy sans IDs externes)
 app.post("/admin/lookup-anilist-ids", async (req, reply) => {

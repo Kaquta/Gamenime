@@ -216,8 +216,32 @@
   .search-pill.active { background: #d9a978; color: #1a140c; border-color: #d9a978; }
   /* split liste / détail */
   .search-split { display: flex; gap: 0; height: 380px; padding: 12px 16px 16px; }
-  .search-list { width: 44%; overflow-y: auto; padding-right: 10px; border-right: 1px solid #1c1610; }
+  .search-left { width: 44%; display: flex; flex-direction: column; border-right: 1px solid #1c1610; padding-right: 10px; min-height: 0; }
+  .search-list { overflow-y: auto; flex: 1; min-height: 80px; }
   .search-detail { width: 56%; overflow-y: auto; padding-left: 14px; }
+  /* Aperçu vidéo (colonne gauche, sous la liste) */
+  .search-preview { margin-top: 10px; border-top: 1px solid #1c1610; padding-top: 10px; flex-shrink: 0; }
+  .sp-label { font-size: 0.66rem; font-weight: 700; color: #d9a978; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .sp-video { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; border: 1px solid #2a2218; overflow: hidden; }
+  .sp-video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .sp-video-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: #4a4038; font-size: 0.74rem; }
+  .sp-hint { font-size: 0.66rem; color: #5a5048; margin-top: 6px; }
+  /* Propositions de trailers */
+  .sd-trailer-current { display: flex; gap: 6px; margin-top: 6px; }
+  .sd-tc-input { flex: 1; min-width: 0; background: #080706; border: 1px solid #2a2218; border-radius: 7px; padding: 7px 10px; color: #e8ddd0; font-size: 0.72rem; font-family: ui-monospace, monospace; outline: none; }
+  .sd-tc-input:focus { border-color: #d9a978; }
+  .sd-tc-apply { background: #13110d; color: #d9a978; border: 1px solid #2a2218; border-radius: 7px; padding: 7px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .sd-tc-apply:hover { border-color: #d9a978; }
+  .sd-props { margin-top: 8px; }
+  .sd-prop { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; background: #100e0c; border: 1px solid #241c14; margin-bottom: 6px; }
+  .sd-prop-info { flex: 1; min-width: 0; }
+  .sd-prop-name { font-size: 0.76rem; font-weight: 700; }
+  .sd-prop-url { font-size: 0.64rem; color: #7a6e60; font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sd-prop-play { background: #1a0d0d; color: #e0564a; border: 1px solid #5a2a22; border-radius: 6px; padding: 5px 10px; font-size: 0.68rem; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .sd-prop-play:hover { background: #2a1414; }
+  .sd-prop-choose { background: #13110d; color: #d9a978; border: 1px solid #2a2218; border-radius: 6px; padding: 5px 10px; font-size: 0.68rem; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap; }
+  .sd-prop-choose:hover { border-color: #d9a978; }
+  .sd-prop-none { font-size: 0.66rem; color: #5a5048; font-style: italic; }
   .search-list::-webkit-scrollbar, .search-detail::-webkit-scrollbar { width: 6px; }
   .search-list::-webkit-scrollbar-thumb, .search-detail::-webkit-scrollbar-thumb { background: #2a2218; border-radius: 3px; }
   .search-empty { color: #5a5048; font-size: 0.82rem; text-align: center; padding: 30px 10px; }
@@ -561,8 +585,15 @@
       <button class="search-pill" data-type="game" onclick="setSearchType('game')">Jeux</button>
     </div>
     <div class="search-split">
-      <div class="search-list" id="search-results">
-        <div class="search-empty">Tape un titre et lance la recherche</div>
+      <div class="search-left">
+        <div class="search-list" id="search-results">
+          <div class="search-empty">Tape un titre et lance la recherche</div>
+        </div>
+        <div class="search-preview" id="search-preview" style="display:none">
+          <div class="sp-label" id="sp-label">▶ APERÇU</div>
+          <div class="sp-video" id="sp-video"></div>
+          <div class="sp-hint">Clique ▶ sur une proposition pour la jouer ici</div>
+        </div>
       </div>
       <div class="search-detail" id="search-detail">
         <div class="search-empty">Sélectionne un résultat</div>
@@ -1262,6 +1293,13 @@
     document.querySelectorAll(".sr-item").forEach(function(r) { r.classList.remove("selected"); });
     if (el) el.classList.add("selected");
     renderDetail(item);
+    // reset l'aperçu vidéo
+    var preview = document.getElementById("search-preview");
+    var video = document.getElementById("sp-video");
+    if (preview) preview.style.display = "none";
+    if (video) video.innerHTML = "";
+    // charger les propositions de trailers
+    loadTrailerProps(item);
   }
 
   function renderDetail(item) {
@@ -1295,6 +1333,13 @@
       '</div>' +
       '<div class="sd-section-label">ÉTAT DU CONTENU</div>' +
       '<div class="sd-checks">' + checksHtml + '</div>' +
+      '<div class="sd-section-label">TRAILER ACTUEL</div>' +
+      '<div class="sd-trailer-current">' +
+        '<input type="text" class="sd-tc-input" id="sd-tc-input" value="' + escHtml(item.trailerUrl || "") + '" placeholder="https://youtube.com/watch?v=..." />' +
+        '<button class="sd-tc-apply" onclick="searchEditTrailer(' + item.id + ',\'' + item.type + '\')">\u270e Appliquer</button>' +
+      '</div>' +
+      '<div class="sd-section-label">PROPOSITIONS</div>' +
+      '<div class="sd-props" id="sd-props"><div class="sd-prop-none">Chargement des sources...</div></div>' +
       '<div class="sd-actions">' +
         '<button class="sd-btn sd-btn-repair" onclick="searchRepair(' + item.id + ',\'' + item.type + '\')">\u27f3 Forcer le refetch</button>' +
         '<div class="sd-btn-row">' +
@@ -1360,6 +1405,116 @@
         doGlobalSearch();
       }
     } catch (err) { consoleLine("  \u2717 " + err.message, "err"); }
+  }
+
+  // Editer le trailer manuellement (force le remplacement)
+  async function searchEditTrailer(id, type) {
+    ensureConsoleOpen();
+    var input = document.getElementById("sd-tc-input");
+    if (!input) { consoleLine("  \u2717 Champ trailer introuvable", "err"); return; }
+    var url = input.value.trim();
+    consoleLine("$ Application trailer #" + id + " (" + type + ")...", "cmd");
+    consoleLine("  URL : " + (url || "(vide \u2192 effacement)"), "info");
+    try {
+      var res = await fetch("/dashboard/admin/item-trailer", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: id, type: type, trailerUrl: url })
+      });
+      var data = await res.json();
+      if (data.ok === false) consoleLine("  \u2717 Refus\u00e9 : " + (data.msg || "erreur"), "err");
+      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable en base", "warn");
+      else {
+        consoleLine("  \u2713 #" + id + " trailer " + (data.trailerUrl ? "appliqu\u00e9 \u2713" : "effac\u00e9"), "ok");
+        if (data.trailerUrl) consoleLine("  \u2192 " + data.trailerUrl, "ok");
+        // mettre à jour l'item en mémoire + rerender (recharge aussi les propositions)
+        if (searchSelected && searchSelected.id === id) {
+          searchSelected.trailerUrl = data.trailerUrl;
+          renderDetail(searchSelected);
+          loadTrailerProps(searchSelected);
+        }
+      }
+    } catch (err) { consoleLine("  \u2717 Erreur r\u00e9seau : " + err.message, "err"); }
+  }
+
+  // Extraire l'ID YouTube depuis une URL
+  function ytId(url) {
+    if (!url) return null;
+    var m = String(url).match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : null;
+  }
+
+  // Jouer un trailer dans le carré aperçu (colonne gauche)
+  function playTrailer(url, source) {
+    var preview = document.getElementById("search-preview");
+    var video = document.getElementById("sp-video");
+    var label = document.getElementById("sp-label");
+    if (!preview || !video) return;
+    var id = ytId(url);
+    preview.style.display = "block";
+    if (label) label.textContent = "\u25b6 APERÇU — " + (source || "");
+    if (!id) {
+      video.innerHTML = '<div class="sp-video-empty">URL YouTube invalide</div>';
+      return;
+    }
+    video.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
+  }
+
+  // Choisir un trailer (remplit le champ TRAILER ACTUEL)
+  function chooseTrailer(url) {
+    var input = document.getElementById("sd-tc-input");
+    if (input) { input.value = url; input.focus(); }
+  }
+
+  // Charger les propositions de trailers (depuis les sources)
+  async function loadTrailerProps(item) {
+    var box = document.getElementById("sd-props");
+    if (!box) return;
+    box.innerHTML = '<div class="sd-prop-none">Chargement des sources...</div>';
+    var props = [];
+    // Toujours : le trailer actuel (s'il existe)
+    if (item.trailerUrl) props.push({ name: "Actuel", url: item.trailerUrl, col: "#7a6e60" });
+    try {
+      var res = await fetch("/dashboard/admin/item-raw-sources?id=" + item.id + "&type=" + item.type);
+      var data = await res.json();
+      if (data.found && data.sources) {
+        var srcColors = { anilist: "#5fb88a", jikan: "#7a8cc9", rawg: "#c99a6a", igdb: "#d96aff" };
+        Object.keys(data.sources).forEach(function(name) {
+          var s = data.sources[name];
+          var tUrl = s ? s.trailerUrl : null;
+          if (tUrl) {
+            // éviter doublon avec actuel
+            if (!props.some(function(p) { return p.url === tUrl; })) {
+              props.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url: tUrl, col: srcColors[name] || "#d9a978" });
+            } else {
+              // marquer que l'actuel vient de cette source
+              props.forEach(function(p) { if (p.url === tUrl && p.name === "Actuel") p.name = "Actuel (" + name + ")"; });
+            }
+          } else if (s !== undefined) {
+            // source existe mais pas de trailer
+            props.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url: null, col: "#5a5048" });
+          }
+        });
+      }
+    } catch (e) { /* silencieux */ }
+    if (!props.length) {
+      box.innerHTML = '<div class="sd-prop-none">Aucune source avec trailer</div>';
+      return;
+    }
+    box.innerHTML = props.map(function(p) {
+      if (!p.url) {
+        return '<div class="sd-prop"><div class="sd-prop-info"><div class="sd-prop-name" style="color:' + p.col + '">' + escHtml(p.name) + '</div><div class="sd-prop-url sd-prop-none">(aucun trailer)</div></div></div>';
+      }
+      var safeUrl = escHtml(p.url).replace(/'/g, "&#39;");
+      return '<div class="sd-prop">' +
+        '<div class="sd-prop-info">' +
+          '<div class="sd-prop-name" style="color:' + p.col + '">' + escHtml(p.name) + '</div>' +
+          '<div class="sd-prop-url">' + escHtml(p.url) + '</div>' +
+        '</div>' +
+        '<button class="sd-prop-play" onclick="playTrailer(&#39;' + safeUrl + '&#39;,&#39;' + escHtml(p.name) + '&#39;)">\u25b6 voir</button>' +
+        '<button class="sd-prop-choose" onclick="chooseTrailer(&#39;' + safeUrl + '&#39;)">choisir</button>' +
+      '</div>';
+    }).join("");
   }
 
   // ── Outils diagnostic ──

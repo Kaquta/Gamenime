@@ -750,13 +750,16 @@ export function sortByDate(
       if (a.releaseDate && !b.releaseDate) return -1;
       if (!a.releaseDate && !b.releaseDate) return a.id - b.id;
 
-      // 1b. SESSION 12.7 : pour ascending (upcoming), les items precision='year'
-      // sont relegués en bas (date "01-01" fictive ne doit pas masquer les vraies dates).
-      // En descending, pas d'effet (les precision=year sont déjà tout en haut avec leur 01-01).
+      // 1b. SESSION 18 : pour ascending (upcoming), priorité par précision de date.
+      // Les dates FIXES (day) en tête : un item avec compte à rebours (sortie confirmée
+      // et imminente) prime sur une date approximative (month) ou vague (year).
+      // Ordre : day (0) < month (1) < year (2). Les "01-01"/"01" fictifs ne masquent plus les vraies dates.
       if (ascending) {
-        const aYear = a.releasePrecision === "year" ? 1 : 0;
-        const bYear = b.releasePrecision === "year" ? 1 : 0;
-        if (aYear !== bYear) return aYear - bYear;
+        const precRank = (p: string | null | undefined): number =>
+          p === "day" ? 0 : p === "month" ? 1 : 2;
+        const aPrec = precRank(a.releasePrecision);
+        const bPrec = precRank(b.releasePrecision);
+        if (aPrec !== bPrec) return aPrec - bPrec;
       }
 
       // 2. By date - direction depends on ascending param

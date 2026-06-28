@@ -35,7 +35,7 @@ interface LookupChange {
   match?: AniListMatch;
 }
 
-async function lookupAniListByTitle(
+export async function lookupAniListByTitle(
   title: string,
   releaseDate: string | null,
   knownMalId: number | null = null
@@ -93,23 +93,29 @@ async function lookupAniListByTitle(
     }
   }`;
 
-  try {
+  // SESSION 18 : variantes de recherche pour rattraper les divergences de romanisation.
+  // Sources mettent parfois des tirets ("Tenkou-saki") la ou AniList colle ("Tenkousaki").
+  // On essaie le titre brut d'abord (gere les cas comme Nikke), puis sans tirets.
+  const searchVariants: string[] = [title];
+  const noDashTitle = title.replace(/-/g, "");
+  if (noDashTitle !== title) searchVariants.push(noDashTitle);
+  const refYear = releaseDate ? new Date(releaseDate).getUTCFullYear() : null;
+  let lastReason = "no_results";
+
+  for (const searchTerm of searchVariants) {
+   try {
     const res = await fetch("https://graphql.anilist.co", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, variables: { search: title } }),
+      body: JSON.stringify({ query, variables: { search: searchTerm } }),
     });
 
     if (res.status === 429) return { match: null, reason: "rate_limit_429" };
-    if (!res.ok) return { match: null, reason: "http_" + res.status };
+    if (!res.ok) { lastReason = "http_" + res.status; continue; }
 
     const data = (await res.json()) as any;
     const candidates = data?.data?.Page?.media;
-    if (!candidates || candidates.length === 0) {
-      return { match: null, reason: "no_results" };
-    }
-
-    const refYear = releaseDate ? new Date(releaseDate).getUTCFullYear() : null;
+    if (!candidates || candidates.length === 0) { lastReason = "no_results"; continue; }
 
     // ETAT CLEAN: si on connaît déjà le mal_id, privilégier le candidat qui matche
     if (knownMalId) {
@@ -147,14 +153,16 @@ async function lookupAniListByTitle(
           format,
           year,
         },
-        reason: "ok",
+        reason: searchTerm === title ? "ok" : "ok_dash_variant",
       };
     }
 
-    return { match: null, reason: "no_valid_candidate" };
-  } catch (e) {
-    return { match: null, reason: "exception" };
+    lastReason = "no_valid_candidate";
+   } catch (e) {
+    lastReason = "exception";
+   }
   }
+  return { match: null, reason: lastReason };
 }
 
 export async function lookupMissingIdsCycle(
