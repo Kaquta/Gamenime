@@ -13,6 +13,29 @@ import HeroHeader from "../../components/HeroHeader.astro";
 
     <h1 class="prefs-page__title">Mes préférences d'alertes</h1>
     <p class="prefs-page__sub">Tu seras alerté dès qu'une nouveauté correspond à tes préférences.</p>
+    <div class="prefs-summary" id="prefsSummary">
+      <span class="prefs-summary__label">⚡ Mes alertes</span>
+      <div class="prefs-summary__rings">
+        <div class="prefs-summary__item">
+          <div class="prefs-summary__ring prefs-summary__ring--genres">
+            <span class="prefs-summary__num" id="sumGenres">3</span>
+          </div>
+          <span class="prefs-summary__cap">genres</span>
+        </div>
+        <div class="prefs-summary__item">
+          <div class="prefs-summary__ring prefs-summary__ring--platforms">
+            <span class="prefs-summary__num" id="sumPlatforms">2</span>
+          </div>
+          <span class="prefs-summary__cap">plateformes</span>
+        </div>
+        <div class="prefs-summary__item">
+          <div class="prefs-summary__ring prefs-summary__ring--reminders">
+            <span class="prefs-summary__num" id="sumReminders">2</span>
+          </div>
+          <span class="prefs-summary__cap">rappels</span>
+        </div>
+      </div>
+    </div>
 
     <div id="prefsLoading" class="prefs-state">Chargement...</div>
 
@@ -22,37 +45,47 @@ import HeroHeader from "../../components/HeroHeader.astro";
     </div>
 
       <!-- Section Agenda unifiee : Free = base + invite / Premium = avance -->
-      <section class="prefs-section prefs-agenda">
-        <h2 class="prefs-section__title">📅 Mon agenda</h2>
-        <p class="prefs-section__desc">Synchronise tes sorties favorites (animes + jeux) dans Google Calendar, Apple Calendar ou Outlook. Mise à jour automatique. ✨</p>
-        <div id="agendaLoading" class="prefs-state">Chargement...</div>
-        <div id="agendaControls" class="hidden">
-
-          <div class="agenda-url-row">
-            <input id="agendaUrl" class="agenda-url-input" type="text" readonly value="" />
-            <button id="agendaCopyBtn" class="agenda-copy-btn" type="button">Copier</button>
+    <form id="prefsForm">
+      <section class="prefs-card prefs-card--genres">
+        <div class="prefs-card__head">
+          <span class="prefs-card__num">1</span>
+          <div class="prefs-card__titles">
+            <h2 class="prefs-card__title">Genres</h2>
+            <p class="prefs-card__sub">Ce que tu aimes regarder et jouer</p>
           </div>
-
-          <div class="agenda-sync-info">💡 Une fois ton lien ajouté à ton agenda, tu n'as plus besoin de le recopier. Ton agenda se met à jour automatiquement à la prochaine synchronisation de ton application (Google, Apple...) — généralement quelques heures.</div>
-
-          <details class="agenda-help">
-            <summary>Comment l'ajouter à mon agenda ?</summary>
-            <ul class="agenda-steps">
-              <li><strong>Google Agenda :</strong> Autres agendas → ＋ → « À partir de l'URL » → colle le lien</li>
-              <li><strong>Apple Calendar :</strong> Fichier → Nouvel abonnement → colle le lien</li>
-              <li><strong>Outlook :</strong> Ajouter un agenda → « S'abonner à partir du web » → colle le lien</li>
-              <li>La première synchronisation peut prendre quelques heures côté Google. C'est normal.</li>
-            </ul>
-          </details>
-          <div id="agendaMsg" class="prefs-msg hidden"></div>
         </div>
+        <div class="prefs-seg" data-for="genres">
+          <button type="button" class="prefs-seg__btn active" data-val="all">Tout</button>
+          <button type="button" class="prefs-seg__btn" data-val="anime">🎬 Animes</button>
+          <button type="button" class="prefs-seg__btn" data-val="game">🎮 Jeux</button>
+        </div>
+        <div id="genresGrid"></div>
       </section>
 
+      <section class="prefs-card prefs-card--platforms">
+        <div class="prefs-card__head">
+          <span class="prefs-card__num">2</span>
+          <div class="prefs-card__titles">
+            <h2 class="prefs-card__title">Plateformes</h2>
+            <p class="prefs-card__sub">Où tu regardes et joues</p>
+          </div>
+        </div>
+        <div class="prefs-seg" data-for="platforms">
+          <button type="button" class="prefs-seg__btn active" data-val="all">Tout</button>
+          <button type="button" class="prefs-seg__btn" data-val="anime">🎬 Animes</button>
+          <button type="button" class="prefs-seg__btn" data-val="game">🎮 Jeux</button>
+        </div>
+        <div id="platformsGrid"></div>
+      </section>
 
-    <form id="prefsForm">
-    <section id="channelsSection" class="prefs-section prefs-channels">
-      <h2 class="prefs-section__title">Canaux de notification</h2>
-      <p class="prefs-section__desc">Comment veux-tu recevoir tes notifications ?</p>
+      <section id="channelsSection" class="prefs-card prefs-card--notify">
+      <div class="prefs-card__head">
+        <span class="prefs-card__num">3</span>
+        <div class="prefs-card__titles">
+          <h2 class="prefs-card__title">Canaux de notification</h2>
+          <p class="prefs-card__sub">Comment veux-tu être prévenu</p>
+        </div>
+      </div>
       <div id="channelsLoading" class="prefs-state">Chargement...</div>
       <div id="channelsControls" class="prefs-channels-grid hidden">
         <label class="prefs-channel-row">
@@ -84,34 +117,47 @@ import HeroHeader from "../../components/HeroHeader.astro";
         <div id="channelsMsg" class="prefs-msg hidden"></div>
       </div>
     </section>
-      <section class="prefs-section">
-        <h2 class="prefs-section__title">Genres préférés</h2>
-        <p class="prefs-section__desc">Sélectionne les genres qui t'intéressent.</p>
-        <div class="prefs-pills" data-for="genres">
-          <button type="button" class="prefs-pill active" data-val="all">Tout</button>
-          <button type="button" class="prefs-pill" data-val="anime">🎬 Animes</button>
-          <button type="button" class="prefs-pill" data-val="game">🎮 Jeux</button>
+      <section class="prefs-card prefs-card--notify">
+        <div class="prefs-card__head">
+          <span class="prefs-card__num">4</span>
+          <div class="prefs-card__titles">
+            <h2 class="prefs-card__title">Rappels avant sortie</h2>
+            <p class="prefs-card__sub">Quand te prévenir avant chaque sortie</p>
+          </div>
         </div>
-        <div id="genresGrid"></div>
-      </section>
-
-      <section class="prefs-section">
-        <h2 class="prefs-section__title">Plateformes préférées</h2>
-        <p class="prefs-section__desc">Sélectionne les plateformes où tu consommes.</p>
-        <div class="prefs-pills" data-for="platforms">
-          <button type="button" class="prefs-pill active" data-val="all">Tout</button>
-          <button type="button" class="prefs-pill" data-val="anime">🎬 Animes</button>
-          <button type="button" class="prefs-pill" data-val="game">🎮 Jeux</button>
-        </div>
-        <div id="platformsGrid"></div>
-      </section>
-
-      <section class="prefs-section">
-        <h2 class="prefs-section__title">Rappels avant sortie</h2>
-        <p class="prefs-section__desc">Reçois des rappels X jours avant chaque sortie de tes favoris.</p>
         <div id="reminderGrid"></div>
       </section>
 
+      <section class="prefs-card prefs-card--agenda">
+        <div class="prefs-card__head">
+          <span class="prefs-card__num">5</span>
+          <div class="prefs-card__titles">
+            <h2 class="prefs-card__title">📅 Mon agenda</h2>
+            <p class="prefs-card__sub">Synchronise tes sorties dans ton calendrier</p>
+          </div>
+        </div>
+        <div id="agendaLoading" class="prefs-state">Chargement...</div>
+        <div id="agendaControls" class="hidden">
+
+          <div class="agenda-url-row">
+            <input id="agendaUrl" class="agenda-url-input" type="text" readonly value="" />
+            <button id="agendaCopyBtn" class="agenda-copy-btn" type="button">Copier</button>
+          </div>
+
+          <div class="agenda-sync-info">💡 Une fois ton lien ajouté à ton agenda, tu n'as plus besoin de le recopier. Ton agenda se met à jour automatiquement à la prochaine synchronisation de ton application (Google, Apple...) — généralement quelques heures.</div>
+
+          <details class="agenda-help">
+            <summary>Comment l'ajouter à mon agenda ?</summary>
+            <ul class="agenda-steps">
+              <li><strong>Google Agenda :</strong> Autres agendas → ＋ → « À partir de l'URL » → colle le lien</li>
+              <li><strong>Apple Calendar :</strong> Fichier → Nouvel abonnement → colle le lien</li>
+              <li><strong>Outlook :</strong> Ajouter un agenda → « S'abonner à partir du web » → colle le lien</li>
+              <li>La première synchronisation peut prendre quelques heures côté Google. C'est normal.</li>
+            </ul>
+          </details>
+          <div id="agendaMsg" class="prefs-msg hidden"></div>
+        </div>
+      </section>
       <button type="submit" class="prefs-save-btn">Enregistrer mes préférences</button>
       <div id="prefsMsg" class="prefs-msg hidden"></div>
     </form>
@@ -246,6 +292,32 @@ import HeroHeader from "../../components/HeroHeader.astro";
       var platformsContentFilter = "all";
       var selectedGenres = [];
       var selectedPlatforms = [];
+
+      // ── W2 : met a jour les anneaux (header + numeros de cartes) selon les vraies selections ──
+      function setRing(el, frac) {
+        if (el) el.style.setProperty("--ring", String(Math.max(0, Math.min(1, frac))));
+      }
+      function updateSummary() {
+        var totalGenres = GENRES_ANIME.length + GENRES_GAMES.length;
+        var totalPlatforms = PLATFORMS_ANIME.length + PLATFORMS_GAMES.length;
+        // compter les rappels coches
+        var remCount = 0;
+        if (reminderGrid) {
+          reminderGrid.querySelectorAll("input[type=checkbox]:checked").forEach(function(){ remCount++; });
+        }
+        var nG = selectedGenres.length, nP = selectedPlatforms.length;
+        // chiffres du header
+        var sg = document.getElementById("sumGenres"); if (sg) sg.textContent = String(nG);
+        var sp = document.getElementById("sumPlatforms"); if (sp) sp.textContent = String(nP);
+        var sr = document.getElementById("sumReminders"); if (sr) sr.textContent = String(remCount);
+        // anneaux du header
+        setRing(document.querySelector(".prefs-summary__ring--genres"), nG / totalGenres);
+        setRing(document.querySelector(".prefs-summary__ring--platforms"), nP / totalPlatforms);
+        setRing(document.querySelector(".prefs-summary__ring--reminders"), remCount / 2);
+        // anneaux des numeros de cartes
+        var cardG = document.querySelector(".prefs-card--genres .prefs-card__num"); setRing(cardG, nG / totalGenres);
+        var cardP = document.querySelector(".prefs-card--platforms .prefs-card__num"); setRing(cardP, nP / totalPlatforms);
+      }
       var REMINDERS = [
         { value: 7, label: "7 jours avant" },
         
@@ -253,22 +325,22 @@ import HeroHeader from "../../components/HeroHeader.astro";
       ];
 
       function chipDot(val, checked) {
-        return '<label class="prefs-chip2' + (checked ? ' active' : '') + '"><input type="checkbox" value="' + val.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' /><span class="prefs-chip2__dot"></span>' + val + '</label>';
+        return '<label class="prefs-chipC' + (checked ? ' active' : '') + '"><input type="checkbox" value="' + val.replace(/"/g, '&quot;') + '" ' + (checked ? 'checked' : '') + ' /><span class="prefs-chipC__dot"></span>' + val + '</label>';
       }
       function renderGroupedChips(container, animeList, gamesList, filter, selected) {
         var html = "";
         if (filter === "all" || filter === "anime") {
           if (filter === "all") html += '<div class="prefs-grp-sub">🎬 Anime</div>';
-          html += '<div class="prefs-chips2">' + animeList.map(function(g){ return chipDot(g, selected.indexOf(g) !== -1); }).join("") + '</div>';
+          html += '<div class="prefs-chipset">' + animeList.map(function(g){ return chipDot(g, selected.indexOf(g) !== -1); }).join("") + '</div>';
         }
         if (filter === "all" || filter === "game") {
           if (filter === "all") html += '<div class="prefs-grp-sub">🎮 Jeux</div>';
-          html += '<div class="prefs-chips2">' + gamesList.map(function(g){ return chipDot(g, selected.indexOf(g) !== -1); }).join("") + '</div>';
+          html += '<div class="prefs-chipset">' + gamesList.map(function(g){ return chipDot(g, selected.indexOf(g) !== -1); }).join("") + '</div>';
         }
         container.innerHTML = html;
         container.querySelectorAll("input[type=checkbox]").forEach(function(cb){
           cb.addEventListener("change", function(){
-            var label = cb.closest(".prefs-chip2");
+            var label = cb.closest(".prefs-chipC");
             if (cb.checked) {
               if (label) label.classList.add("active");
               if (selected.indexOf(cb.value) === -1) selected.push(cb.value);
@@ -277,6 +349,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
               var idx = selected.indexOf(cb.value);
               if (idx !== -1) selected.splice(idx, 1);
             }
+            updateSummary();
           });
         });
       }
@@ -287,24 +360,25 @@ import HeroHeader from "../../components/HeroHeader.astro";
         renderGroupedChips(platformsGrid, PLATFORMS_ANIME, PLATFORMS_GAMES, platformsContentFilter, selectedPlatforms);
       }
       function renderReminders(selected) {
-        reminderGrid.innerHTML = '<div class="prefs-chips2">' + REMINDERS.map(function(r){
+        reminderGrid.innerHTML = '<div class="prefs-chipset">' + REMINDERS.map(function(r){
           var checked = selected.indexOf(r.value) !== -1;
-          return '<label class="prefs-chip2' + (checked ? ' active' : '') + '"><input type="checkbox" value="' + r.value + '" ' + (checked ? 'checked' : '') + ' /><span class="prefs-chip2__dot"></span>' + r.label + '</label>';
+          return '<label class="prefs-chipC' + (checked ? ' active' : '') + '"><input type="checkbox" value="' + r.value + '" ' + (checked ? 'checked' : '') + ' /><span class="prefs-chipC__dot"></span>' + r.label + '</label>';
         }).join("") + '</div>';
         reminderGrid.querySelectorAll("input[type=checkbox]").forEach(function(cb){
           cb.addEventListener("change", function(){
-            var label = cb.closest(".prefs-chip2");
+            var label = cb.closest(".prefs-chipC");
             if (cb.checked) { if (label) label.classList.add("active"); }
             else { if (label) label.classList.remove("active"); }
+            updateSummary();
           });
         });
       }
       function wireContentPills(groupSelector, onChange) {
         var grp = document.querySelector(groupSelector);
         if (!grp) return;
-        grp.querySelectorAll(".prefs-pill").forEach(function(btn){
+        grp.querySelectorAll(".prefs-seg__btn").forEach(function(btn){
           btn.addEventListener("click", function(){
-            grp.querySelectorAll(".prefs-pill").forEach(function(b){ b.classList.remove("active"); });
+            grp.querySelectorAll(".prefs-seg__btn").forEach(function(b){ b.classList.remove("active"); });
             btn.classList.add("active");
             onChange(btn.getAttribute("data-val"));
           });
@@ -334,8 +408,9 @@ import HeroHeader from "../../components/HeroHeader.astro";
           renderGenres();
           renderPlatforms2();
           renderReminders(data.reminderDaysBefore || [7, 0]);
-          wireContentPills(".prefs-pills[data-for=genres]", function(v){ genresContentFilter = v; renderGenres(); });
-          wireContentPills(".prefs-pills[data-for=platforms]", function(v){ platformsContentFilter = v; renderPlatforms2(); });
+          updateSummary();
+          wireContentPills(".prefs-seg[data-for=genres]", function(v){ genresContentFilter = v; renderGenres(); });
+          wireContentPills(".prefs-seg[data-for=platforms]", function(v){ platformsContentFilter = v; renderPlatforms2(); });
         } catch (e) {
           if (loadingEl) loadingEl.textContent = "Erreur de chargement.";
         }
@@ -382,7 +457,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
   </script>
 </BaseLayout>
 
-<style>
+<style is:global>
   .prefs-channels { margin-bottom: 32px; }
   .prefs-channels-grid { display: flex; flex-direction: column; gap: 12px; }
   .prefs-channel-row { 
@@ -451,4 +526,324 @@ import HeroHeader from "../../components/HeroHeader.astro";
 .agenda-steps li { margin-bottom: 8px; padding-left: 18px; position: relative; }
 .agenda-steps li::before { content: "•"; position: absolute; left: 4px; color: #b85c5c; }
 .agenda-steps strong { color: #ffd4a8; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* DESIGN C — Cartes a identite forte (reproduit le look existant) */
+/* ═══════════════════════════════════════════════════════════ */
+.prefs-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 170, 100, 0.12);
+  border-radius: 16px;
+  padding: 18px 20px 20px 24px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.prefs-card::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--accent, #ff9c4c);
+}
+.prefs-card__head {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+}
+.prefs-card__num {
+  flex-shrink: 0;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800;
+  background: var(--accent-bg, rgba(255, 156, 76, 0.15));
+  color: var(--accent, #ff9c4c);
+  border: 1.5px solid var(--accent, #ff9c4c);
+}
+.prefs-card__titles { flex: 1; min-width: 0; }
+.prefs-card__title {
+  font-size: 1.1rem; font-weight: 700;
+  color: #ffe4cc; margin: 0; line-height: 1.2;
+}
+.prefs-card__sub {
+  font-size: 0.85rem; color: rgba(255, 226, 205, 0.55);
+  margin: 3px 0 0 0;
+}
+.prefs-card--genres    { --accent: #ff9c4c; --accent-bg: rgba(255, 156, 76, 0.15); }
+.prefs-card--platforms { --accent: #7aa7e0; --accent-bg: rgba(122, 167, 224, 0.15); --accent-dim: rgba(122, 167, 224, 0.25); --accent-faint: rgba(122, 167, 224, 0.3); }
+.prefs-card--notify    { --accent: #6fcf97; --accent-bg: rgba(111, 207, 151, 0.15); --accent-dim: rgba(111, 207, 151, 0.25); --accent-faint: rgba(111, 207, 151, 0.3); }
+.prefs-card--agenda    { --accent: #9a8a7a; --accent-bg: rgba(154, 138, 122, 0.15); }
+.prefs-card--agenda .prefs-card__title { color: #d4c0b0; }
+
+.prefs-seg { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.prefs-seg__btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid var(--accent-dim, rgba(255, 170, 100, 0.25));
+  color: #d4c0b0;
+  cursor: pointer;
+  transition: all 150ms;
+}
+.prefs-seg__btn:hover { border-color: var(--accent, #ff9c4c); }
+.prefs-seg__btn.active {
+  background: var(--accent-bg, rgba(255, 156, 76, 0.18));
+  border-color: var(--accent, #ff9c4c);
+  color: #ffe4cc;
+}
+
+.prefs-chipset { display: flex; gap: 8px; flex-wrap: wrap; }
+.prefs-grp-sub {
+  font-size: 0.82rem; color: rgba(255, 226, 205, 0.6); font-weight: 600;
+  margin: 12px 0 8px 0; width: 100%;
+}
+.prefs-grp-sub:first-child { margin-top: 0; }
+.prefs-chipC {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 15px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid var(--accent-dim, rgba(255, 170, 100, 0.22));
+  color: #d4c0b0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 150ms;
+  user-select: none;
+}
+.prefs-chipC input { display: none; }
+.prefs-chipC__dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent-faint, rgba(255, 170, 100, 0.3));
+  transition: all 150ms; flex-shrink: 0;
+}
+.prefs-chipC:hover { border-color: var(--accent, #ff9c4c); }
+.prefs-chipC.active {
+  background: var(--accent-bg, rgba(255, 156, 76, 0.18));
+  border-color: var(--accent, #ffb877);
+  color: #ffe4cc;
+}
+.prefs-chipC.active .prefs-chipC__dot {
+  background: var(--accent, #ff9c4c);
+  box-shadow: 0 0 8px var(--accent, #ff9c4c);
+}
+
+.prefs-channel-compact {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0;
+}
+.prefs-channel-compact:not(:last-of-type) {
+  border-bottom: 1px solid rgba(255, 170, 100, 0.1);
+}
+.prefs-channel-compact__label {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.95rem; color: #ffe4cc;
+}
+.prefs-channel-compact__label small {
+  display: block; color: rgba(255, 226, 205, 0.55); font-size: 0.8rem; margin-top: 2px;
+}
+.prefs-divider-label {
+  font-size: 0.82rem; color: rgba(255, 226, 205, 0.6); font-weight: 600;
+  margin: 16px 0 10px 0;
+}
+
+
+  /* ═══════════════════════════════════════════════════════════ */
+  /* W2 GLASS 3D — Cartes flottantes dans halos colores            */
+  /* ═══════════════════════════════════════════════════════════ */
+  .prefs-card {
+    background: linear-gradient(180deg, rgba(30,22,17,0.30) 0%, rgba(20,15,9,0.42) 100%) !important;
+    border: 1px solid var(--accent, #ff9c4c) !important;
+    border-radius: 20px !important;
+    box-shadow:
+      0 10px 44px -10px var(--halo, rgba(255,156,76,0.40)),
+      0 3px 14px rgba(0,0,0,0.45) !important;
+    margin-bottom: 22px !important;
+  }
+  /* reflet clair en haut de la carte */
+  .prefs-card::after {
+    content: "";
+    position: absolute;
+    left: 20px; right: 20px; top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+    pointer-events: none;
+  }
+  /* la barre laterale devient plus discrete (le halo prend le relais) */
+  .prefs-card::before {
+    width: 3px !important;
+    opacity: 0.7;
+    border-radius: 3px;
+  }
+  /* halos colores par carte */
+  .prefs-card--genres    { --halo: rgba(255,156,76,0.40); }
+  .prefs-card--platforms { --halo: rgba(122,167,224,0.40); }
+  .prefs-card--notify    { --halo: rgba(111,207,151,0.38); }
+  .prefs-card--agenda    { --halo: rgba(176,160,144,0.34); }
+
+
+  /* ── W2 : numeros en anneaux fins (au lieu de cercles pleins) ── */
+  .prefs-card__num {
+    position: relative;
+    width: 38px !important; height: 38px !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--accent, #ff9c4c) !important;
+    font-size: 14px !important;
+  }
+  /* l'anneau : conic-gradient (arc colore + reste sombre) */
+  .prefs-card__num::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--accent, #ff9c4c) calc(var(--ring, 0.25) * 360deg),
+      rgba(255,255,255,0.12) 0
+    );
+    -webkit-mask: radial-gradient(closest-side, transparent 68%, #000 70%);
+            mask: radial-gradient(closest-side, transparent 68%, #000 70%);
+  }
+  /* petit halo sur l'anneau */
+  .prefs-card__num::after {
+    content: "";
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    box-shadow: 0 0 8px -1px var(--accent, #ff9c4c);
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  /* le chiffre doit passer AU-DESSUS de l'anneau */
+  .prefs-card__num { z-index: 1; }
+  .prefs-card__num > * { position: relative; z-index: 2; }
+  /* valeurs de remplissage par carte (statique pour l'instant) */
+  .prefs-card--genres    .prefs-card__num { --ring: 0.14; }
+  .prefs-card--platforms .prefs-card__num { --ring: 0.33; }
+  .prefs-card--notify    .prefs-card__num { --ring: 1.0; }
+  .prefs-card--agenda    .prefs-card__num { --ring: 1.0; }
+
+
+  /* ── W2 : segment souligne (au lieu de boutons pleins) ── */
+  .prefs-seg {
+    gap: 4px !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding-bottom: 0 !important;
+    margin-bottom: 16px !important;
+  }
+  .prefs-seg__btn {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 8px 14px 10px !important;
+    color: #8a7e86 !important;
+    position: relative;
+    font-weight: 600;
+  }
+  .prefs-seg__btn:hover {
+    color: #c4b0b8 !important;
+    border: none !important;
+  }
+  .prefs-seg__btn.active {
+    background: transparent !important;
+    border: none !important;
+    color: var(--accent, #ff9c4c) !important;
+  }
+  /* le soulignement sous l'actif */
+  .prefs-seg__btn.active::after {
+    content: "";
+    position: absolute;
+    left: 14px; right: 14px; bottom: -1px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--accent, #ff9c4c);
+    box-shadow: 0 0 6px var(--accent, #ff9c4c);
+  }
+  /* ── W2 : chips un poil plus legeres ── */
+  .prefs-chipC {
+    padding: 7px 14px !important;
+    border-width: 1px !important;
+    background: rgba(255,255,255,0.04) !important;
+  }
+  .prefs-chipC.active {
+    background: var(--accent-bg) !important;
+    border-color: var(--accent) !important;
+  }
+
+
+  /* ── W2 : header "Mes alertes" avec 3 anneaux de synthese ── */
+  .prefs-summary {
+    background: linear-gradient(180deg, rgba(30,22,17,0.30) 0%, rgba(20,15,9,0.42) 100%);
+    border: 1px solid rgba(255,255,255,0.10);
+    border-radius: 20px;
+    padding: 16px 20px 18px;
+    margin: 18px 0 22px;
+    box-shadow: 0 8px 36px -12px rgba(120,120,180,0.30), 0 3px 12px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .prefs-summary::after {
+    content: "";
+    position: absolute; left: 20px; right: 20px; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.30), transparent);
+  }
+  .prefs-summary__label {
+    display: block; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #b0b0d0; margin-bottom: 14px;
+  }
+  .prefs-summary__rings {
+    display: flex; justify-content: space-around; gap: 8px;
+  }
+  /* chaque item = anneau (carre) + label en dessous, en colonne */
+  .prefs-summary__item {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 6px;
+  }
+  /* l'anneau : carre 46px, chiffre centre DEDANS par flexbox (garanti) */
+  .prefs-summary__ring {
+    position: relative;
+    width: 46px; height: 46px;
+    display: flex;
+    align-items: center; justify-content: center;
+    --ring: 0.3;
+  }
+  /* l'arc de progression (conic-gradient masque en anneau) */
+  .prefs-summary__ring::before {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(var(--c) calc(var(--ring) * 360deg), rgba(255,255,255,0.12) 0);
+    -webkit-mask: radial-gradient(closest-side, transparent 70%, #000 72%);
+            mask: radial-gradient(closest-side, transparent 70%, #000 72%);
+  }
+  /* halo autour de l'anneau */
+  .prefs-summary__ring::after {
+    content: "";
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    box-shadow: 0 0 10px -2px var(--c); opacity: 0.5;
+    pointer-events: none;
+  }
+  /* le chiffre : simplement centre par le flex du parent */
+  .prefs-summary__num {
+    position: relative; z-index: 2;
+    font-size: 16px; font-weight: 800; color: #fff;
+    line-height: 1;
+  }
+  .prefs-summary__cap {
+    font-size: 0.62rem; color: #9a9ab0;
+  }
+  .prefs-summary__ring--genres    { --c: #ff9c4c; --ring: 0.14; }
+  .prefs-summary__ring--platforms { --c: #7aa7e0; --ring: 0.33; }
+  .prefs-summary__ring--reminders { --c: #6fcf97; --ring: 1.0; }
+
+
+  /* ── W2 : fond identique a l'original mais legerement plus fonce (page prefs only) ── */
+  /* voile sombre par-dessus l'image de fond, uniquement sur cette page */
+  .prefs-page::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: rgba(5, 3, 2, 0.30);
+  }
+
 </style>

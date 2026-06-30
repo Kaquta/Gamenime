@@ -18,6 +18,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       <div id="authUserDropdown" class="auth-user-menu__dropdown">
         <button class="auth-user-menu__item" id="openFavDrawer" type="button">❤️ Mes favoris</button>
         <button class="auth-user-menu__item" id="openNotifPage" type="button">🔔 Notifications</button>
+        <a class="auth-user-menu__item" href="/account/preferences">⚡ Mes préférences</a>
         <button class="auth-user-menu__item" id="openAccountDrawer" type="button">⚙️ Compte</button>
         <a id="premiumMenuBtn" href="/premium" class="auth-user-menu__item auth-user-menu__premium" style="display:none">✨ Passer Premium</a>
         <button id="authLogoutBtn" class="auth-user-menu__item auth-user-menu__item--danger" type="button">🚪 Déconnexion</button>
@@ -178,7 +179,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div></div>'+
 
       '<button class="account-option" data-toggle="notifOptForm" type="button">🔔 Options notifications</button>'+
-      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label><a href="/account/preferences" class="account-prefs-link">⚡ Mes préférences →</a></div>'+
+      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label></div>'+
 
       (u.isPremium?'<a href="/account" class="account-option account-option--premium">🤚 Gérer mon abonnement</a>':'')+'<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
 

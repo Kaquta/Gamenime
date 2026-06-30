@@ -746,9 +746,9 @@ app.post("/premium/generate-reminders", async (req, reply) => {
             [row.user_id, itemType, row.item_id, offset, targetStr]
           );
 
-          // FREE LAUNCH : email pour tous ceux qui l'ont active + verifie
-          // Email envoye UNIQUEMENT le Jour J (offset 0) pour ne pas spammer. In-app reste sur J-7 et J-0.
-          const reminderEmailEligible = !!(offset === 0 && Number(row.user_email_enabled) === 1 && Number(row.user_email_verified) === 1);
+          // Email envoye pour J-7 ET Jour J (offset 7 et 0) a ceux qui l'ont active + verifie.
+          // L'utilisateur controle via ses preferences quels rappels il veut (7j, jour J, ou les deux).
+          const reminderEmailEligible = !!(Number(row.user_email_enabled) === 1 && Number(row.user_email_verified) === 1);
           if (reminderEmailEligible) {
             void (async () => {
               try {
