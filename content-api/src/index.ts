@@ -2177,7 +2177,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         const insertPh = itemType === "game" ? "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)" : "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
         const insertVals: any[] = [
           b.title, b.titleEnglish, normalizedStrictIncoming, b.anilistId, b.malId, b.animeScheduleRoute, ...(itemType === "game" ? [(b as any).rawgId ?? null, (b as any).igdbId ?? null] : []), b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
-          b.releasePrecision || "day",
+          b.releasePrecision || null,
           b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.ratingScore, b.popularity, b.screenshots
         ];
         if (itemType === "game") insertVals.push((b as any).dlcs ?? null);
@@ -2204,9 +2204,9 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
                rawg_id = IF(? IS NOT NULL, ?, rawg_id),
                igdb_id = IF(? IS NOT NULL, ?, igdb_id),` : ""}
                anime_schedule_route = IF(? IS NOT NULL AND ? != '', ?, anime_schedule_route),
-               release_date = IF(? IS NOT NULL, ?, release_date),
-               release_datetime = IF(? IS NOT NULL, ?, release_datetime),
-               release_precision = ?,
+               release_date = release_date,
+               release_datetime = release_datetime,
+               release_precision = release_precision,
                is_recently_released = ?,
                trailer_url = IF(? IS NOT NULL AND ? != '', ?, trailer_url),
                description = IF(description IS NULL OR description = '', ?, description),
@@ -2229,9 +2229,6 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
                 (b as any).igdbId ?? null, (b as any).igdbId ?? null,
               ] : []),
               b.animeScheduleRoute, b.animeScheduleRoute, b.animeScheduleRoute,
-              b.releaseDate, b.releaseDate,
-              b.releaseDatetime, b.releaseDatetime,
-              b.releasePrecision || "day",
               b.isRecentlyReleased ? 1 : 0,
               b.trailerUrl, b.trailerUrl, b.trailerUrl,
               b.description,
@@ -2261,9 +2258,9 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
                rawg_id=IF(VALUES(rawg_id) IS NOT NULL, VALUES(rawg_id), rawg_id),
                igdb_id=IF(VALUES(igdb_id) IS NOT NULL, VALUES(igdb_id), igdb_id),` : ""}
                anime_schedule_route=IF(VALUES(anime_schedule_route) IS NOT NULL AND VALUES(anime_schedule_route) != '', VALUES(anime_schedule_route), anime_schedule_route),
-               release_date=IF(VALUES(release_date) IS NOT NULL, VALUES(release_date), release_date),
-               release_datetime=IF(VALUES(release_datetime) IS NOT NULL, VALUES(release_datetime), release_datetime),
-               release_precision=VALUES(release_precision),
+               release_date=release_date,
+               release_datetime=release_datetime,
+               release_precision=release_precision,
                is_recently_released=VALUES(is_recently_released),
                trailer_url=IF(VALUES(trailer_url) IS NOT NULL AND VALUES(trailer_url) != '', VALUES(trailer_url), trailer_url),
                description=IF(description IS NULL OR description = '', VALUES(description), description),

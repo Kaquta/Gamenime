@@ -28,12 +28,14 @@ interface SourceData {
   trailerUrl?: string | null;
   description: string | null;
   format?: string | null;
+  releaseDate?: string | null;        // "YYYY-MM-DD" (jour=01 si precision month/year)
+  releasePrecision?: "day" | "month" | "year" | null;  // precision reelle selon la source
 }
 
 export async function fetchAniList(anilistId: number): Promise<SourceData | null> {
   if (!anilistId) return null;
 
-  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { format description coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
+  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
 
   try {
     const res = await fetch("https://graphql.anilist.co", {
@@ -71,7 +73,24 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
 
     const description = stripDescriptionTags(media.description);
     const format = media.format ?? null;
-    return { cover, platform, trailerUrl, description, format };
+    // Deduire date + precision reelle depuis startDate AniList (day=null => precision month, month=null => year)
+    let releaseDate: string | null = null;
+    let releasePrecision: "day" | "month" | "year" | null = null;
+    const sd = media.startDate;
+    if (sd && sd.year) {
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      if (sd.month && sd.day) {
+        releaseDate = sd.year + "-" + pad2(sd.month) + "-" + pad2(sd.day);
+        releasePrecision = "day";
+      } else if (sd.month) {
+        releaseDate = sd.year + "-" + pad2(sd.month) + "-01";
+        releasePrecision = "month";
+      } else {
+        releaseDate = sd.year + "-01-01";
+        releasePrecision = "year";
+      }
+    }
+    return { cover, platform, trailerUrl, description, format, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -103,7 +122,29 @@ export async function fetchJikan(malId: number): Promise<SourceData | null> {
     }
 
     const description = stripDescriptionTags(data.synopsis);
-    return { cover, platform, trailerUrl, description };
+    // Jikan : ATTENTION prop.from invente day:1/month:1 quand il ne connait que l'annee/mois.
+    // La VRAIE precision est dans aired.string : "2027"=year, "Jul 2026"=month, "Jul 2, 2026"=day.
+    let releaseDate: string | null = null;
+    let releasePrecision: "day" | "month" | "year" | null = null;
+    const from = data.aired?.prop?.from;
+    const airedStr = String(data.aired?.string || "");
+    if (from && from.year) {
+      const pad2 = (n: number) => String(n).padStart(2, "0");
+      // "Jul 2, 2026" (mois jour, annee) => day precis
+      if (/^[A-Za-z]{3,}\s+\d{1,2},\s+\d{4}/.test(airedStr)) {
+        releaseDate = from.year + "-" + pad2(from.month) + "-" + pad2(from.day);
+        releasePrecision = "day";
+      // "Jul 2026" (mois annee, sans jour) => month
+      } else if (/^[A-Za-z]{3,}\s+\d{4}/.test(airedStr)) {
+        releaseDate = from.year + "-" + pad2(from.month) + "-01";
+        releasePrecision = "month";
+      // "2027" ou autre (annee seule) => year
+      } else {
+        releaseDate = from.year + "-01-01";
+        releasePrecision = "year";
+      }
+    }
+    return { cover, platform, trailerUrl, description, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -133,7 +174,19 @@ export async function fetchAnimeSchedule(route: string, apiToken: string): Promi
     const platform = platforms.length > 0 ? platforms.join(", ") : null;
 
     const description = stripDescriptionTags(data.description);
-    return { cover, platform, trailerUrl: null, description };
+    // AnimeSchedule : champ 'premier' = vraie date de sortie (jour). Les autres
+    // (subPremier, jpnTime, subTime...) sont des sentinels 0001-01-01 => ignores.
+    let releaseDate: string | null = null;
+    let releasePrecision: "day" | "month" | "year" | null = null;
+    const premier = data.premier;
+    if (typeof premier === "string" && !premier.startsWith("0001-01-01")) {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(premier);
+      if (m) {
+        releaseDate = m[1] + "-" + m[2] + "-" + m[3];
+        releasePrecision = "day";  // premier donne toujours le jour
+      }
+    }
+    return { cover, platform, trailerUrl: null, description, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -183,12 +236,27 @@ export function mergeSources(
   animeSchedule: SourceData | null
 ): SourceData {
   const sources = [aniList, jikan, animeSchedule].filter(s => s !== null) as SourceData[];
+  // Date : preferer la source avec la MEILLEURE precision (day > month > year).
+  // AniList prioritaire a precision egale (ordre du tableau : aniList d'abord).
+  const precRank: Record<string, number> = { day: 3, month: 2, year: 1 };
+  let bestDate: string | null = null;
+  let bestPrecision: "day" | "month" | "year" | null = null;
+  for (const s of sources) {
+    if (s.releaseDate && s.releasePrecision) {
+      if (bestPrecision === null || precRank[s.releasePrecision] > precRank[bestPrecision]) {
+        bestDate = s.releaseDate;
+        bestPrecision = s.releasePrecision;
+      }
+    }
+  }
   return {
     cover: sources.find(s => s.cover)?.cover ?? null,
     platform: sources.find(s => s.platform)?.platform ?? null,
     trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
     description: sources.find(s => s.description)?.description ?? null,
     format: sources.find(s => s.format)?.format ?? null,
+    releaseDate: bestDate,
+    releasePrecision: bestPrecision,
   };
 }
 
@@ -213,7 +281,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
   try {
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format FROM anime_items WHERE (platform IS NULL OR platform = '' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -275,6 +343,23 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           itemChanges.push({ field: "format", oldValue: item.format, newValue: merged.format });
         }
 
+        // DATE : objectif = converger vers precision 'day'. Ne JAMAIS regresser.
+        // Update si precision MEILLEURE (day>month>year) ou date differente a precision egale.
+        // Etat Clean : la SOURCE fait autorite. Adopte sa date des qu'elle differe
+        // (precision OU jour), dans les 2 sens. Corrige les faux 'day' (ex: 2027-01-01
+        // day -> year quand la source ne connait que l'annee).
+        if (merged.releaseDate && merged.releasePrecision) {
+          const dateChanged = merged.releaseDate !== (item as any).release_date;
+          const precChanged = merged.releasePrecision !== (item as any).release_precision;
+          if (dateChanged || precChanged) {
+            updates.push("release_date = ?");
+            params.push(merged.releaseDate);
+            updates.push("release_precision = ?");
+            params.push(merged.releasePrecision);
+            itemChanges.push({ field: "release_date", oldValue: (item as any).release_date + " (" + ((item as any).release_precision || "?") + ")", newValue: merged.releaseDate + " (" + merged.releasePrecision + ")" });
+          }
+        }
+
         if (updates.length > 0) {
           params.push(item.id);
           await conn.query(
@@ -327,7 +412,7 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
   const conn = await pool.getConnection();
   try {
     const rows: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format FROM anime_items WHERE id = ? LIMIT 1",
+      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE id = ? LIMIT 1",
       [id]
     );
     if (!rows || rows.length === 0) {
@@ -366,6 +451,17 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
     const formatIsMissing = !item.format || item.format === "";
     if (formatIsMissing && merged.format) {
       updates.push("format = ?"); params.push(merged.format); fields.push("format");
+    }
+    // DATE : objectif = converger vers precision 'day'. Ne JAMAIS regresser.
+    // Etat Clean : la SOURCE fait autorite. Adopte sa date des qu'elle differe (2 sens).
+    if (merged.releaseDate && merged.releasePrecision) {
+      const dateChanged = merged.releaseDate !== (item as any).release_date;
+      const precChanged = merged.releasePrecision !== (item as any).release_precision;
+      if (dateChanged || precChanged) {
+        updates.push("release_date = ?"); params.push(merged.releaseDate);
+        updates.push("release_precision = ?"); params.push(merged.releasePrecision);
+        fields.push("date:" + merged.releaseDate + "(" + merged.releasePrecision + ")");
+      }
     }
     if (updates.length > 0) {
       params.push(item.id);

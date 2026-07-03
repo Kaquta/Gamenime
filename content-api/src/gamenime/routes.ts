@@ -22,6 +22,8 @@ import { z } from "zod";
 import {
   CAPACITY_ANIME,
   CAPACITY_GAMES,
+  CAPACITY_UPCOMING_ANIME,
+  CAPACITY_UPCOMING_GAMES,
   CAPACITY_HOME,
   SEARCH_LIMIT_PER_TYPE,
   MAX_DB_FETCH,
@@ -116,10 +118,11 @@ function filterByStatus(
   if (status === "released") {
     return items.filter((i) => {
       if (!i.releaseDate) return false;
-      // ETAT CLEAN: items with year-only precision are NEVER in released.
-      // Even if their stored date (YYYY-01-01) is past, we don't really
-      // know when they came out. Keep them in upcoming until precise.
-      if (i.releasePrecision === "year") return false;
+      // ETAT CLEAN: seule une date PRECISE (precision 'day') peut etre "sortie".
+      // year/month/null = on ne connait pas le JOUR exact (le 1er du mois stocke
+      // est une convention, pas une vraie date). Ces items restent en upcoming
+      // jusqu'a ce qu'une source fournisse le jour precis (precision 'day').
+      if (i.releasePrecision !== "day") return false;
       const inWindow = i.releaseDate <= todayISO && i.releaseDate >= windowStart;
       if (!inWindow && i.releaseDate < windowStart) {
         // Older game/anime with a DLC released in the current window
@@ -132,9 +135,11 @@ function filterByStatus(
   if (status === "upcoming") {
     return items.filter((i) => {
       if (!i.releaseDate) return false;
-      // ETAT CLEAN: items with year-only precision belong here regardless
-      // of stored date — we just know it's "Prévu YYYY" within the window.
-      if (i.releasePrecision === "year") {
+      // ETAT CLEAN: precision imprecise (year/month/null) = TOUJOURS a venir dans
+      // la fenetre, peu importe la date stockee (le 1er du mois/annee est une
+      // convention). On ne connait pas le jour exact => "Prevu [mois/annee]".
+      // Symetrique de released qui n'accepte QUE precision 'day'.
+      if (i.releasePrecision !== "day") {
         return i.releaseDate >= windowStart && i.releaseDate <= windowEnd;
       }
       const inWindow = i.releaseDate > todayISO && i.releaseDate <= windowEnd;
@@ -561,9 +566,12 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   // ─────────────────────────────────────────────────
   app.get("/feed/anime", async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = feedQuerySchema.safeParse(req.query);
-    const requested = parsed.success ? parsed.data.limit ?? CAPACITY_ANIME : CAPACITY_ANIME;
-    const limit = Math.min(requested, CAPACITY_ANIME);
     const status: ReleaseStatus = parsed.success ? parsed.data.status : "all";
+    // Plafond selon le contexte : "a venir" = 300 (CAPACITY_UPCOMING_ANIME),
+    // le reste (Top) = 150 (CAPACITY_ANIME). Le Top reste intouche.
+    const cap = status === "upcoming" ? CAPACITY_UPCOMING_ANIME : CAPACITY_ANIME;
+    const requested = parsed.success ? parsed.data.limit ?? cap : cap;
+    const limit = Math.min(requested, cap);
     const orderBy: "score" | "date" = parsed.success ? parsed.data.orderBy : "score";
 
     const now = new Date();
@@ -592,8 +600,10 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   // ─────────────────────────────────────────────────
   app.get("/feed/games", async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = feedQuerySchema.safeParse(req.query);
-    const requested = parsed.success ? parsed.data.limit ?? CAPACITY_GAMES : CAPACITY_GAMES;
-    const limit = Math.min(requested, CAPACITY_GAMES);
+    const statusG: ReleaseStatus = parsed.success ? parsed.data.status : "all";
+    const capG = statusG === "upcoming" ? CAPACITY_UPCOMING_GAMES : CAPACITY_GAMES;
+    const requested = parsed.success ? parsed.data.limit ?? capG : capG;
+    const limit = Math.min(requested, capG);
     const status: ReleaseStatus = parsed.success ? parsed.data.status : "all";
     const orderBy: "score" | "date" = parsed.success ? parsed.data.orderBy : "score";
 

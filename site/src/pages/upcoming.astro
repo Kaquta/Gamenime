@@ -5,11 +5,109 @@ import FilterBar from "../components/FilterBar.astro";
 import SectionBlock from "../components/SectionBlock.astro";
 import Footer from "../components/Footer.astro";
 ---
-
 <BaseLayout title="GameNime — À venir">
   <HeroHeader activeTab="upcoming" />
   <FilterBar domain="both" />
+
+  <!-- Onglets Style A (Segment pill) : bascule Anime | Jeux -->
+  <div class="upcoming-tabs container">
+    <div class="up-segment">
+      <button class="up-tab active" data-target="anime-upcoming" type="button">
+        <span class="up-tab-emoji">🎬</span> Animes
+      </button>
+      <button class="up-tab" data-target="games-upcoming" type="button">
+        <span class="up-tab-emoji">🎮</span> Jeux
+      </button>
+    </div>
+  </div>
+
   <SectionBlock title="Animés à venir" source="anime-upcoming" />
   <SectionBlock title="Jeux vidéo à venir" source="games-upcoming" />
   <Footer />
 </BaseLayout>
+
+<style>
+  .upcoming-tabs {
+    margin: 8px auto 4px;
+  }
+  .up-segment {
+    display: flex;
+    gap: 0;
+    background: rgba(35, 26, 20, 0.85);
+    border: 1px solid rgba(90, 68, 52, 0.5);
+    border-radius: 22px;
+    padding: 4px;
+    max-width: 380px;
+    margin: 0 auto;
+  }
+  .up-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 18px;
+    background: transparent;
+    color: #a89a90;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-family: inherit;
+  }
+  .up-tab-emoji {
+    font-size: 1.05rem;
+  }
+  .up-tab.active {
+    background: linear-gradient(135deg, #ffb877 0%, #ff9c4c 100%);
+    color: #1a0d08;
+    box-shadow: 0 2px 8px rgba(255, 156, 76, 0.35);
+  }
+  .up-tab:not(.active):hover {
+    color: #fff6ee;
+  }
+
+  /* Par défaut : section jeux masquée (Anime actif au chargement).
+     :global() OBLIGATOIRE car .section-block est rendu par le composant
+     SectionBlock (le scope Astro isolerait sinon ce style). */
+  :global(.section-block[data-source="games-upcoming"]) {
+    display: none;
+  }
+  :global(.section-block[data-source="games-upcoming"].up-visible) {
+    display: block;
+  }
+  :global(.section-block[data-source="anime-upcoming"].up-hidden) {
+    display: none;
+  }
+</style>
+
+<script>
+  (function () {
+    const tabs = document.querySelectorAll(".up-tab");
+    // querySelectorAll : il peut y avoir plusieurs sections (desktop + mobile responsive)
+    const animeSections = document.querySelectorAll('.section-block[data-source="anime-upcoming"]');
+    const gamesSections = document.querySelectorAll('.section-block[data-source="games-upcoming"]');
+
+    function activate(target) {
+      tabs.forEach((t) => {
+        t.classList.toggle("active", t.getAttribute("data-target") === target);
+      });
+      if (target === "anime-upcoming") {
+        animeSections.forEach((s) => s.classList.remove("up-hidden"));
+        gamesSections.forEach((s) => s.classList.remove("up-visible"));
+      } else {
+        animeSections.forEach((s) => s.classList.add("up-hidden"));
+        gamesSections.forEach((s) => s.classList.add("up-visible"));
+      }
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const target = tab.getAttribute("data-target");
+        if (target) activate(target);
+      });
+    });
+  })();
+</script>

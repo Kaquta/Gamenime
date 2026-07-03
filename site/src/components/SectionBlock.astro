@@ -437,9 +437,9 @@ async function loadSection(section) {
     } else if (source === "games") {
       items = await getFeedGames({ status: "released", limit: 100, orderBy: "date" }); domain = "games";
     } else if (source === "anime-upcoming") {
-      items = await getFeedAnime({ status: "upcoming", limit: 100, orderBy: "date" }); domain = "anime";
+      items = await getFeedAnime({ status: "upcoming", limit: 300, orderBy: "date" }); domain = "anime";
     } else if (source === "games-upcoming") {
-      items = await getFeedGames({ status: "upcoming", limit: 100, orderBy: "date" }); domain = "games";
+      items = await getFeedGames({ status: "upcoming", limit: 300, orderBy: "date" }); domain = "games";
     } else if (source === "top-anime") {
       items = await getFeedAnime({ status: "released", limit: 25 }); domain = "anime"; isTop = true;
     } else if (source === "top-games") {
@@ -493,8 +493,8 @@ document.addEventListener("applyFilters", async function(e) {
       // Utilise /feed/* (fenetre glissante 2 ans + applyFeedFilters) comme le chargement normal
       if (source === "anime") { items = await getFeedAnime(Object.assign({ status: "released", limit: 100, orderBy: "date" }, fo)); domain = "anime"; }
       else if (source === "games") { items = await getFeedGames(Object.assign({ status: "released", limit: 100, orderBy: "date" }, fo)); domain = "games"; }
-      else if (source === "anime-upcoming") { items = await getFeedAnime(Object.assign({ status: "upcoming", limit: 100, orderBy: "date" }, fo)); domain = "anime"; }
-      else if (source === "games-upcoming") { items = await getFeedGames(Object.assign({ status: "upcoming", limit: 100, orderBy: "date" }, fo)); domain = "games"; }
+      else if (source === "anime-upcoming") { items = await getFeedAnime(Object.assign({ status: "upcoming", limit: 300, orderBy: "date" }, fo)); domain = "anime"; }
+      else if (source === "games-upcoming") { items = await getFeedGames(Object.assign({ status: "upcoming", limit: 300, orderBy: "date" }, fo)); domain = "games"; }
       else { continue; }
       row.innerHTML = items.length
         ? items.map(function(it) { return renderCard(it, domain); }).join("")

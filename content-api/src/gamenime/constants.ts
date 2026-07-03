@@ -27,10 +27,10 @@ export const CAPACITY_ANIME = 150;
 export const CAPACITY_GAMES = 150;
 
 /** Max number of upcoming anime displayed in /feed/anime?status=upcoming. */
-export const CAPACITY_UPCOMING_ANIME = 150;
+export const CAPACITY_UPCOMING_ANIME = 300;
 
 /** Max number of upcoming games displayed in /feed/games?status=upcoming. */
-export const CAPACITY_UPCOMING_GAMES = 150;
+export const CAPACITY_UPCOMING_GAMES = 300;
 
 /** Top par catégorie sur la homepage (Top 25 Animés / Top 25 Jeux Vidéo). */
 export const CAPACITY_HOME_TOP = 25;

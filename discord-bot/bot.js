@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 import cron from "node-cron";
 import dotenv from "dotenv";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { QUESTIONS_ANIME, QUESTIONS_JEUX } from "./poll-questions.js";
 dotenv.config({ path: "/opt/stack/.env" });
 dotenv.config();
 
@@ -73,20 +74,6 @@ async function postSorties() {
   }
 }
 
-const QUESTIONS_ANIME = [
-  "Quel anime vous hype le plus ? 🔥",
-  "Votre coup de cœur anime du moment ? ❤️",
-  "Lequel allez-vous regarder en priorité ? 👀",
-  "Le plus attendu selon vous ? 🎌",
-  "Sur lequel vous misez cette saison ? ⭐",
-];
-const QUESTIONS_JEUX = [
-  "Quel jeu vous hype le plus ? 🔥",
-  "Votre coup de cœur jeu du moment ? ❤️",
-  "Lequel allez-vous jouer en priorité ? 🎮",
-  "Le plus attendu selon vous ? 🕹️",
-  "Sur lequel vous misez ? ⭐",
-];
 
 function ensureDataDir() {
   if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
@@ -138,16 +125,27 @@ async function pickOptions(type) {
 
 async function postOnePoll(type, channelId, questions) {
   try {
-    const options = await pickOptions(type);
+    // Tirage aleatoire d'une question (mix : "sorties" dynamiques OU "thematique" fixe)
+    const q = questions[Math.floor(Math.random() * questions.length)];
+    const questionText = typeof q === "string" ? q : q.text;
+
+    // Options : si la question a des options fixes (thematique) -> les utiliser.
+    // Sinon (useReleases ou string simple) -> options dynamiques des sorties du site.
+    let options;
+    if (typeof q === "object" && Array.isArray(q.options) && q.options.length >= 2) {
+      options = q.options;
+    } else {
+      options = await pickOptions(type);
+    }
+
     if (options.length < 2) {
       console.log(`⚠️ Sondage ${type} annulé : pas assez d'options`);
       return;
     }
-    const question = questions[Math.floor(Math.random() * questions.length)];
     const channel = await client.channels.fetch(channelId);
     const msg = await channel.send({
       poll: {
-        question: { text: question },
+        question: { text: questionText },
         answers: options.map((o) => ({ text: o })),
         duration: 24,
         allowMultiselect: false,
@@ -162,7 +160,7 @@ async function postOnePoll(type, channelId, questions) {
       deleteAt: null,
     });
     savePolls(polls);
-    console.log(`✅ Sondage ${type} posté : "${question}"`);
+    console.log(`✅ Sondage ${type} posté : "${questionText}"`);
   } catch (err) {
     console.error(`❌ Erreur postOnePoll(${type}):`, err.message);
   }
