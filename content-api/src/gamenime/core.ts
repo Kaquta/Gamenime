@@ -750,27 +750,31 @@ export function sortByDate(
       if (a.releaseDate && !b.releaseDate) return -1;
       if (!a.releaseDate && !b.releaseDate) return a.id - b.id;
 
-      // 1b. SESSION 18 : pour ascending (upcoming), priorité par précision de date.
-      // Les dates FIXES (day) en tête : un item avec compte à rebours (sortie confirmée
-      // et imminente) prime sur une date approximative (month) ou vague (year).
-      // Ordre : day (0) < month (1) < year (2). Les "01-01"/"01" fictifs ne masquent plus les vraies dates.
+      // Tri A VENIR (ascending) a DEUX NIVEAUX (regle GameNime) :
+      //   Niveau 1 : l'ANNEE (annee courante avant annee suivante).
+      //   Niveau 2 : dans chaque annee, par PRECISION day -> month -> year.
+      // Tous les comptes a rebours (day) de 2026 en tete, puis les "Prevu <mois>
+      // 2026" (month), puis "Prevu 2026" (year), PUIS pareil pour 2027.
+      // Un day de 2027 ne passe PAS avant un month de 2026 (l'annee prime).
       if (ascending) {
+        const yearA = a.releaseDate!.slice(0, 4);
+        const yearB = b.releaseDate!.slice(0, 4);
+        if (yearA !== yearB) return yearA < yearB ? -1 : 1;
         const precRank = (p: string | null | undefined): number =>
           p === "day" ? 0 : p === "month" ? 1 : 2;
-        const aPrec = precRank(a.releasePrecision);
-        const bPrec = precRank(b.releasePrecision);
-        if (aPrec !== bPrec) return aPrec - bPrec;
+        const pa = precRank(a.releasePrecision);
+        const pb = precRank(b.releasePrecision);
+        if (pa !== pb) return pa - pb;
+        if (a.releaseDate !== b.releaseDate) return a.releaseDate! < b.releaseDate! ? -1 : 1;
+        const popDiffAsc = Number(b.popularity || 0) - Number(a.popularity || 0);
+        if (popDiffAsc !== 0) return popDiffAsc;
+        return a.id - b.id;
       }
 
-      // 2. By date - direction depends on ascending param
+      // Tri DERNIERS SORTIS (descending) : plus recent d'abord
       if (a.releaseDate !== b.releaseDate) {
-        if (ascending) {
-          return a.releaseDate! < b.releaseDate! ? -1 : 1;
-        }
         return a.releaseDate! < b.releaseDate! ? 1 : -1;
       }
-
-      // 3. Tie-break: popularity, then id (stable)
       const popDiff = Number(b.popularity || 0) - Number(a.popularity || 0);
       if (popDiff !== 0) return popDiff;
       return a.id - b.id;

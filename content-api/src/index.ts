@@ -13,6 +13,7 @@ import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatf
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb } from "./gamenime/refetch-games-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
+import { expandSearchTerm } from "./gamenime/search-aliases.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
 import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setStatsPool } from "./gamenime/dashboard.js";
 
@@ -1892,7 +1893,13 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       }
       if (platConds.length) conditions.push("(" + platConds.join(" OR ") + ")");
     }
-    if (q.search) { conditions.push("title LIKE ?"); params.push(`%${q.search}%`); }
+    if (q.search) {
+      // Recherche avec surnoms : "gta" trouve aussi "grand theft auto", "jjk" -> "jujutsu kaisen".
+      const searchTerms = expandSearchTerm(String(q.search));
+      const likeConds = searchTerms.map(() => "title LIKE ?").join(" OR ");
+      conditions.push(`(${likeConds})`);
+      for (const term of searchTerms) params.push(`%${term}%`);
+    }
 
     const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
 
@@ -2150,6 +2157,17 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           ]
         );
         const before = beforeRows.length ? beforeRows[0] : null;
+
+        // FIX RACINE anti-doublons : AnimeSchedule ENRICHIT les items existants
+        // (dates), il ne CREE PAS de nouveaux animes. Un item sans anilist_id ET
+        // sans mal_id qui n'a trouve AUCUN match est un orphelin (titre legerement
+        // different d'un vrai, echappant a la dedup titre+date). REJET : pas d'INSERT.
+        // Empeche les doublons type Saijo (crees le 4 juillet). Un vrai anime a
+        // TOUJOURS un anilist_id ou mal_id (il existe sur AniList/MAL).
+        if (!before && !b.anilistId && !b.malId) {
+          app.log.warn({ title: b.title }, "Orphelin sans ID rejete (AnimeSchedule enrichit, ne cree pas)");
+          continue;
+        }
 
         // ETAT CLEAN: when updating an existing item, GameNime API merges
         // platform lists (never loses a valid platform). For new inserts,
