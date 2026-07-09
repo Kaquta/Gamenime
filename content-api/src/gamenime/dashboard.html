@@ -100,6 +100,7 @@
   .hist-fab {
     position: fixed; bottom: 24px; right: 24px;
     width: 56px; height: 56px; border-radius: 50%;
+    display: none;
     background: linear-gradient(135deg, #16161c, #0f0f14);
     border: 1px solid #d9a978; color: #d9a978;
     display: flex; align-items: center; justify-content: center;
@@ -699,11 +700,16 @@
       document.getElementById("page-surveillance").className = "page";
       document.getElementById("page-traffic").className = "page active";
       document.getElementById("toggle-label").textContent = "Surveillance";
+      var hf = document.getElementById("histFab");
+      if (hf) hf.style.display = "flex";
     } else {
       currentView = "surveillance";
       document.getElementById("page-traffic").className = "page";
       document.getElementById("page-surveillance").className = "page active";
       document.getElementById("toggle-label").textContent = "Trafic";
+      var hf2 = document.getElementById("histFab");
+      if (hf2) hf2.style.display = "none";
+      closeHist();
     }
   }
 
@@ -1234,6 +1240,7 @@
     if (histState.period === p) return;
     histState.period = p;
     histState.index = 0;
+    histState.available = [];
     document.getElementById("hist-tab-month").classList.toggle("active", p === "month");
     document.getElementById("hist-tab-year").classList.toggle("active", p === "year");
     loadHistory();
@@ -1707,7 +1714,7 @@
   connect();
 </script>
 <div class="hist-overlay" id="histOverlay" onclick="closeHist()"></div>
-<button class="hist-fab" onclick="openHist()" aria-label="Historique" title="Historique">
+<button class="hist-fab" id="histFab" onclick="openHist()" aria-label="Historique" title="Historique">
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
 </button>
 <div class="hist-drawer" id="histDrawer">
