@@ -423,7 +423,7 @@ export function startDashboard(app: FastifyInstance, pool: any) {
 
   // Historique des stats par periode (LECTURE SEULE - que des SELECT).
   // Fenetre 2 ans glissante (24 derniers mois). Ne modifie jamais daily_stats.
-  app.get("/admin/dashboard/history", async (req: any, reply) => {
+  app.get("/admin/history", async (req: any, reply) => {
     const period = req.query?.period === "year" ? "year" : "month";
     const value = String(req.query?.value || "");
     if (!STATS_POOL) return { total: 0, uniques: 0, sources: [], available: [] };

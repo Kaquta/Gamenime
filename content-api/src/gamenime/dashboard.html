@@ -1254,7 +1254,7 @@
   async function loadHistory() {
     var val = histState.available[histState.index] || "";
     try {
-      var url = "/admin/dashboard/history?period=" + histState.period + (val ? "&value=" + encodeURIComponent(val) : "");
+      var url = "/dashboard/admin/history?period=" + histState.period + (val ? "&value=" + encodeURIComponent(val) : "");
       var res = await fetch(url);
       var d = await res.json();
       histState.available = d.available || [];
