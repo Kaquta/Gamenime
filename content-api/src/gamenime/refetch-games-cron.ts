@@ -117,7 +117,7 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "text/plain",
       },
-      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, category; where id = ${igdbId};`,
+      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type; where id = ${igdbId};`,
     });
     if (!res.ok) return null;
     const data = await res.json() as any;
@@ -137,9 +137,13 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
 
     // IGDB rating : 0-100, on garde tel quel
     const ratingScore = game.total_rating ? Math.round(Number(game.total_rating)) : null;
-    // IGDB category : 1=DLC, 2=expansion, 4=standalone expansion -> tous "DLC"
-    const cat = game.category;
-    const gameType = (cat === 1 || cat === 2 || cat === 4) ? "DLC" : null;
+    // IGDB game_type (nouveau champ, remplace category deprecie).
+    // Taggue "DLC" (choix Rey) : 1=DLC, 2=Expansion, 4=Standalone Expansion,
+    // 6=Episode, 7=Season, 13=Pack/Addon (couvre Character/Map/Skin Pack,
+    // Story Expansion), 14=Update. Restent jeux de base (null) :
+    // 0=Main, 3=Bundle, 5=Mod, 8=Remake, 9=Remaster, 10=Expanded, 11=Port, 12=Fork.
+    const gt = game.game_type;
+    const gameType = [1, 2, 4, 6, 7, 13, 14].includes(gt) ? "DLC" : null;
     return {
       cover,
       platform: platforms,

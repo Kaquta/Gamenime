@@ -1683,6 +1683,40 @@ async function createNotificationsForItemChange(
 
 
 // ── Phase B refetch endpoint ──
+// Endpoint : re-tague les DLC via IGDB (category 1/2/4 -> "DLC").
+// Se fie a la vraie category IGDB, JAMAIS au titre (evite faux positifs
+// type "Seven Deadly Sins: Origin" qui est un jeu de base, pas un DLC).
+app.post("/admin/retag-dlc", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const rows: any = await pool.query(
+    "SELECT id, title, igdb_id FROM game_items WHERE igdb_id IS NOT NULL AND game_type IS NULL"
+  );
+  let tagged = 0, baseGame = 0, errors = 0;
+  const taggedList: any[] = [];
+  for (const row of rows) {
+    try {
+      const igdbData = await fetchIgdb(Number(row.igdb_id));
+      if (igdbData && igdbData.gameType === "DLC") {
+        await pool.query("UPDATE game_items SET game_type = 'DLC' WHERE id = ?", [row.id]);
+        tagged++;
+        if (taggedList.length < 30) taggedList.push({ id: row.id, title: row.title });
+      } else if (igdbData) {
+        baseGame++;
+      } else {
+        errors++;
+      }
+      await new Promise((r) => setTimeout(r, 260));
+    } catch (e) {
+      errors++;
+    }
+  }
+  app.log.info({ scanned: rows.length, tagged, baseGame, errors }, "retag-dlc termine");
+  return { ok: true, scanned: rows.length, tagged_dlc: tagged, confirmed_base_game: baseGame, errors, examples: taggedList };
+});
+
 app.post("/admin/refetch-incomplete", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
