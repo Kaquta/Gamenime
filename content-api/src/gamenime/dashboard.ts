@@ -421,6 +421,60 @@ export function startDashboard(app: FastifyInstance, pool: any) {
     });
   });
 
+  // Historique des stats par periode (LECTURE SEULE - que des SELECT).
+  // Fenetre 2 ans glissante (24 derniers mois). Ne modifie jamais daily_stats.
+  app.get("/admin/dashboard/history", async (req: any, reply) => {
+    const period = req.query?.period === "year" ? "year" : "month";
+    const value = String(req.query?.value || "");
+    if (!STATS_POOL) return { total: 0, uniques: 0, sources: [], available: [] };
+    try {
+      let available: string[] = [];
+      if (period === "month") {
+        const av: any = await STATS_POOL.query(
+          `SELECT DISTINCT DATE_FORMAT(stat_date, '%Y-%m') AS p
+           FROM daily_stats
+           WHERE stat_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 23 MONTH)
+           ORDER BY p DESC`
+        );
+        available = av.map((r: any) => r.p);
+      } else {
+        const av: any = await STATS_POOL.query(
+          `SELECT DISTINCT YEAR(stat_date) AS p
+           FROM daily_stats
+           WHERE stat_date >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-01-01'), INTERVAL 1 YEAR)
+           ORDER BY p DESC`
+        );
+        available = av.map((r: any) => String(r.p));
+      }
+      const target = value || available[0] || "";
+      if (!target) return { total: 0, uniques: 0, sources: [], available, period, value: "" };
+      let where = "";
+      let params: any[] = [];
+      if (period === "month") {
+        where = "DATE_FORMAT(stat_date, '%Y-%m') = ?";
+        params = [target];
+      } else {
+        where = "YEAR(stat_date) = ?";
+        params = [target];
+      }
+      const rows: any = await STATS_POOL.query(
+        `SELECT source, SUM(visits) AS visits, SUM(unique_visitors) AS uniques
+         FROM daily_stats WHERE ${where}
+         GROUP BY source ORDER BY visits DESC`,
+        params
+      );
+      const total = rows.reduce((s: number, r: any) => s + Number(r.visits), 0);
+      const uniques = rows.reduce((s: number, r: any) => s + Number(r.uniques), 0);
+      return {
+        period, value: target, total, uniques,
+        sources: rows.map((r: any) => [r.source, Number(r.visits)]),
+        available,
+      };
+    } catch (e: any) {
+      return { total: 0, uniques: 0, sources: [], available: [], error: e?.message };
+    }
+  });
+
   app.get("/admin/dashboard/snapshot", async (_req, reply) => {
     const m = await collectMetrics(pool);
     return reply.send(m);

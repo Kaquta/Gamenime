@@ -95,6 +95,54 @@
   .diag-key.fix { color: #30d16c; }
   .diag-val { color: #d5d2ce; }
   .diag-val.fix { color: #8c8c92; font-style: italic; }
+
+  /* ── Tiroir Historique (bouton flottant + panneau) ── */
+  .hist-fab {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #16161c, #0f0f14);
+    border: 1px solid #d9a978; color: #d9a978;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; z-index: 1000;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .hist-fab:hover { transform: scale(1.08); box-shadow: 0 0 26px rgba(217,169,120,0.42); }
+  .hist-fab:active { transform: scale(0.97); }
+  .hist-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    z-index: 1001; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .hist-overlay.open { opacity: 1; pointer-events: auto; }
+  .hist-drawer {
+    position: fixed; top: 0; right: -380px; width: 340px; max-width: 88vw; height: 100vh;
+    background: #0f0f14; border-left: 1px solid #2c2c34;
+    z-index: 1002; transition: right 0.32s cubic-bezier(0.4,0,0.2,1);
+    padding: 22px; overflow-y: auto; box-sizing: border-box;
+    color: #ffe8c0;
+  }
+  .hist-drawer.open { right: 0; }
+  .hist-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; border-bottom: 1px solid #2c2c34; padding-bottom: 12px; }
+  .hist-head-l { display: flex; align-items: center; gap: 9px; }
+  .hist-title { font-size: 15px; font-weight: 700; }
+  .hist-close { background: none; border: none; color: #8a8580; cursor: pointer; font-size: 20px; line-height: 1; padding: 4px; }
+  .hist-close:hover { color: #ffe8c0; }
+  .hist-block { margin-bottom: 22px; }
+  .hist-block-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .hist-block-label { font-size: 11px; color: #8a8580; letter-spacing: 0.6px; font-weight: 700; }
+  .hist-block-total { font-size: 23px; font-weight: 700; color: #fff; }
+  .hist-tabs { display: flex; gap: 4px; background: #16161c; border-radius: 9px; padding: 4px; margin-bottom: 16px; }
+  .hist-tab { flex: 1; text-align: center; font-size: 12px; padding: 7px; border-radius: 6px; cursor: pointer; color: #8a8580; transition: all 0.2s; }
+  .hist-tab.active { background: #d9a978; color: #16161c; font-weight: 700; }
+  .hist-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; background: #16161c; border-radius: 8px; padding: 8px 10px; }
+  .hist-arrow { color: #d9a978; font-size: 22px; cursor: pointer; padding: 0 8px; user-select: none; line-height: 1; }
+  .hist-arrow.disabled { color: #3a3833; cursor: default; pointer-events: none; }
+  .hist-period { font-size: 14px; font-weight: 700; color: #fff; }
+  .hist-src-row { display: flex; justify-content: space-between; font-size: 12.5px; color: #b8b3ad; padding: 3px 0; }
+  .hist-src-row .v { color: #d9a978; font-weight: 700; }
+  .hist-empty { font-size: 12px; color: #6a655f; font-style: italic; }
+
 </style>
 </head>
 <style>
@@ -1170,6 +1218,63 @@
     return "#8c8c92";
   }
 
+  // -- Tiroir Historique --
+  var histState = { period: "month", index: 0, available: [] };
+  function openHist() {
+    document.getElementById("histDrawer").classList.add("open");
+    document.getElementById("histOverlay").classList.add("open");
+    histState.index = 0;
+    loadHistory();
+  }
+  function closeHist() {
+    document.getElementById("histDrawer").classList.remove("open");
+    document.getElementById("histOverlay").classList.remove("open");
+  }
+  function histSwitch(p) {
+    if (histState.period === p) return;
+    histState.period = p;
+    histState.index = 0;
+    document.getElementById("hist-tab-month").classList.toggle("active", p === "month");
+    document.getElementById("hist-tab-year").classList.toggle("active", p === "year");
+    loadHistory();
+  }
+  function histNav(dir) {
+    var ni = histState.index + dir;
+    if (ni < 0 || ni >= histState.available.length) return;
+    histState.index = ni;
+    loadHistory();
+  }
+  function histPeriodLabel(period, value) {
+    if (period === "year") return value;
+    var mois = ["", "Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+    var parts = String(value).split("-");
+    if (parts.length === 2) return (mois[parseInt(parts[1],10)] || parts[1]) + " " + parts[0];
+    return value;
+  }
+  async function loadHistory() {
+    var val = histState.available[histState.index] || "";
+    try {
+      var url = "/admin/dashboard/history?period=" + histState.period + (val ? "&value=" + encodeURIComponent(val) : "");
+      var res = await fetch(url);
+      var d = await res.json();
+      histState.available = d.available || [];
+      var curVal = d.value || histState.available[histState.index] || "";
+      document.getElementById("hist-period").textContent = histPeriodLabel(histState.period, curVal);
+      document.getElementById("hist-total").textContent = d.total != null ? d.total : 0;
+      var sources = d.sources || [];
+      var srcHtml = sources.length === 0
+        ? '<div class="hist-empty">Aucune donnee</div>'
+        : sources.map(function(s) { return '<div class="hist-src-row"><span>' + s[0] + '</span><span class="v">' + s[1] + '</span></div>'; }).join('');
+      document.getElementById("hist-src").innerHTML = srcHtml;
+      var prev = document.getElementById("hist-prev");
+      var next = document.getElementById("hist-next");
+      prev.classList.toggle("disabled", histState.index >= histState.available.length - 1);
+      next.classList.toggle("disabled", histState.index <= 0);
+    } catch (e) {
+      document.getElementById("hist-src").innerHTML = '<div class="hist-empty">Erreur de chargement</div>';
+    }
+  }
+
   function renderIncomplete() {
     var list = document.getElementById("inc-list");
     var searchEl = document.getElementById("inc-search");
@@ -1601,5 +1706,32 @@
   }
   connect();
 </script>
+<div class="hist-overlay" id="histOverlay" onclick="closeHist()"></div>
+<button class="hist-fab" onclick="openHist()" aria-label="Historique" title="Historique">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+</button>
+<div class="hist-drawer" id="histDrawer">
+  <div class="hist-head">
+    <div class="hist-head-l">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d9a978" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+      <span class="hist-title">Historique</span>
+    </div>
+    <button class="hist-close" onclick="closeHist()" aria-label="Fermer">&times;</button>
+  </div>
+  <div class="hist-tabs">
+    <div class="hist-tab active" id="hist-tab-month" onclick="histSwitch('month')">Mois</div>
+    <div class="hist-tab" id="hist-tab-year" onclick="histSwitch('year')">Année</div>
+  </div>
+  <div class="hist-nav">
+    <span class="hist-arrow" id="hist-prev" onclick="histNav(1)">&lsaquo;</span>
+    <span class="hist-period" id="hist-period">—</span>
+    <span class="hist-arrow" id="hist-next" onclick="histNav(-1)">&rsaquo;</span>
+  </div>
+  <div class="hist-block-head">
+    <span class="hist-block-label">TOTAL VISITES</span>
+    <span class="hist-block-total" id="hist-total">—</span>
+  </div>
+  <div id="hist-src"></div>
+</div>
 </body>
 </html>
