@@ -348,12 +348,33 @@ async function getSSLStatus(): Promise<{ daysLeft: number | null; validTo: strin
   return result;
 }
 
+async function readSourceHealth(pool: any) {
+  try {
+    const rows: any = await pool.query(
+      "SELECT source, status, http_code, response_ms, error_msg, " +
+      "UNIX_TIMESTAMP(last_check) AS last_check_ts, UNIX_TIMESTAMP(last_ok) AS last_ok_ts " +
+      "FROM source_health ORDER BY source"
+    );
+    return rows.map((r: any) => ({
+      source: r.source,
+      status: r.status,
+      httpCode: r.http_code,
+      responseMs: r.response_ms,
+      errorMsg: r.error_msg,
+      lastCheck: r.last_check_ts ? Number(r.last_check_ts) * 1000 : null,
+      lastOk: r.last_ok_ts ? Number(r.last_ok_ts) * 1000 : null,
+    }));
+  } catch (e: any) {
+    return [];
+  }
+}
+
 export async function collectMetrics(pool: any) {
-  const [system, catalog, workflows] = await Promise.all([
-    readSystemMetrics(), readCatalogMetrics(pool), readWorkflowMetrics(pool)
+  const [system, catalog, workflows, sourceHealth] = await Promise.all([
+    readSystemMetrics(), readCatalogMetrics(pool), readWorkflowMetrics(pool), readSourceHealth(pool)
   ]);
   return {
-    ts: Date.now(), system, catalog, workflows,
+    ts: Date.now(), system, catalog, workflows, sourceHealth,
     crons: LAST_RUNS,
     cache: { hits: CACHE_HITS, misses: CACHE_MISSES, hit_rate: getCacheHitRate() },
     requests_per_min: getRequestsPerMinute(),

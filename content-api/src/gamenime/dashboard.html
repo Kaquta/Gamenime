@@ -790,26 +790,33 @@
       }
     }
 
-    var wfKeys = [["anilist","AniList"],["jikan","Jikan"],["animeschedule","AnimeSchedule"],["rawg","RAWG"]];
-    var oldestAge = 0, oldestName = "";
-    wfKeys.forEach(function(wk) {
-      var w = wf[wk[0]];
-      if (w && w.last_push) {
-        var age = (Date.now() - new Date(w.last_push).getTime()) / 3600000;
-        if (age > oldestAge) { oldestAge = age; oldestName = wk[1]; }
+    // Sante des sources externes (health check quotidien - vrais pings API)
+    var srcHealth = m.sourceHealth || [];
+    var srcLabels = { rawg: "RAWG", igdb: "IGDB", anilist: "AniList", jikan: "Jikan", animeschedule: "AnimeSchedule" };
+    srcHealth.forEach(function(s) {
+      var label = srcLabels[s.source] || s.source;
+      var checkAge = s.lastCheck ? (Date.now() - s.lastCheck) / 3600000 : null;
+      var ageStr = checkAge === null ? "jamais vérifié" : (checkAge < 1 ? "vérifié il y a <1h" : "vérifié il y a " + checkAge.toFixed(0) + "h");
+      if (s.status === "DOWN") {
+        checks.push({ name: "Source " + label, level: "crit",
+          detail: label + " : DOWN (HTTP " + (s.httpCode || "?") + ") · " + ageStr,
+          cause: "L'API " + label + " ne répond plus (" + (s.errorMsg || "erreur") + "). " + (s.httpCode === 401 ? "401 = quota épuisé ou clé invalide." : (s.httpCode === 429 ? "429 = rate limit atteint." : "Vérifier la source.")),
+          fix: label === "RAWG" ? "Vérifier le quota RAWG sur rawg.io (reset le 10 du mois) ou régénérer la clé." : "Vérifier la clé/token de " + label + " et son quota." });
+      } else if (s.status === "UP" && s.responseMs && s.responseMs > 3000) {
+        checks.push({ name: "Source " + label, level: "warn",
+          detail: label + " : UP mais lent (" + s.responseMs + "ms) · " + ageStr,
+          cause: "L'API " + label + " répond mais lentement (" + s.responseMs + "ms). À surveiller.",
+          fix: "Normal si ponctuel. Si persistant, vérifier l'état de " + label + "." });
+      } else if (s.status === "UP") {
+        checks.push({ name: "Source " + label, level: "ok",
+          detail: label + " : UP (" + (s.responseMs || "?") + "ms) · " + ageStr, cause: "", fix: "" });
+      } else {
+        checks.push({ name: "Source " + label, level: "warn",
+          detail: label + " : jamais testé",
+          cause: "Aucun health check effectué pour " + label + " (le cron tourne à 00h00).",
+          fix: "Attendre le prochain cycle (00h00) ou lancer un check manuel." });
       }
     });
-    if (oldestAge > 12) {
-      checks.push({ name: "Workflows n8n", level: "crit", detail: oldestName + " : dernier push il y a " + oldestAge.toFixed(0) + "h",
-        cause: "Workflow " + oldestName + " silencieux depuis " + oldestAge.toFixed(0) + "h. Le catalogue ne se met plus à jour.",
-        fix: "Vérifier n8n : le workflow tourne-t-il ? Regarder les logs dans l'interface n8n." });
-    } else if (oldestAge > 6) {
-      checks.push({ name: "Workflows n8n", level: "warn", detail: oldestName + " : dernier push il y a " + oldestAge.toFixed(0) + "h",
-        cause: "Workflow " + oldestName + " un peu lent (" + oldestAge.toFixed(0) + "h). À surveiller.",
-        fix: "Vérifier dans n8n que le workflow " + oldestName + " s'exécute à son intervalle." });
-    } else {
-      checks.push({ name: "Workflows n8n", level: "ok", detail: "Tous actifs · dernier push " + (oldestAge < 1 ? "<1h" : oldestAge.toFixed(0)+"h"), cause: "", fix: "" });
-    }
 
     // Covers ANIME (hotlink + sans cover)
     var animeHotlink = (cat.anime ? cat.anime.hotlink : 0) || 0;

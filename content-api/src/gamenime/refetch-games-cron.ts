@@ -186,6 +186,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
       "FROM game_items " +
       "WHERE (cover IS NULL OR cover = '' OR cover LIKE '%media.rawg.io%' OR cover LIKE '%images.igdb.com%' OR platform IS NULL OR platform = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR rating_score IS NULL OR game_type IS NULL) " +
       "AND (rawg_id IS NOT NULL OR igdb_id IS NOT NULL) " +
+      "AND (last_refetch_at IS NULL OR last_refetch_at < NOW() - INTERVAL 7 DAY) " +
       "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
     scanned = items.length;
@@ -239,7 +240,11 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
           itemChanges.push({ field: "game_type", oldValue: item.game_type, newValue: merged.gameType });
         }
 
+        // Marquer TOUJOURS last_refetch_at (meme si rien a enrichir) :
+        // un jeu de base (game_type null legitime) est ainsi verifie une fois
+        // puis laisse tranquille 7 jours -> casse la boucle infinie sur RAWG.
         if (updates.length > 0) {
+          updates.push("last_refetch_at = NOW()");
           params.push(item.id);
           await conn.query("UPDATE game_items SET " + updates.join(", ") + " WHERE id = ?", params);
           enriched++;
@@ -247,6 +252,9 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
             changes.push({ id: item.id, title: item.title, ...ch });
           }
           app.log.info({ id: item.id, title: item.title, fields: itemChanges.map(c => c.field) }, "Game enriched");
+        } else {
+          // Rien a enrichir, mais on marque quand meme la verification.
+          await conn.query("UPDATE game_items SET last_refetch_at = NOW() WHERE id = ?", [item.id]);
         }
       } catch (e: any) {
         errors++;

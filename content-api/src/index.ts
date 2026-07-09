@@ -12,6 +12,7 @@ import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatf
 
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb } from "./gamenime/refetch-games-cron.js";
+import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { expandSearchTerm } from "./gamenime/search-aliases.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
@@ -2394,8 +2395,16 @@ app.post("/track", async (req, reply) => {
 });
 
 setStatsPool(pool);
+// Endpoint de test manuel du health check (lance les pings a la demande)
+app.post("/admin/run-health-check", async (req, reply) => {
+  await runHealthCheck(app, pool);
+  const rows: any = await pool.query("SELECT source, status, http_code, last_check, error_msg, response_ms FROM source_health ORDER BY source");
+  return { ok: true, sources: rows };
+});
+
 startDashboard(app, pool);
 startRefetchGamesCron(app);
+startHealthCheckCron(app, pool);
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
 
 startRefetchCron(app);
