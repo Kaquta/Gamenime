@@ -101,9 +101,9 @@
     position: fixed; bottom: 24px; right: 24px;
     width: 56px; height: 56px; border-radius: 50%;
     display: none;
+    align-items: center; justify-content: center;
     background: linear-gradient(135deg, #16161c, #0f0f14);
     border: 1px solid #d9a978; color: #d9a978;
-    display: flex; align-items: center; justify-content: center;
     cursor: pointer; z-index: 1000;
     box-shadow: 0 4px 20px rgba(0,0,0,0.45);
     transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -694,23 +694,29 @@
 
   // ═══ Toggle vues (Surveillance <-> Trafic) ═══
   var currentView = "surveillance";
+  function updateHistFab() {
+    var hf = document.getElementById("histFab");
+    if (!hf) return;
+    if (currentView === "traffic" && !adminOpen) {
+      hf.style.display = "flex";
+    } else {
+      hf.style.display = "none";
+      closeHist();
+    }
+  }
   function switchView() {
     if (currentView === "surveillance") {
       currentView = "traffic";
       document.getElementById("page-surveillance").className = "page";
       document.getElementById("page-traffic").className = "page active";
       document.getElementById("toggle-label").textContent = "Surveillance";
-      var hf = document.getElementById("histFab");
-      if (hf) hf.style.display = "flex";
     } else {
       currentView = "surveillance";
       document.getElementById("page-traffic").className = "page";
       document.getElementById("page-surveillance").className = "page active";
       document.getElementById("toggle-label").textContent = "Trafic";
-      var hf2 = document.getElementById("histFab");
-      if (hf2) hf2.style.display = "none";
-      closeHist();
     }
+    updateHistFab();
   }
 
   // ═══ Navigation Administration ═══
@@ -726,6 +732,7 @@
       document.getElementById("toggle-btn").style.display = "none";
       document.getElementById("console-fab").classList.add("visible");
       document.getElementById("search-fab").classList.add("visible");
+      updateHistFab();
     } else {
       adminOpen = false;
       document.getElementById("console-fab").classList.remove("visible");
@@ -743,6 +750,7 @@
       document.getElementById("admin-label").textContent = "Administration";
       document.getElementById("admin-btn").classList.remove("active");
       document.getElementById("toggle-btn").style.display = "";
+      updateHistFab();
     }
   }
 

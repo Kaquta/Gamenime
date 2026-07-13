@@ -35,6 +35,7 @@ interface SourceData {
   description?: string | null;
   ratingScore?: number | null;
   gameType?: string | null;
+  slug?: string | null;
 }
 
 /**
@@ -62,6 +63,7 @@ export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
       platform,
       description: description ? String(description).substring(0, 2000) : null,
       ratingScore: ratingMetacritic,
+      slug: data?.slug ?? null,
     };
   } catch {
     return null;
@@ -97,6 +99,37 @@ async function getTwitchToken(): Promise<string | null> {
       expiresAt: Date.now() + (data.expires_in || 5184000) * 1000,
     };
     return TWITCH_TOKEN.token;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Cherche un jeu IGDB par son SLUG RAWG (ancre fiable, pas de match par titre).
+ * Securites : exactement UN resultat + slug strictement identique, sinon null.
+ * Mieux vaut un champ vide qu une donnee fausse.
+ */
+export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
+  if (!slug) return null;
+  const token = await getTwitchToken();
+  const clientId = process.env.TWITCH_CLIENT_ID || "";
+  if (!token || !clientId) return null;
+  const safe = slug.replace(/["\\]/g, "");
+  try {
+    const res = await fetch("https://api.igdb.com/v4/games", {
+      method: "POST",
+      headers: {
+        "Client-ID": clientId,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "text/plain",
+      },
+      body: `fields id, slug; where slug = "${safe}"; limit 2;`,
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    if (!Array.isArray(data) || data.length !== 1) return null;
+    if (data[0]?.slug !== slug) return null;
+    return Number(data[0].id) || null;
   } catch {
     return null;
   }
@@ -202,7 +235,19 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
           item.rawg_id ? fetchRawg(item.rawg_id) : null,
           item.igdb_id ? fetchIgdb(item.igdb_id) : null,
         ]);
-        const merged = mergeSources(rawg, igdb);
+        let merged = mergeSources(rawg, igdb);
+        // FALLBACK IGDB par slug : RAWG a repondu mais laisse la plateforme vide,
+        // et le jeu n a pas d igdb_id -> le rattacher via son slug RAWG (ancre fiable).
+        // Aucun appel RAWG supplementaire (le slug vient de la reponse deja recue).
+        if (!item.igdb_id && !merged.platform && rawg?.slug) {
+          const foundId = await lookupIgdbBySlug(rawg.slug);
+          if (foundId) {
+            app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
+            await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
+            const igdbData = await fetchIgdb(foundId);
+            if (igdbData) merged = mergeSources(rawg, igdbData);
+          }
+        }
 
         const updates: string[] = [];
         const params: any[] = [];
@@ -303,7 +348,17 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
       item.rawg_id ? fetchRawg(item.rawg_id) : null,
       item.igdb_id ? fetchIgdb(item.igdb_id) : null,
     ]);
-    const merged = mergeSources(rawg, igdb);
+    let merged = mergeSources(rawg, igdb);
+    // FALLBACK IGDB par slug (meme logique que le cron).
+    if (!item.igdb_id && !merged.platform && rawg?.slug) {
+      const foundId = await lookupIgdbBySlug(rawg.slug);
+      if (foundId) {
+        app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
+        await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
+        const igdbData = await fetchIgdb(foundId);
+        if (igdbData) merged = mergeSources(rawg, igdbData);
+      }
+    }
     const updates: string[] = [];
     const params: any[] = [];
     const fields: string[] = [];

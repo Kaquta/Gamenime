@@ -11,7 +11,7 @@ import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
 import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
-import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb } from "./gamenime/refetch-games-cron.js";
+import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug } from "./gamenime/refetch-games-cron.js";
 import { startHealthCheckCron } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { expandSearchTerm } from "./gamenime/search-aliases.js";
@@ -1686,6 +1686,41 @@ async function createNotificationsForItemChange(
 // Endpoint : re-tague les DLC via IGDB (category 1/2/4 -> "DLC").
 // Se fie a la vraie category IGDB, JAMAIS au titre (evite faux positifs
 // type "Seven Deadly Sins: Origin" qui est un jeu de base, pas un DLC).
+// Batch : rattacher les jeux RAWG-only a IGDB via leur slug (ancre fiable, pas de match par titre).
+// Cible uniquement les jeux SANS igdb_id ET SANS plateforme (economise le quota RAWG).
+app.post("/admin/link-igdb-by-slug", async (req: any, reply) => {
+  if (!requireApiKey(req, reply)) return;
+  const limit = Math.min(Number(req.query?.limit) || 50, 200);
+  const conn = await (app as any).pool.getConnection();
+  let scanned = 0, linked = 0, no_match = 0, errors = 0;
+  const examples: any[] = [];
+  try {
+    const rows: any[] = await conn.query(
+      "SELECT id, title, rawg_id FROM game_items " +
+      "WHERE igdb_id IS NULL AND rawg_id IS NOT NULL AND (platform IS NULL OR platform = '') " +
+      "ORDER BY popularity DESC LIMIT " + limit
+    );
+    for (const item of rows) {
+      scanned++;
+      try {
+        const rawg = await fetchRawg(item.rawg_id);
+        if (!rawg?.slug) { no_match++; continue; }
+        const igdbId = await lookupIgdbBySlug(rawg.slug);
+        if (!igdbId) { no_match++; continue; }
+        await conn.query("UPDATE game_items SET igdb_id = ?, last_refetch_at = NULL WHERE id = ?", [igdbId, item.id]);
+        linked++;
+        if (examples.length < 10) examples.push({ id: item.id, title: item.title, slug: rawg.slug, igdb_id: igdbId });
+      } catch {
+        errors++;
+      }
+      await new Promise((r) => setTimeout(r, 300));
+    }
+    return { ok: true, scanned, linked, no_match, errors, examples };
+  } finally {
+    conn.release();
+  }
+});
+
 app.post("/admin/retag-dlc", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
