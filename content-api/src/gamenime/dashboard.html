@@ -4,6 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>GameNime · Monitoring</title>
+<link rel="manifest" href="/dashboard/manifest.json" />
+<meta name="theme-color" content="#d9a978" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GameNime" />
+<link rel="apple-touch-icon" href="https://gamenime.fr/favicon-180.png" />
+<link rel="icon" type="image/png" href="https://gamenime.fr/favicon-512.png" />
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function() {
+      navigator.serviceWorker.register("/dashboard/sw.js", { scope: "/dashboard" }).catch(function(){});
+    });
+  }
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
@@ -491,6 +505,12 @@
             <button class="proc-launch" style="background:#30d16c" onclick="lancerProcess(this,'refetch-incomplete-games','Phase B Jeux')">▶ Lancer</button>
           </div>
           <div class="proc-card">
+            <div class="proc-stripe" style="background:#e24b4a"></div>
+            <div class="proc-name">Refetch YouTube (sortis)</div>
+            <div class="proc-desc">Rattrape les animes deja sortis avec YouTube seul (via Jikan)</div>
+            <button class="proc-launch" style="background:#e24b4a" onclick="lancerProcess(this,'refetch-youtube-released','Refetch YouTube sortis')">▶ Lancer</button>
+          </div>
+          <div class="proc-card">
             <div class="proc-stripe" style="background:#7b8cff"></div>
             <div class="proc-name">Phase C Anime</div>
             <div class="proc-desc">Lookup AniList par titre (IDs manquants)</div>
@@ -519,22 +539,6 @@
     </div>
 
     <!-- SECTION 2 : RÉPARER PAR ID -->
-    <div class="adm-section" id="sec-repair">
-      <div class="adm-head">
-        <span class="adm-chevron">▼</span>
-        <span class="adm-title">Réparer un item par ID</span>
-      </div>
-      <div class="adm-body">
-        <div class="repair-row">
-          <input type="number" class="adm-input" id="repair-id" placeholder="ID" />
-          <select class="adm-select" id="repair-type">
-            <option value="anime">Anime</option>
-            <option value="game">Jeux</option>
-          </select>
-          <button class="adm-action-btn" id="repair-btn" onclick="repairById()">⟳ Forcer refetch</button>
-        </div>
-      </div>
-    </div>
 
     <!-- SECTION 3 : ITEMS INCOMPLETS -->
     <div class="adm-section" id="sec-incomplete">
@@ -1166,35 +1170,6 @@
   }
 
   // Réparer un item précis par ID
-  async function repairById() {
-    ensureConsoleOpen();
-    var id = document.getElementById("repair-id").value;
-    var type = document.getElementById("repair-type").value;
-    if (!id) { consoleLine("  ⚠ Entre un ID d'abord.", "warn"); return; }
-    var btn = document.getElementById("repair-btn");
-    var original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = "⏳...";
-    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
-    try {
-      var res = await fetch("/dashboard/admin/refetch-one?id=" + encodeURIComponent(id) + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      var data = await res.json();
-      if (data.ok === false) {
-        consoleLine("  ✗ " + (data.msg || "erreur"), "err");
-      } else if (!data.found) {
-        consoleLine("  ⚠ Item #" + id + " introuvable.", "warn");
-      } else if (data.enriched) {
-        consoleLine("  ✓ #" + id + " " + (data.title || "") + " → réparé : " + data.fields.join(" + "), "ok");
-      } else {
-        consoleLine("  ℹ #" + id + " " + (data.title || "") + " déjà complet (rien à réparer).", "info");
-      }
-    } catch (err) {
-      consoleLine("  ✗ Erreur réseau : " + err.message, "err");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = original;
-    }
-  }
 
   // ── Liste des items incomplets ──
   var incompleteData = [];
