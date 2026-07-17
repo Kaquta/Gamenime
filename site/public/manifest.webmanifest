@@ -1,0 +1,16 @@
+{
+  "name": "GameNime — Radar Animes & Jeux",
+  "short_name": "GameNime",
+  "description": "Les sorties animes et jeux a ne pas manquer",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0d",
+  "theme_color": "#d9a978",
+  "icons": [
+    { "src": "/favicon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
