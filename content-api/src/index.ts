@@ -12,7 +12,7 @@ import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatf
 
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug } from "./gamenime/refetch-games-cron.js";
-import { startHealthCheckCron } from "./gamenime/health-check-cron.js";
+import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { expandSearchTerm } from "./gamenime/search-aliases.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
@@ -1761,6 +1761,129 @@ app.post("/admin/refetch-incomplete", async (req, reply) => {
 });
 
 // SESSION 18 : Refetch UN item precis par ID (bouton "Reparer" admin)
+// Batch : refetch les animes "YouTube seul" DEJA SORTIS (le cron ne traite que les a-venir)
+// Relance manuelle du health check des sources (le cron ne tourne qu'a 00h00).
+// Protege par cle API : la version sans auth avait ete retiree en session 24.
+app.post("/admin/run-health-check", async (req: any, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const auth = requireApiKey(expected, req.headers["x-api-key"]);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const pool = (app as any).pool;
+  if (!pool) return reply.code(500).send({ ok: false, msg: "pool DB introuvable" });
+  await runHealthCheck(app, pool);
+  const rows: any[] = await pool.query(
+    "SELECT source, status, http_code, error_msg, response_ms, last_check, last_ok FROM source_health ORDER BY source"
+  );
+  return reply.send({ ok: true, sources: rows });
+});
+// BOT AUDITEUR : rapport d'etat du site (lecture seule, aucune modification)
+app.post("/admin/audit-report", async (req: any, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const pool = (app as any).pool;
+  if (!pool) return reply.code(500).send({ ok: false, msg: "pool DB introuvable" });
+  const conn = await pool.getConnection();
+  try {
+    // Animes : on recupere tout ce qui a une date, pour auditer les champs
+    const animes: any[] = await conn.query(
+      "SELECT id, title, cover, platform, trailer_url, description, " +
+      "DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision, popularity, " +
+      "DATEDIFF(release_date, CURDATE()) AS jours " +
+      "FROM anime_items WHERE release_date IS NOT NULL"
+    );
+    const games: any[] = await conn.query(
+      "SELECT id, title, cover, platform, description, rating_score, game_type, " +
+      "DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision, popularity, " +
+      "DATEDIFF(release_date, CURDATE()) AS jours " +
+      "FROM game_items WHERE release_date IS NOT NULL"
+    );
+
+    function auditAnime(a: any): string[] {
+      const m: string[] = [];
+      if (!a.cover || a.cover === "" || String(a.cover).includes("myanimelist.net") || String(a.cover).includes("animeschedule.net")) m.push("cover");
+      if (!a.platform || a.platform === "" || String(a.platform).trim() === "YouTube") m.push("plateforme");
+      if (!a.trailer_url || a.trailer_url === "") m.push("trailer");
+      if (!a.description || String(a.description).trim().length < 10) m.push("description");
+      // NB : date imprecise = info, PAS un manque bloquant (source pas encore a jour)
+      return m;
+    }
+    function auditGame(g: any): string[] {
+      const m: string[] = [];
+      // Cover : vide seulement (les URLs media.rawg.io/images.igdb.com sont les VRAIES covers, pas des defauts)
+      if (!g.cover || g.cover === "") m.push("cover");
+      if (!g.platform || g.platform === "") m.push("plateforme");
+      if (!g.description || String(g.description).trim().length < 10) m.push("description");
+      // NB : note (pas de reviews avant sortie) et game_type (NULL = jeu normal, pas DLC)
+      // ne sont PAS des manques bloquants.
+      return m;
+    }
+
+    const critique: any[] = [];
+    const incomplets: any[] = [];
+    let complets = 0;
+
+    for (const a of animes) {
+      const manque = auditAnime(a);
+      if (manque.length === 0) { complets++; continue; }
+      const entry = { id: a.id, type: "anime", title: a.title, release_date: a.release_date, jours: a.jours, popularity: a.popularity, manque, dateImprecise: a.release_precision !== "day", cover: !manque.includes("cover"), platform: !manque.includes("plateforme"), trailer: !manque.includes("trailer"), description: !manque.includes("description") };
+      // Critique = sort dans 0 a 7 jours
+      if (a.jours !== null && a.jours >= 0 && a.jours <= 7) critique.push(entry);
+      else incomplets.push(entry);
+    }
+    for (const g of games) {
+      const manque = auditGame(g);
+      if (manque.length === 0) { complets++; continue; }
+      const entry = { id: g.id, type: "game", title: g.title, release_date: g.release_date, jours: g.jours, popularity: g.popularity, manque, cover: !manque.includes("cover"), platform: !manque.includes("plateforme"), description: !manque.includes("description") };
+      if (g.jours !== null && g.jours >= 0 && g.jours <= 7) critique.push(entry);
+      else incomplets.push(entry);
+    }
+
+    // Tri : critique par jours croissant, incomplets par popularite decroissante
+    critique.sort((x, y) => (x.jours ?? 999) - (y.jours ?? 999));
+    incomplets.sort((x, y) => (y.popularity ?? 0) - (x.popularity ?? 0));
+
+    const total = animes.length + games.length;
+    return reply.send({
+      ok: true,
+      scanDate: new Date().toISOString(),
+      resume: { total, complets, incomplets: incomplets.length, critiques_j7: critique.length },
+      critique_j7: critique,
+      incomplets: incomplets.slice(0, 100)
+    });
+  } finally {
+    conn.release();
+  }
+});
+app.post("/admin/refetch-youtube-released", async (req: any, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const pool = (app as any).pool;
+  if (!pool) return reply.code(500).send({ ok: false, msg: "pool DB introuvable" });
+  const conn = await pool.getConnection();
+  try {
+    const rows: any[] = await conn.query(
+      "SELECT id FROM anime_items WHERE TRIM(platform) = 'YouTube' AND release_date < CURDATE() AND mal_id IS NOT NULL ORDER BY popularity DESC"
+    );
+    let enriched = 0;
+    let stillYoutube = 0;
+    for (const row of rows) {
+      try {
+        const res = await refetchOneAnimeItem(app, row.id);
+        if (res.enriched) enriched++;
+        else stillYoutube++;
+      } catch { stillYoutube++; }
+      await new Promise(r => setTimeout(r, 1500));
+    }
+    app.log.info({ scanned: rows.length, enriched, stillYoutube }, "refetch-youtube-released termine");
+    return reply.send({ ok: true, scanned: rows.length, enriched, stillYoutube });
+  } finally {
+    conn.release();
+  }
+});
 app.post("/admin/refetch-one", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
