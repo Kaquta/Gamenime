@@ -1963,7 +1963,7 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
   const pool = (app as any).pool;
   try {
     if (type === "anime") {
-      const rows = await pool.query(`SELECT id, title, anilist_id, mal_id FROM anime_items WHERE id = ?`, [id]);
+      const rows = await pool.query(`SELECT id, title, anilist_id, mal_id, cover, platform, trailer_url, description FROM anime_items WHERE id = ?`, [id]);
       if (!rows.length) return reply.send({ ok: true, found: false });
       const it = rows[0];
       const [anilist, jikan] = await Promise.all([
@@ -1972,9 +1972,10 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
       ]);
       return reply.send({ ok: true, found: true, type, id, title: it.title,
         ids: { anilist_id: it.anilist_id, mal_id: it.mal_id },
+        current: { cover: it.cover, platform: it.platform, trailer_url: it.trailer_url, description: it.description },
         sources: { anilist, jikan } });
     } else {
-      const rows = await pool.query(`SELECT id, title, rawg_id, igdb_id FROM game_items WHERE id = ?`, [id]);
+      const rows = await pool.query(`SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description FROM game_items WHERE id = ?`, [id]);
       if (!rows.length) return reply.send({ ok: true, found: false });
       const it = rows[0];
       const [rawg, igdb] = await Promise.all([
@@ -2021,9 +2022,11 @@ app.patch("/admin/items/:type/:id", async (req: any, reply) => {
     }
     sets.push("trailer_url = ?"); vals.push(v || null);
   }
-  if (typeof body.description === "string") {
-    sets.push("description = ?"); vals.push(body.description.trim() || null);
-  }
+  // La description en base porte des balises metier ([FORMAT:] [STATUS:] [SEASON:])
+  // que les sources externes ne renvoient pas. On les conserve : remplacer le
+  // texte ne doit jamais faire perdre ces metadonnees.
+  let descNew: string | null | undefined = undefined;
+  if (typeof body.description === "string") descNew = body.description.trim();
   if (typeof body.platform === "string") {
     const raw = body.platform.trim();
     const clean = String(gnSanitizePlatform(raw) || "").trim();
@@ -2033,11 +2036,26 @@ app.patch("/admin/items/:type/:id", async (req: any, reply) => {
     if (clean !== raw) notes.push("plateforme normalisee : " + raw + " -> " + clean);
     sets.push("platform = ?"); vals.push(clean || null);
   }
-  if (!sets.length) return reply.code(400).send({ ok: false, msg: "aucun champ a modifier" });
+  if (descNew === undefined && !sets.length) return reply.code(400).send({ ok: false, msg: "aucun champ a modifier" });
   const pool = (app as any).pool;
   try {
-    const before = await pool.query(`SELECT id FROM ${table} WHERE id = ?`, [id]);
+    const before = await pool.query(`SELECT id, description FROM ${table} WHERE id = ?`, [id]);
     if (!before.length) return reply.send({ ok: true, found: false });
+    if (descNew !== undefined) {
+      const oldDesc = String(before[0].description || "");
+      const tags = oldDesc.match(/\[[A-Z_]+:[^\]]*\]/g) || [];
+      let finalDesc = descNew || "";
+      const kept: string[] = [];
+      for (const t of tags) {
+        const key = t.slice(1, t.indexOf(":"));
+        if (finalDesc.indexOf("[" + key + ":") === -1) kept.push(t);
+      }
+      if (kept.length) {
+        finalDesc = (finalDesc ? finalDesc + "\n" : "") + kept.join(" ");
+        notes.push("balises conservees : " + kept.join(" "));
+      }
+      sets.push("description = ?"); vals.push(finalDesc || null);
+    }
     vals.push(id);
     await pool.query(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`, vals);
     const after = await pool.query(`SELECT id, title, cover, platform, trailer_url FROM ${table} WHERE id = ?`, [id]);
