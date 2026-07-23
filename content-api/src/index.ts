@@ -1770,9 +1770,14 @@ app.post("/admin/run-health-check", async (req: any, reply) => {
   if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
   const pool = (app as any).pool;
   if (!pool) return reply.code(500).send({ ok: false, msg: "pool DB introuvable" });
-  await runHealthCheck(app, pool);
+  const only = String((req.query as any)?.source || "").trim().toLowerCase();
+  const VALID_SRC = ["rawg", "igdb", "anilist", "jikan", "animeschedule"];
+  await runHealthCheck(app, pool, VALID_SRC.indexOf(only) !== -1 ? only : undefined);
   const rows: any[] = await pool.query(
-    "SELECT source, status, http_code, error_msg, response_ms, last_check, last_ok FROM source_health ORDER BY source"
+    "SELECT source, status, http_code, error_msg, response_ms, "
+    + "DATE_FORMAT(last_check, '%Y-%m-%d %H:%i:%s') AS last_check, "
+    + "DATE_FORMAT(last_ok, '%Y-%m-%d %H:%i:%s') AS last_ok "
+    + "FROM source_health ORDER BY source"
   );
   return reply.send({ ok: true, sources: rows });
 });
@@ -1986,6 +1991,63 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
   }
 });
 
+// Edition manuelle d'un item depuis le panneau de controle du bot auditeur.
+// Champs acceptes : cover, platform, trailer_url, description (les 2 tables
+// ont les memes colonnes). La plateforme passe par le filtre whitelist comme
+// tous les autres points d'ecriture.
+app.patch("/admin/items/:type/:id", async (req: any, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const auth = requireApiKey(expected, req.headers["x-api-key"]);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const type = String(req.params?.type || "");
+  const id = parseInt(String(req.params?.id || ""), 10);
+  if ((type !== "anime" && type !== "game") || !id || isNaN(id)) {
+    return reply.code(400).send({ ok: false, msg: "type (anime|game) et id requis" });
+  }
+  const table = type === "anime" ? "anime_items" : "game_items";
+  const body = (req.body || {}) as any;
+  const sets: string[] = [];
+  const vals: any[] = [];
+  const notes: string[] = [];
+  if (typeof body.cover === "string") {
+    const v = body.cover.trim();
+    if (v !== "" && !/^https?:\/\//i.test(v)) return reply.code(400).send({ ok: false, msg: "cover doit etre une URL http(s)" });
+    sets.push("cover = ?"); vals.push(v || null);
+  }
+  if (typeof body.trailer_url === "string") {
+    const v = body.trailer_url.trim();
+    if (v !== "" && !/^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]+/.test(v)) {
+      return reply.code(400).send({ ok: false, msg: "trailer_url doit etre une URL YouTube" });
+    }
+    sets.push("trailer_url = ?"); vals.push(v || null);
+  }
+  if (typeof body.description === "string") {
+    sets.push("description = ?"); vals.push(body.description.trim() || null);
+  }
+  if (typeof body.platform === "string") {
+    const raw = body.platform.trim();
+    const clean = String(gnSanitizePlatform(raw) || "").trim();
+    if (raw !== "" && clean === "") {
+      return reply.code(400).send({ ok: false, msg: "plateforme refusee par la whitelist : " + raw });
+    }
+    if (clean !== raw) notes.push("plateforme normalisee : " + raw + " -> " + clean);
+    sets.push("platform = ?"); vals.push(clean || null);
+  }
+  if (!sets.length) return reply.code(400).send({ ok: false, msg: "aucun champ a modifier" });
+  const pool = (app as any).pool;
+  try {
+    const before = await pool.query(`SELECT id FROM ${table} WHERE id = ?`, [id]);
+    if (!before.length) return reply.send({ ok: true, found: false });
+    vals.push(id);
+    await pool.query(`UPDATE ${table} SET ${sets.join(", ")} WHERE id = ?`, vals);
+    const after = await pool.query(`SELECT id, title, cover, platform, trailer_url FROM ${table} WHERE id = ?`, [id]);
+    app.log.info({ id, type, champs: sets.length }, "admin.patch-item");
+    return reply.send({ ok: true, found: true, updated: sets.length, notes, item: after[0] });
+  } catch (e) {
+    app.log.error({ err: (e as any)?.message, id, type }, "admin.patch-item failed");
+    return reply.code(500).send({ ok: false, msg: (e as any)?.message || "erreur" });
+  }
+});
 // SESSION 18 : Editer le trailer d'un item manuellement (force le remplacement, contourne lossless volontairement)
 app.patch("/admin/item-trailer", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
