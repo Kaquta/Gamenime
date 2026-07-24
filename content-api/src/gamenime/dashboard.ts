@@ -352,7 +352,8 @@ async function readSourceHealth(pool: any) {
   try {
     const rows: any = await pool.query(
       "SELECT source, status, http_code, response_ms, error_msg, " +
-      "UNIX_TIMESTAMP(last_check) AS last_check_ts, UNIX_TIMESTAMP(last_ok) AS last_ok_ts " +
+      "UNIX_TIMESTAMP(last_check) AS last_check_ts, UNIX_TIMESTAMP(last_ok) AS last_ok_ts, " +
+      "UNIX_TIMESTAMP(last_lookup_warn) AS last_lookup_warn_ts, last_lookup_warn_msg " +
       "FROM source_health ORDER BY source"
     );
     return rows.map((r: any) => ({
@@ -363,6 +364,8 @@ async function readSourceHealth(pool: any) {
       errorMsg: r.error_msg,
       lastCheck: r.last_check_ts ? Number(r.last_check_ts) * 1000 : null,
       lastOk: r.last_ok_ts ? Number(r.last_ok_ts) * 1000 : null,
+      lookupWarn: r.last_lookup_warn_ts ? Number(r.last_lookup_warn_ts) * 1000 : null,
+      lookupWarnMsg: r.last_lookup_warn_msg || null,
     }));
   } catch (e: any) {
     return [];
@@ -478,6 +481,39 @@ export function startDashboard(app: FastifyInstance, pool: any) {
   app.get("/admin/dashboard/snapshot", async (_req, reply) => {
     const m = await collectMetrics(pool);
     return reply.send(m);
+  });
+
+  // PWA : manifest (permet l'installation sur ecran d'accueil)
+  app.get("/admin/dashboard/manifest.json", async (_req, reply) => {
+    const manifest = {
+      name: "GameNime Admin",
+      short_name: "GameNime",
+      description: "Dashboard de monitoring GameNime",
+      start_url: "/dashboard",
+      scope: "/dashboard",
+      display: "standalone",
+      orientation: "portrait",
+      background_color: "#000000",
+      theme_color: "#d9a978",
+      icons: [
+        { src: "https://gamenime.fr/favicon-180.png", sizes: "180x180", type: "image/png", purpose: "any" },
+        { src: "https://gamenime.fr/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        { src: "https://gamenime.fr/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
+      ]
+    };
+    reply.type("application/manifest+json").send(JSON.stringify(manifest));
+  });
+
+  // PWA : service worker minimal (obligatoire pour rendre l'app installable)
+  app.get("/admin/dashboard/sw.js", async (_req, reply) => {
+    const sw = `
+// Service worker minimal GameNime Admin
+self.addEventListener("install", function(e) { self.skipWaiting(); });
+self.addEventListener("activate", function(e) { self.clients.claim(); });
+// Pas de cache offline : le dashboard a besoin des donnees live.
+self.addEventListener("fetch", function(e) { /* passthrough reseau */ });
+`.trim();
+    reply.type("application/javascript").send(sw);
   });
 
   app.get("/admin/dashboard", async (_req, reply) => {

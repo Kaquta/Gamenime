@@ -10,6 +10,7 @@
  */
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000; // 1h
 const REFETCH_BATCH_SIZE = 100;
@@ -76,10 +77,31 @@ export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
  */
 let TWITCH_TOKEN: { token: string; expiresAt: number } | null = null;
 
+// Log dedie aux appels IGDB/Twitch. Ces fonctions sont hors de la portee de
+// 'app', d'ou un logger autonome. Objectif : ne plus confondre "IGDB ne
+// connait pas ce jeu" (info, normal) avec "auth cassee" ou "HTTP en erreur"
+// (warn, demande une action). C'est ce qui rendait le 20/07 indiagnosticable.
+let igdbWarnPool: any = null;
+export function setIgdbWarnPool(pool: any): void { igdbWarnPool = pool; }
+function igdbLog(level: "info" | "warn", event: string, extra?: Record<string, any>): void {
+  try {
+    const line = { level: level === "warn" ? 40 : 30, time: Date.now(), src: "igdb-lookup", event, ...(extra || {}) };
+    process.stdout.write(JSON.stringify(line) + "\n");
+  } catch { /* le log ne doit jamais faire echouer un lookup */ }
+  // Un warn d'auth/HTTP remonte dans la carte IGDB de la page Surveillance.
+  // Colonne dediee : le health-check-cron ne l'ecrase jamais.
+  if (level === "warn" && igdbWarnPool) {
+    const msg = event + (extra && extra.status ? " (HTTP " + extra.status + ")" : "");
+    igdbWarnPool.query(
+      "UPDATE source_health SET last_lookup_warn = NOW(), last_lookup_warn_msg = ? WHERE source = 'igdb'",
+      [msg.slice(0, 255)]
+    ).catch(() => { /* jamais bloquant */ });
+  }
+}
 async function getTwitchToken(): Promise<string | null> {
   const clientId = process.env.TWITCH_CLIENT_ID || "";
   const clientSecret = process.env.TWITCH_CLIENT_SECRET || "";
-  if (!clientId || !clientSecret) return null;
+  if (!clientId || !clientSecret) { igdbLog("warn", "twitch_credentials_absentes"); return null; }
 
   // Token valide encore ?
   if (TWITCH_TOKEN && TWITCH_TOKEN.expiresAt > Date.now() + 60000) {
@@ -91,15 +113,16 @@ async function getTwitchToken(): Promise<string | null> {
       `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
       { method: "POST" }
     );
-    if (!res.ok) return null;
+    if (!res.ok) { igdbLog("warn", "twitch_token_http", { status: res.status }); return null; }
     const data = await res.json() as any;
-    if (!data?.access_token) return null;
+    if (!data?.access_token) { igdbLog("warn", "twitch_token_sans_access_token"); return null; }
     TWITCH_TOKEN = {
       token: data.access_token,
       expiresAt: Date.now() + (data.expires_in || 5184000) * 1000,
     };
     return TWITCH_TOKEN.token;
-  } catch {
+  } catch (e) {
+    igdbLog("warn", "twitch_token_exception", { err: (e as any)?.message });
     return null;
   }
 }
@@ -113,7 +136,7 @@ export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
   if (!slug) return null;
   const token = await getTwitchToken();
   const clientId = process.env.TWITCH_CLIENT_ID || "";
-  if (!token || !clientId) return null;
+  if (!token || !clientId) { igdbLog("warn", "slug_pas_de_token", { slug }); return null; }
   const safe = slug.replace(/["\\]/g, "");
   try {
     const res = await fetch("https://api.igdb.com/v4/games", {
@@ -125,12 +148,50 @@ export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
       },
       body: `fields id, slug; where slug = "${safe}"; limit 2;`,
     });
-    if (!res.ok) return null;
+    if (!res.ok) { igdbLog("warn", "slug_http", { slug, status: res.status }); return null; }
     const data = await res.json() as any;
-    if (!Array.isArray(data) || data.length !== 1) return null;
-    if (data[0]?.slug !== slug) return null;
+    if (!Array.isArray(data) || data.length !== 1) { igdbLog("info", "slug_absent", { slug, trouves: Array.isArray(data) ? data.length : -1 }); return null; }
+    if (data[0]?.slug !== slug) { igdbLog("info", "slug_different", { slug, recu: data[0]?.slug }); return null; }
     return Number(data[0].id) || null;
-  } catch {
+  } catch (e) {
+    igdbLog("warn", "slug_exception", { slug, err: (e as any)?.message });
+    return null;
+  }
+}
+
+// Repli quand le slug RAWG ne correspond a aucun slug IGDB : IGDB suffixe les
+// siens pour desambiguer (ex. "tomak-save-the-earth-regeneration--1" quand un
+// autre jeu porte un titre proche). On recherche alors par titre.
+// Garde-fous : titre normalise STRICTEMENT identique, et un seul candidat.
+// Zero candidat = inconnu, deux ou plus = ambigu — dans les deux cas on
+// n'ecrit rien. Un champ vide vaut mieux qu'une plateforme fausse.
+export async function lookupIgdbByTitle(title: string): Promise<number | null> {
+  if (!title) return null;
+  const token = await getTwitchToken();
+  const clientId = process.env.TWITCH_CLIENT_ID || "";
+  if (!token || !clientId) { igdbLog("warn", "titre_pas_de_token", { title }); return null; }
+  const safe = String(title).replace(/["\\]/g, "");
+  try {
+    const res = await fetch("https://api.igdb.com/v4/games", {
+      method: "POST",
+      headers: {
+        "Client-ID": clientId,
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "text/plain",
+      },
+      body: `search "${safe}"; fields id, name; limit 10;`,
+    });
+    if (!res.ok) { igdbLog("warn", "titre_http", { title, status: res.status }); return null; }
+    const data = await res.json() as any;
+    if (!Array.isArray(data) || data.length === 0) { igdbLog("info", "titre_aucun_resultat", { title }); return null; }
+    const wanted = gnNormalizeTitleStrict(title);
+    if (!wanted) return null;
+    const exact = data.filter((g: any) => gnNormalizeTitleStrict(String(g?.name || "")) === wanted);
+    if (exact.length !== 1) { igdbLog("info", "titre_ambigu_ou_absent", { title, candidats_exacts: exact.length, resultats: data.length }); return null; }
+    igdbLog("info", "titre_rattache", { title, igdbId: exact[0].id });
+    return Number(exact[0].id) || null;
+  } catch (e) {
+    igdbLog("warn", "titre_exception", { title, err: (e as any)?.message });
     return null;
   }
 }
@@ -221,9 +282,24 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
     const items: IncompleteGame[] = await conn.query(
       "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type " +
       "FROM game_items " +
-      "WHERE (cover IS NULL OR cover = '' OR cover LIKE '%media.rawg.io%' OR cover LIKE '%images.igdb.com%' OR platform IS NULL OR platform = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR rating_score IS NULL OR game_type IS NULL) " +
+      // Criteres calibres (session 27, repris de gnAuditGame) : seuls cover,
+      // plateforme et description sont de vrais manques. rating_score NULL est
+      // normal avant la sortie (pas de reviews) et game_type NULL signifie
+      // "jeu standard, pas un DLC" — les inclure mettait 433 jeux sur 477 dans
+      // la file, noyant les 3 items reellement sans plateforme.
+      // Les covers rawg/igdb sont les VRAIES covers, pas des hotlinks.
+      "WHERE (cover IS NULL OR cover = '' OR platform IS NULL OR platform = '' OR description IS NULL OR LENGTH(TRIM(description)) < 10) " +
       "AND (rawg_id IS NOT NULL OR igdb_id IS NOT NULL) " +
-      "AND (last_refetch_at IS NULL OR last_refetch_at < NOW() - INTERVAL 7 DAY) " +
+      // Anti-boucle modulee par l'urgence : un jeu qui sort dans moins de 30 jours
+      // est reessaye chaque jour, les autres tous les 7 jours. Sans ca, un echec
+      // passager (fiche source absente, token expire) sur un item proche de sa
+      // sortie reste fige une semaine — cas Aisle Survive, sans plateforme jusqu'a
+      // la veille de sa sortie alors que la file du cron etait vide.
+      "AND (last_refetch_at IS NULL " +
+      "     OR (release_date IS NOT NULL " +
+      "         AND release_date BETWEEN CURDATE() AND CURDATE() + INTERVAL 30 DAY " +
+      "         AND last_refetch_at < NOW() - INTERVAL 1 DAY) " +
+      "     OR last_refetch_at < NOW() - INTERVAL 7 DAY) " +
       "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
     scanned = items.length;
@@ -240,7 +316,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
         // et le jeu n a pas d igdb_id -> le rattacher via son slug RAWG (ancre fiable).
         // Aucun appel RAWG supplementaire (le slug vient de la reponse deja recue).
         if (!item.igdb_id && !merged.platform && rawg?.slug) {
-          const foundId = await lookupIgdbBySlug(rawg.slug);
+          const foundId = await lookupIgdbBySlug(rawg.slug) || await lookupIgdbByTitle(item.title);
           if (foundId) {
             app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
             await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
@@ -266,6 +342,8 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
             itemChanges.push({ field: "cover", oldValue: item.cover, newValue: merged.cover });
           }
         }
+        // IGDB renvoie "PC (Microsoft Windows)" la ou la base attend "PC".
+        merged.platform = gnSanitizePlatform(merged.platform);
         if ((!item.platform || item.platform === "") && merged.platform) {
           updates.push("platform = ?");
           params.push(merged.platform);
@@ -351,7 +429,7 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
     let merged = mergeSources(rawg, igdb);
     // FALLBACK IGDB par slug (meme logique que le cron).
     if (!item.igdb_id && !merged.platform && rawg?.slug) {
-      const foundId = await lookupIgdbBySlug(rawg.slug);
+      const foundId = await lookupIgdbBySlug(rawg.slug) || await lookupIgdbByTitle(item.title);
       if (foundId) {
         app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
         await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
@@ -370,7 +448,7 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
       }
     }
     if ((!item.platform || item.platform === "") && merged.platform) {
-      updates.push("platform = ?"); params.push(merged.platform); fields.push("plateforme");
+      updates.push("platform = ?"); params.push(gnSanitizePlatform(merged.platform)); fields.push("plateforme");
     }
     const descIsMissing = !item.description || item.description === "" || (typeof item.description === "string" && item.description.trim().length < 10);
     if (descIsMissing && merged.description) {
@@ -411,6 +489,7 @@ export async function adminRefetchGamesHandler(req: any, reply: any) {
 
 export function startRefetchGamesCron(app: FastifyInstance) {
   app.post("/admin/refetch-incomplete-games", adminRefetchGamesHandler);
+  setIgdbWarnPool((app as any).pool);
   setTimeout(() => {
     refetchIncompleteGamesCycle(app).catch(e => app.log.error(e, "First Games refetch cycle failed"));
   }, 15 * 60 * 1000); // First run after 15 min (let Phase B anime run first)

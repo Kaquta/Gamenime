@@ -1294,6 +1294,13 @@
           detail: label + " : DOWN (HTTP " + (s.httpCode || "?") + ") · " + ageStr,
           cause: "L'API " + label + " ne répond plus (" + (s.errorMsg || "erreur") + "). " + (s.httpCode === 401 ? "401 = quota épuisé ou clé invalide." : (s.httpCode === 429 ? "429 = rate limit atteint." : "Vérifier la source.")),
           fix: label === "RAWG" ? "Vérifier le quota RAWG sur rawg.io (reset le 10 du mois) ou régénérer la clé." : "Vérifier la clé/token de " + label + " et son quota." });
+      } else if (s.lookupWarn && (Date.now() - s.lookupWarn) < 6 * 3600000) {
+        var wAge = ((Date.now() - s.lookupWarn) / 3600000);
+        var wAgeStr = wAge < 1 ? "il y a <1h" : "il y a " + wAge.toFixed(0) + "h";
+        checks.push({ srcKey: s.source, name: "Source " + label, level: "warn",
+          detail: label + " : appariement en echec (" + wAgeStr + ")",
+          cause: "Un lookup " + label + " a echoue recemment : " + (s.lookupWarnMsg || "erreur") + ". La source repond peut-etre au health check, mais l'appariement d'un item a rate — souvent un token expire.",
+          fix: "Verifier le token Twitch (TWITCH_CLIENT_ID / SECRET) et son quota. Details : docker logs content-api | grep igdb-lookup" });
       } else if (s.status === "UP" && s.responseMs && s.responseMs > 3000) {
         checks.push({ srcKey: s.source, name: "Source " + label, level: "warn",
           detail: label + " : UP mais lent (" + s.responseMs + "ms) · " + ageStr,
