@@ -130,116 +130,100 @@
   .src-refresh.busy { animation:srcSpin .9s linear infinite; }
   @keyframes srcSpin { to { transform:rotate(360deg); } }
   /* ═══ BOT AUDITEUR ═══ */
-  .bot-fab-wrap { position: fixed; bottom: 24px; right: 90px; width: 60px; height: 60px; display: none; z-index: 1000; }
-  .bot-fab { position: relative; width: 60px; height: 60px; border-radius: 18px; display: flex; align-items: center; justify-content: center; background: linear-gradient(145deg,#1a1a24,#0d0d12); border: 1.5px solid rgba(217,169,120,0.5); cursor: pointer; box-shadow: 0 8px 32px rgba(217,169,120,0.25); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); overflow: hidden; }
-  .bot-fab:hover { transform: translateY(-3px) scale(1.05); }
-  .bot-fab::before { content:""; position:absolute; inset:-2px; border-radius:18px; background:conic-gradient(from 0deg,transparent,#d9a978,transparent,transparent); animation:botRotate 3s linear infinite; opacity:0.55; }
-  .bot-fab::after { content:""; position:absolute; inset:1.5px; border-radius:16px; background:linear-gradient(145deg,#1a1a24,#0d0d12); }
-  @keyframes botRotate { to { transform:rotate(360deg); } }
-  .bot-fab svg { position:relative; z-index:2; }
-  .bot-eye { animation:botBlink 4s infinite; transform-origin:center; }
-  @keyframes botBlink { 0%,92%,100%{transform:scaleY(1);} 96%{transform:scaleY(0.1);} }
-  .bot-badge { position:absolute; top:-9px; right:-9px; z-index:5; background:linear-gradient(135deg,#ff5b52,#e8342b); color:#fff; font-size:13px; font-weight:800; min-width:26px; height:26px; padding:0 6px; border-radius:13px; display:flex; align-items:center; justify-content:center; border:3px solid #0d0d12; box-shadow:0 0 12px rgba(255,69,58,0.7), 0 2px 8px rgba(0,0,0,0.4); animation:botBadgePulse 1.8s ease-in-out infinite; }
-  @keyframes botBadgePulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.18);} }
-  .bot-fab.has-alert::before { animation:botRotate 1.5s linear infinite; opacity:0.85; }
-  .bot-fab.has-alert { border-color:rgba(255,69,58,0.6); box-shadow:0 8px 32px rgba(255,69,58,0.35); }
   /* Panneau bot */
-  .bot-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1001; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-  .bot-overlay.open { opacity: 1; pointer-events: auto; }
-  .bot-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-48%) scale(0.96); width: min(680px,94vw); max-height: 88vh; overflow-y: auto; background: linear-gradient(180deg,rgba(18,16,22,0.99),rgba(10,10,14,0.99)); border: 1px solid rgba(217,169,120,0.2); border-radius: 20px; z-index: 1002; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
-  .bot-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
-  /* Panneau de controle d'un item (bot auditeur) */
-  .bot-item { cursor: pointer; }
-  .bi-chev { color: #6a6560; font-size: 15px; margin-left: 6px; }
-  .bi-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-48%) scale(0.96); width: min(680px,94vw); max-height: 88vh; overflow-y: auto; background: linear-gradient(180deg,rgba(18,16,22,0.99),rgba(10,10,14,0.99)); border: 1px solid rgba(217,169,120,0.25); border-radius: 20px; z-index: 1003; opacity: 0; pointer-events: none; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
-  .bi-modal.open { opacity: 1; pointer-events: auto; transform: translate(-50%,-50%) scale(1); }
-  .bi-head { padding: 15px 17px; background: linear-gradient(135deg,rgba(217,169,120,0.08),transparent); border-bottom: 1px solid rgba(217,169,120,0.15); display: flex; align-items: center; gap: 11px; position: sticky; top: 0; background-color: rgba(14,12,18,0.99); z-index: 5; }
-  .bi-back { background: none; border: none; color: #d9a978; font-size: 20px; cursor: pointer; padding: 2px 7px; }
-  .bi-title { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #f5f2ee; }
-  .bi-type { font-size: 9.5px; color: #8a8580; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
-  .bi-loading { padding: 40px 20px; text-align: center; }
+  /* ── Panneau de controle d'un item — design "Noyau" ──
+     Ancre en bas a droite : la console reste lisible en bas a gauche.
+     Bordure en degrade via padding-box/border-box (pas de div interne). */
+  .bi-modal { position: fixed; right: 18px; bottom: 18px; width: 410px; max-width: calc(100vw - 36px); max-height: calc(100vh - 36px); overflow-y: auto; z-index: 1003; opacity: 0; pointer-events: none; transform: translateY(20px) scale(0.96); transition: all 0.42s cubic-bezier(0.22,1.2,0.36,1); border-radius: 20px; border: 1px solid transparent; background: linear-gradient(178deg,#16141c,#0b0a0f 45%,#08080b) padding-box, linear-gradient(150deg,rgba(217,169,120,0.55),rgba(217,169,120,0.06) 35%,rgba(255,255,255,0.03) 60%,rgba(217,169,120,0.3)) border-box; box-shadow: 0 30px 80px rgba(0,0,0,0.9), 0 0 40px rgba(217,169,120,0.05); }
+  .bi-modal.open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+  @media (max-width: 980px) { .bi-modal { right: 12px; left: 12px; width: auto; max-width: none; bottom: 12px; max-height: 78vh; } }
+  .bi-head { position: relative; padding: 17px 16px 15px; display: flex; align-items: center; gap: 13px; overflow: hidden; }
+  .bi-head::after { content: ""; position: absolute; left: -40%; top: 0; width: 40%; height: 100%; background: linear-gradient(90deg,transparent,rgba(255,232,192,0.07),transparent); animation: biSweep 5s ease-in-out infinite; pointer-events: none; }
+  @keyframes biSweep { 0%, 72% { left: -40%; } 100% { left: 120%; } }
+  .bi-br { position: absolute; width: 16px; height: 16px; border-color: rgba(217,169,120,0.5); border-style: solid; border-width: 0; }
+  .bi-br.tl { top: 9px; left: 9px; border-top-width: 1.5px; border-left-width: 1.5px; border-radius: 5px 0 0 0; }
+  .bi-br.tr { top: 9px; right: 9px; border-top-width: 1.5px; border-right-width: 1.5px; border-radius: 0 5px 0 0; }
+  .bi-avatar { width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; background: linear-gradient(155deg,#2e2a34,#141219 60%); box-shadow: inset 0 1px 0 rgba(255,232,192,0.22), inset 0 -8px 16px rgba(0,0,0,0.6), 0 5px 18px rgba(0,0,0,0.6); z-index: 2; }
+  .bi-avatar::before { content: ""; position: absolute; inset: -1.5px; border-radius: 17px; background: conic-gradient(from 0deg,transparent 0deg,#d9a978 60deg,#ffe8c0 90deg,transparent 150deg,transparent 360deg); animation: biRot 3.6s linear infinite; z-index: -1; }
+  @keyframes biRot { to { transform: rotate(360deg); } }
+  .bi-avatar::after { content: ""; position: absolute; inset: -9px; border-radius: 22px; background: radial-gradient(circle,rgba(217,169,120,0.22),transparent 68%); z-index: -2; animation: biBreathe 3.2s ease-in-out infinite; }
+  @keyframes biBreathe { 50% { opacity: 0.45; transform: scale(1.1); } }
+  .bi-eye { animation: biBlink 4.4s infinite; transform-origin: center; }
+  @keyframes biBlink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.06); } }
+  .bi-htx { flex: 1; min-width: 0; z-index: 2; }
+  .bi-title { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px; background: linear-gradient(100deg,#fff8ec,#d9a978); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .bi-meta { font-size: 9px; color: #8a8074; font-family: ui-monospace, monospace; letter-spacing: 0.9px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+  .bi-led { width: 5px; height: 5px; border-radius: 50%; background: #30d16c; box-shadow: 0 0 8px #30d16c; animation: biPulse 2.2s infinite; flex-shrink: 0; }
+  @keyframes biPulse { 50% { opacity: 0.3; } }
+  .bi-close { background: none; border: none; color: #6a6570; font-size: 19px; cursor: pointer; padding: 0 3px; flex-shrink: 0; z-index: 2; transition: color 0.2s ease; }
+  .bi-close:hover { color: #ff6b6b; }
+  .bi-sep { height: 1px; background: linear-gradient(90deg,transparent,rgba(217,169,120,0.42),rgba(217,169,120,0.12),transparent); }
+  .bi-diag { padding: 12px 16px; display: flex; gap: 11px; align-items: flex-start; background: linear-gradient(90deg,rgba(217,169,120,0.06),transparent 70%); }
+  .bi-diag-i { width: 22px; height: 22px; border-radius: 7px; background: rgba(255,69,58,0.13); border: 1px solid rgba(255,69,58,0.28); color: #ff8b82; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; margin-top: 1px; }
+  .bi-diag-i.ok { background: rgba(48,209,108,0.12); border-color: rgba(48,209,108,0.28); color: #4ade80; }
+  .bi-diag-t { font-size: 11.5px; color: #b8ada0; line-height: 1.55; }
+  .bi-diag-t b { color: #ffb8b0; font-weight: 700; }
+  .bi-loading { padding: 42px 20px; text-align: center; }
   .bi-spin { width: 34px; height: 34px; border: 3px solid rgba(217,169,120,0.15); border-top-color: #d9a978; border-radius: 50%; margin: 0 auto 14px; animation: biSpin 1s linear infinite; }
   @keyframes biSpin { to { transform: rotate(360deg); } }
   .bi-loadtxt { font-size: 12px; color: #8a8580; }
   .bi-loadtxt span { font-size: 10.5px; color: #6a6560; }
-  .bi-field { border-top: 1px solid rgba(255,255,255,0.05); padding: 13px 17px; }
-  .bi-fhead { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
-  .bi-fname { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #d9a978; }
-  .bi-fstate { font-size: 9.5px; padding: 2px 8px; border-radius: 5px; margin-left: auto; }
-  .bi-fstate.miss { background: rgba(255,69,58,0.15); color: #ff7b72; }
-  .bi-fstate.ok { background: rgba(48,209,108,0.12); color: #4ade80; }
-  .bi-cur { font-size: 12px; color: #c9b8a8; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 9px; padding: 8px 11px; margin-bottom: 8px; word-break: break-all; display: flex; align-items: center; gap: 9px; }
+  /* Un champ = un module */
+  .bi-field { margin: 11px 13px; border-radius: 14px; background: linear-gradient(168deg,rgba(255,255,255,0.045),rgba(255,255,255,0.012)); border: 1px solid rgba(255,255,255,0.055); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); overflow: hidden; }
+  .bi-field.miss { border-color: rgba(255,69,58,0.22); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 3px 0 0 rgba(255,69,58,0.55); }
+  .bi-field.ok { box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 3px 0 0 rgba(48,209,108,0.4); }
+  .bi-field.pend { border-color: rgba(217,169,120,0.35); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), inset 3px 0 0 #d9a978; }
+  .bi-fhead { display: flex; align-items: center; gap: 9px; padding: 10px 13px 9px; }
+  .bi-fname { font-size: 9.5px; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; color: #d9a978; font-family: ui-monospace, monospace; }
+  .bi-fline { flex: 1; height: 1px; background: linear-gradient(90deg,rgba(217,169,120,0.22),transparent); }
+  .bi-fstate { font-size: 8px; font-weight: 800; letter-spacing: 0.8px; padding: 3px 8px; border-radius: 20px; font-family: ui-monospace, monospace; border: 1px solid; }
+  .bi-fstate.miss { background: rgba(255,69,58,0.1); color: #ff8b82; border-color: rgba(255,69,58,0.3); }
+  .bi-fstate.ok { background: rgba(48,209,108,0.08); color: #4ade80; border-color: rgba(48,209,108,0.25); }
+  .bi-fstate.pend { background: rgba(217,169,120,0.12); color: #ffe8c0; border-color: rgba(217,169,120,0.4); }
+  .bi-fbody { padding: 0 13px 12px; }
+  .bi-cur { font-size: 10.5px; color: #a29a92; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.045); border-radius: 9px; padding: 9px 11px; margin-bottom: 8px; font-family: ui-monospace, monospace; display: flex; gap: 9px; align-items: center; word-break: break-all; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5); }
   .bi-cur span { flex: 1; min-width: 0; }
-  .bi-cur.empty { color: #6a6560; font-style: italic; }
-  .bi-prop { display: flex; align-items: center; gap: 8px; background: rgba(217,169,120,0.05); border: 1px solid rgba(217,169,120,0.14); border-radius: 9px; padding: 8px 10px; margin-bottom: 6px; }
-  .bi-psrc { font-size: 9px; font-weight: 800; letter-spacing: 0.4px; color: #8a8580; background: rgba(255,255,255,0.07); padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
-  .bi-pval { flex: 1; font-size: 11.5px; min-width: 0; word-break: break-word; }
-  .bi-prop.none { opacity: 0.5; }
+  .bi-curl { font-size: 7.5px; letter-spacing: 0.9px; color: #5a544e; text-transform: uppercase; flex-shrink: 0; }
+  .bi-cur.empty span { color: #6a6560; font-style: italic; }
+  .bi-prop { display: flex; align-items: center; gap: 8px; background: linear-gradient(100deg,rgba(217,169,120,0.09),rgba(217,169,120,0.025)); border: 1px solid rgba(217,169,120,0.16); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; transition: all 0.22s cubic-bezier(0.3,1.2,0.5,1); position: relative; overflow: hidden; }
+  .bi-prop::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg,transparent,rgba(217,169,120,0.65),transparent); opacity: 0; transition: opacity 0.22s ease; }
+  .bi-prop:hover { border-color: rgba(217,169,120,0.45); transform: translateX(3px); box-shadow: 0 4px 14px rgba(0,0,0,0.35); }
+  .bi-prop:hover::before { opacity: 1; }
+  .bi-prop.none { opacity: 0.45; }
   .bi-prop.none .bi-pval { color: #6a6560; font-style: italic; }
-  .bi-see { width: 28px; height: 28px; flex-shrink: 0; border-radius: 8px; border: 1px solid rgba(217,169,120,0.35); background: rgba(217,169,120,0.08); color: #d9a978; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
-  .bi-see:hover { background: rgba(217,169,120,0.22); }
-  .bi-use { border: 1px solid rgba(48,209,108,0.4); background: rgba(48,209,108,0.1); color: #4ade80; font-size: 10.5px; font-weight: 700; padding: 5px 10px; border-radius: 7px; cursor: pointer; font-family: inherit; white-space: nowrap; }
-  .bi-use:hover { background: rgba(48,209,108,0.22); }
-  .bi-manual { display: flex; gap: 7px; margin-top: 7px; }
-  .bi-manual input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 7px 10px; color: #f5f2ee; font-size: 12px; font-family: inherit; min-width: 0; }
-  .bi-manual input:focus { outline: none; border-color: rgba(217,169,120,0.5); }
-  .bi-manual button { border: 1px solid rgba(217,169,120,0.35); background: rgba(217,169,120,0.1); color: #d9a978; font-size: 10.5px; font-weight: 700; padding: 6px 11px; border-radius: 8px; cursor: pointer; font-family: inherit; white-space: nowrap; }
-  .bi-actions { padding: 14px 17px; border-top: 1px solid rgba(217,169,120,0.12); display: flex; gap: 9px; position: sticky; bottom: 0; background: rgba(10,10,14,0.98); }
-  .bi-btn { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  .bi-btn.rep { background: rgba(26,26,31,0.8); color: #d9a978; border: 1px solid rgba(217,169,120,0.3); }
-  .bi-btn.save { background: linear-gradient(135deg,#30d16c,#22a855); color: #04231a; }
-  .bi-btn.del { background: rgba(255,69,58,0.1); color: #ff6b6b; border: 1px solid rgba(255,69,58,0.35); flex: 0 0 auto; padding: 12px 15px; }
-  .bi-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .bi-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1004; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+  .bi-psrc { font-size: 7.5px; font-weight: 800; letter-spacing: 0.9px; color: #a89880; background: rgba(0,0,0,0.4); border: 1px solid rgba(217,169,120,0.2); padding: 3px 7px; border-radius: 5px; font-family: ui-monospace, monospace; flex-shrink: 0; }
+  .bi-pval { flex: 1; font-size: 10.5px; min-width: 0; word-break: break-word; font-family: ui-monospace, monospace; color: #cdc5bc; }
+  .bi-see { width: 26px; height: 26px; border-radius: 8px; border: 1px solid rgba(217,169,120,0.28); background: linear-gradient(160deg,rgba(217,169,120,0.13),rgba(217,169,120,0.03)); color: #d9a978; font-size: 11px; cursor: pointer; flex-shrink: 0; transition: all 0.2s ease; box-shadow: inset 0 1px 0 rgba(255,232,192,0.15); }
+  .bi-see:hover { background: rgba(217,169,120,0.25); box-shadow: 0 0 12px rgba(217,169,120,0.3); }
+  .bi-use { border: 1px solid rgba(48,209,108,0.35); background: linear-gradient(160deg,rgba(48,209,108,0.15),rgba(48,209,108,0.04)); color: #5ee9a0; font-size: 9.5px; font-weight: 800; padding: 6px 11px; border-radius: 7px; cursor: pointer; font-family: inherit; letter-spacing: 0.3px; flex-shrink: 0; transition: all 0.2s ease; box-shadow: inset 0 1px 0 rgba(94,233,160,0.2); }
+  .bi-use:hover { background: rgba(48,209,108,0.28); }
+  .bi-use.applied { background: linear-gradient(160deg,#3ee08a,#22a855); color: #04231a; box-shadow: 0 0 16px rgba(48,209,108,0.4); }
+  .bi-manual { display: flex; gap: 6px; margin-top: 8px; }
+  .bi-manual input { flex: 1; background: rgba(0,0,0,0.42); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 7px 10px; color: #f5f2ee; font-size: 10.5px; font-family: ui-monospace, monospace; min-width: 0; outline: none; transition: all 0.2s ease; box-shadow: inset 0 2px 5px rgba(0,0,0,0.4); }
+  .bi-manual input:focus { border-color: rgba(217,169,120,0.5); box-shadow: inset 0 2px 5px rgba(0,0,0,0.4), 0 0 0 3px rgba(217,169,120,0.07); }
+  .bi-manual button { border: 1px solid rgba(217,169,120,0.3); background: linear-gradient(160deg,rgba(217,169,120,0.14),rgba(217,169,120,0.04)); color: #d9a978; font-size: 9.5px; font-weight: 800; padding: 7px 12px; border-radius: 8px; cursor: pointer; font-family: inherit; }
+  .bi-actions { padding: 13px; display: flex; gap: 8px; position: sticky; bottom: 0; background: linear-gradient(180deg,rgba(8,8,11,0.55),rgba(8,8,11,0.98) 45%); backdrop-filter: blur(12px); border-top: 1px solid rgba(217,169,120,0.14); }
+  .bi-btn { flex: 1; padding: 12px; border-radius: 11px; border: none; font-size: 11px; font-weight: 800; cursor: pointer; font-family: inherit; letter-spacing: 0.3px; transition: all 0.2s ease; }
+  .bi-btn.rep { background: linear-gradient(165deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02)); color: #d9a978; border: 1px solid rgba(217,169,120,0.28); box-shadow: inset 0 1px 0 rgba(255,232,192,0.12); }
+  .bi-btn.rep:hover { background: rgba(217,169,120,0.16); }
+  .bi-btn.save { background: linear-gradient(165deg,#43e28f,#1f9c4e); color: #022417; box-shadow: 0 5px 20px rgba(48,209,108,0.32), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .bi-btn.del { background: rgba(255,69,58,0.1); color: #ff6b6b; border: 1px solid rgba(255,69,58,0.3); flex: 0 0 auto; padding: 12px 14px; }
+  .bi-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  .bi-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.92); z-index: 1004; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
   .bi-viewer.open { opacity: 1; pointer-events: auto; }
-  .bi-vlabel { font-size: 11.5px; font-weight: 700; color: #d9a978; margin-bottom: 12px; letter-spacing: 0.5px; }
-  .bi-vcover { width: min(300px,76vw); aspect-ratio: 3/4.2; border-radius: 14px; overflow: hidden; border: 1px solid rgba(217,169,120,0.25); box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+  .bi-vlabel { font-size: 11.5px; font-weight: 800; color: #d9a978; margin-bottom: 12px; letter-spacing: 1px; font-family: ui-monospace, monospace; text-transform: uppercase; }
+  .bi-vcover { width: min(300px,76vw); aspect-ratio: 3/4.2; border-radius: 14px; overflow: hidden; border: 1px solid rgba(217,169,120,0.3); box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
   .bi-vcover img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .bi-vtrailer { width: min(560px,92vw); aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; border: 1px solid rgba(217,169,120,0.25); background: #000; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
+  .bi-vtrailer { width: min(560px,92vw); aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; border: 1px solid rgba(217,169,120,0.3); background: #000; box-shadow: 0 20px 60px rgba(0,0,0,0.8); }
   .bi-vtrailer iframe { width: 100%; height: 100%; border: 0; }
   .bi-vactions { display: flex; gap: 10px; margin-top: 16px; }
-  .bi-vbtn { padding: 10px 18px; border-radius: 11px; border: none; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  .bi-vuse { background: #30d16c; color: #04231a; }
-  .bi-vclose { background: rgba(255,255,255,0.1); color: #c9b8a8; }
-  .bi-toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%,160%); background: #30d16c; color: #04231a; font-size: 12px; font-weight: 700; padding: 11px 18px; border-radius: 11px; transition: transform 0.3s; z-index: 1010; max-width: 92vw; text-align: center; }
+  .bi-vbtn { padding: 10px 18px; border-radius: 11px; border: none; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .bi-vuse { background: linear-gradient(160deg,#43e28f,#1f9c4e); color: #022417; }
+  .bi-vclose { background: rgba(255,255,255,0.1); color: #c9c2ba; }
+  .bi-toast { position: fixed; left: 50%; bottom: 18px; transform: translate(-50%,160%); background: linear-gradient(160deg,#43e28f,#22a855); color: #022417; font-size: 12px; font-weight: 800; padding: 11px 18px; border-radius: 11px; transition: transform 0.3s ease; z-index: 1010; max-width: 92vw; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
   .bi-toast.show { transform: translate(-50%,0); }
-  .bi-toast.err { background: #ff9f0a; color: #231a04; }
-  .bot-mhead { padding: 18px 20px; background: linear-gradient(135deg,rgba(217,169,120,0.08),transparent); border-bottom: 1px solid rgba(217,169,120,0.15); display: flex; align-items: center; gap: 13px; position: relative; }
-  .bot-mhead::after { content:""; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,#d9a978,transparent); }
-  .bot-mico { width: 44px; height: 44px; border-radius: 13px; background: linear-gradient(145deg,#232330,#14141c); border: 1px solid rgba(217,169,120,0.4); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .bot-mtitle { font-size: 16px; font-weight: 700; background: linear-gradient(135deg,#ffe8c0,#d9a978); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
-  .bot-msub { font-size: 11px; color: #8a8580; margin-top: 2px; display: flex; align-items: center; gap: 6px; }
-  .bot-sdot { width: 7px; height: 7px; border-radius: 50%; background: #30d16c; box-shadow: 0 0 8px #30d16c; }
-  .bot-mclose { margin-left: auto; background: none; border: none; color: #8a8580; font-size: 22px; cursor: pointer; padding: 4px 8px; }
-  .bot-summary { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; padding: 18px 20px; }
-  .bot-scard { background: linear-gradient(145deg,rgba(22,22,28,0.8),rgba(15,15,20,0.8)); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; padding: 14px; text-align: center; position: relative; overflow: hidden; }
-  .bot-scard::before { content:""; position:absolute; top:0; left:0; right:0; height:2px; }
-  .bot-scard.ok::before { background:linear-gradient(90deg,transparent,#30d16c,transparent); }
-  .bot-scard.warn::before { background:linear-gradient(90deg,transparent,#ff9f0a,transparent); }
-  .bot-scard.crit::before { background:linear-gradient(90deg,transparent,#ff453a,transparent); }
-  .bot-snum { font-size: 26px; font-weight: 800; line-height: 1; }
-  .bot-snum.ok { color:#30d16c; } .bot-snum.warn { color:#ff9f0a; } .bot-snum.crit { color:#ff453a; }
-  .bot-slbl { font-size: 10px; color: #8a8580; margin-top: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .bot-sectitle { font-size: 12px; font-weight: 700; padding: 10px 20px 8px; display: flex; align-items: center; gap: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .bot-sectitle.crit { color: #ff6b6b; } .bot-sectitle.warn { color: #ffb340; }
-  .bot-pill { font-size: 10px; background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 8px; color: #8a8580; }
-  .bot-item { display: flex; align-items: center; gap: 12px; padding: 11px 20px; border-top: 1px solid rgba(255,255,255,0.04); }
-  .bot-ithumb { width: 34px; height: 46px; border-radius: 6px; background: linear-gradient(145deg,#2c2c34,#1a1a20); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-  .bot-ibody { flex: 1; min-width: 0; }
-  .bot-iname { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bot-imeta { font-size: 11px; color: #8a8580; margin-top: 2px; }
-  .bot-idays { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
-  .bot-idays.urgent { background: rgba(255,69,58,0.15); color: #ff6b6b; border: 1px solid rgba(255,69,58,0.3); }
-  .bot-idays.soon { background: rgba(255,159,10,0.12); color: #ffb340; }
-  .bot-ichecks { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
-  .bot-chk { font-size: 10px; padding: 2px 7px; border-radius: 5px; }
-  .bot-chk.miss { background: rgba(255,69,58,0.15); color: #ff7b72; }
-  .bot-actions { padding: 18px 20px; border-top: 1px solid rgba(217,169,120,0.12); display: flex; gap: 12px; position: sticky; bottom: 0; background: rgba(10,10,14,0.98); }
-  .bot-btn { flex: 1; padding: 13px; border-radius: 13px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  .bot-btn.scan { background: rgba(26,26,31,0.8); color: #d9a978; border: 1px solid rgba(217,169,120,0.3); }
-  .bot-btn.repair { background: linear-gradient(135deg,#30d16c,#22a855); color: #04231a; }
-  .bot-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .bot-empty { padding: 30px 20px; text-align: center; color: #8a8580; font-size: 13px; }
+  .bi-empty { text-align: center; padding: 26px 16px; color: #6a6560; font-size: 11.5px; }
+  .bi-toast.err { background: linear-gradient(160deg,#ffb340,#e08a10); color: #231a04; }
   .hist-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.55);
     z-index: 1001; opacity: 0; pointer-events: none;
@@ -884,6 +868,12 @@
   function biYtId(u) { var m = String(u || "").match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/); return m ? m[1] : null; }
   function biFieldByKey(k) { var r = null; BI_FIELDS.forEach(function(x) { if (x.key === k) r = x; }); return r; }
   function biVal(k) { if (biPending[k] !== undefined) return biPending[k]; return biCtx && biCtx.current ? biCtx.current[k] : null; }
+  // Trace d'action dans la console du dashboard. Toute ecriture (choix,
+  // saisie, PATCH, refetch, suppression) laisse une ligne horodatee avec
+  // son code HTTP : le toast disparait, la console fait foi.
+  function biLog(txt, type) {
+    if (typeof consoleLine === "function") consoleLine(txt, type || "info");
+  }
   function biToast(t, err) {
     var e = document.getElementById("biToast");
     e.textContent = t; e.className = "bi-toast show" + (err ? " err" : "");
@@ -899,12 +889,16 @@
     try {
       var res = await fetch("/dashboard/admin/item-raw-sources?id=" + id + "&type=" + type);
       var d = await res.json();
-      if (!d.ok || !d.found) { document.getElementById("biContent").innerHTML = '<div class="bot-empty">Item introuvable</div>'; return; }
+      if (!d.ok || !d.found) { document.getElementById("biContent").innerHTML = '<div class="bi-empty">Item introuvable</div>'; return; }
       biCtx = { id: id, type: type, title: d.title || ("#" + id), current: d.current || {}, sources: d.sources || {} };
+      var etat = biSrcNames(type).map(function(nm) { return nm + (biCtx.sources[nm] ? " ok" : " vide"); }).join(", ");
+      biLog("$ item #" + id + " (" + type + ") " + biCtx.title, "cmd");
+      biLog("  sources : " + etat, "info");
       document.getElementById("biTitle").textContent = biCtx.title;
+      document.getElementById("biType").textContent = (type === "anime" ? "Anime" : "Jeu") + " \u00b7 #" + id + " \u00b7 " + etat;
       biRender();
     } catch (e) {
-      document.getElementById("biContent").innerHTML = '<div class="bot-empty">Erreur : ' + biEsc(e.message) + '</div>';
+      document.getElementById("biContent").innerHTML = '<div class="bi-empty">Erreur : ' + biEsc(e.message) + '</div>';
     }
   }
   function closeBotItem() { document.getElementById("biModal").classList.remove("open"); biCloseView(); biCtx = null; biPending = {}; }
@@ -912,14 +906,19 @@
     if (!biCtx) return;
     var names = biSrcNames(biCtx.type);
     var html = "";
+    var manques = [];
     BI_FIELDS.forEach(function(f) {
       var cur = biVal(f.key);
       var has = cur != null && String(cur).trim() !== "";
       var pend = biPending[f.key] !== undefined;
       var visual = (f.key === "cover" || f.key === "trailer_url");
-      html += '<div class="bi-field">';
-      html += '<div class="bi-fhead"><span class="bi-fname">' + f.label + '</span><span class="bi-fstate ' + (has ? "ok" : "miss") + '">' + (pend ? "modifie" : (has ? "ok" : "manquant")) + '</span></div>';
-      html += '<div class="bi-cur' + (has ? "" : " empty") + '"><span>' + (has ? biEsc(biShort(cur, 130)) : "aucun") + '</span>';
+      if (!has) manques.push(f.label.toLowerCase());
+      var etat = pend ? "pend" : (has ? "ok" : "miss");
+      var lbl = pend ? "MODIFIE" : (has ? "OK" : "MANQUANT");
+      html += '<div class="bi-field ' + etat + '">';
+      html += '<div class="bi-fhead"><span class="bi-fname">' + f.label + '</span><span class="bi-fline"></span><span class="bi-fstate ' + etat + '">' + lbl + '</span></div>';
+      html += '<div class="bi-fbody">';
+      html += '<div class="bi-cur' + (has ? "" : " empty") + '"><span class="bi-curl">base</span><span>' + (has ? biEsc(biShort(cur, 120)) : "aucun") + '</span>';
       if (has && visual) html += '<button class="bi-see" onclick="biView(\'' + f.key + '\',\'__cur\')" title="Voir">' + (f.key === "cover" ? "&#128065;" : "&#9654;") + '</button>';
       html += '</div>';
       names.forEach(function(n) {
@@ -929,21 +928,35 @@
           html += '<div class="bi-prop none"><span class="bi-psrc">' + n.toUpperCase() + '</span><span class="bi-pval">aucune donnee</span></div>';
           return;
         }
-        html += '<div class="bi-prop"><span class="bi-psrc">' + n.toUpperCase() + '</span><span class="bi-pval">' + biEsc(biShort(v, 95)) + '</span>';
+        html += '<div class="bi-prop"><span class="bi-psrc">' + n.toUpperCase() + '</span><span class="bi-pval">' + biEsc(biShort(v, 90)) + '</span>';
         if (visual) html += '<button class="bi-see" onclick="biView(\'' + f.key + '\',\'' + n + '\')" title="Voir">' + (f.key === "cover" ? "&#128065;" : "&#9654;") + '</button>';
         html += '<button class="bi-use" onclick="biUse(\'' + f.key + '\',\'' + n + '\')">Utiliser</button></div>';
       });
-      html += '<div class="bi-manual"><input id="bi-in-' + f.key + '" placeholder="Saisir manuellement"><button onclick="biMan(\'' + f.key + '\')">Appliquer</button></div>';
-      html += '</div>';
+      html += '<div class="bi-manual"><input id="bi-in-' + f.key + '" placeholder="Saisie manuelle"><button onclick="biMan(\'' + f.key + '\')">OK</button></div>';
+      html += '</div></div>';
     });
     document.getElementById("biContent").innerHTML = html;
     document.getElementById("biSaveBtn").disabled = Object.keys(biPending).length === 0;
+    // Ligne de diagnostic : ce que le robot conclut de l'analyse
+    var dg = document.getElementById("biDiag");
+    if (dg) {
+      dg.style.display = "flex";
+      if (manques.length) {
+        dg.innerHTML = '<div class="bi-diag-i">!</div><div class="bi-diag-t">Analyse : <b>' + manques.length +
+          ' champ' + (manques.length > 1 ? "s" : "") + ' manquant' + (manques.length > 1 ? "s" : "") + '</b> sur ' +
+          BI_FIELDS.length + ' \u2014 ' + biEsc(manques.join(", ")) + '.</div>';
+      } else {
+        dg.innerHTML = '<div class="bi-diag-i ok">\u2713</div><div class="bi-diag-t">Analyse : <b>aucun manque</b>, les ' +
+          BI_FIELDS.length + ' champs sont renseignes.</div>';
+      }
+    }
   }
   function biUse(fieldKey, srcName) {
     var f = biFieldByKey(fieldKey), s = biCtx && biCtx.sources[srcName];
     if (!f || !s) return;
     biPending[fieldKey] = s[f.src];
     biRender();
+    biLog("  \u2192 " + fieldKey + " \u2190 " + srcName + " : " + biShort(s[f.src], 70), "info");
     biToast("Choisi (" + srcName + ") - pense a Sauvegarder");
   }
   function biMan(fieldKey) {
@@ -952,6 +965,7 @@
     if (!v) return;
     biPending[fieldKey] = v;
     biRender();
+    biLog("  \u2192 " + fieldKey + " \u2190 manuel : " + biShort(v, 70), "info");
     biToast("Valeur manuelle appliquee - pense a Sauvegarder");
   }
   function biView(fieldKey, srcName) {
@@ -967,7 +981,7 @@
     else {
       var vid = biYtId(url);
       box.className = "bi-vtrailer";
-      box.innerHTML = vid ? '<iframe src="https://www.youtube.com/embed/' + vid + '?autoplay=1&mute=1&rel=0" allow="autoplay" allowfullscreen></iframe>' : '<div class="bot-empty">URL YouTube non reconnue</div>';
+      box.innerHTML = vid ? '<iframe src="https://www.youtube.com/embed/' + vid + '?autoplay=1&mute=1&rel=0" allow="autoplay" allowfullscreen></iframe>' : '<div class="bi-empty">URL YouTube non reconnue</div>';
     }
     document.getElementById("biUseFromView").style.display = biViewSrc ? "block" : "none";
     document.getElementById("biViewer").classList.add("open");
@@ -985,9 +999,13 @@
     var btn = document.getElementById("biSaveBtn");
     btn.disabled = true; btn.textContent = "Sauvegarde...";
     try {
+      biLog("$ PATCH /admin/items/" + biCtx.type + "/" + biCtx.id + " \u2014 " + keys.join(", "), "cmd");
       var res = await fetch("/dashboard/admin/items/" + biCtx.type + "/" + biCtx.id, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(biPending) });
       var d = await res.json();
-      if (!d.ok) { biToast("Refuse : " + (d.msg || "erreur"), true); }
+      if (!d.ok) {
+        biLog("  \u2717 HTTP " + res.status + " \u2014 " + (d.msg || "erreur"), "err");
+        biToast("Refuse : " + (d.msg || "erreur"), true);
+      }
       else {
         var saved = biPending; biPending = {};
         var cur = biCtx.current || {};
@@ -995,6 +1013,8 @@
         if (d.item) ["cover", "platform", "trailer_url"].forEach(function(k) { if (d.item[k] !== undefined) cur[k] = d.item[k]; });
         biCtx.current = cur;
         biRender();
+        biLog("  \u2713 HTTP " + res.status + " \u2014 " + (d.updated || keys.length) + " champ(s) ecrit(s) en base", "ok");
+        (d.notes || []).forEach(function(nt) { biLog("  \u26a0 " + nt, "warn"); });
         biToast("Sauvegarde : " + keys.length + " champ(s)" + (d.notes && d.notes.length ? " - " + d.notes[0] : ""));
       }
     } catch (e) { biToast("Erreur : " + e.message, true); }
@@ -1006,7 +1026,10 @@
     var id = biCtx.id, type = biCtx.type;
     btn.disabled = true; btn.textContent = "Refetch...";
     try {
-      await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      biLog("$ POST /admin/refetch-one?id=" + id + "&type=" + type, "cmd");
+      var rr = await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      var rj = await rr.json().catch(function() { return {}; });
+      biLog("  " + (rr.ok ? "\u2713" : "\u2717") + " HTTP " + rr.status + (rj.msg ? " \u2014 " + rj.msg : ""), rr.ok ? "ok" : "err");
       biToast("Refetch termine - rechargement");
       await openBotItem(id, type);
     } catch (e) { biToast("Erreur : " + e.message, true); }
@@ -1016,10 +1039,16 @@
     if (!biCtx) return;
     if (!confirm("Supprimer definitivement « " + biCtx.title + " » (#" + biCtx.id + ") ?\n\nL'item sera supprime ET ajoute a la blocklist.")) return;
     try {
+      biLog("$ DELETE /admin/items/" + biCtx.type + "/" + biCtx.id + " \u2014 " + biCtx.title, "cmd");
       var res = await fetch("/dashboard/admin/items/" + biCtx.type + "/" + biCtx.id, { method: "DELETE", headers: { "Content-Type": "application/json" } });
       var d = await res.json();
-      if (d.ok && d.deleted) { biToast("Supprime + blockliste"); closeBotItem(); }
-      else biToast("Echec : " + (d.msg || "erreur"), true);
+      if (d.ok && d.deleted) {
+        biLog("  \u2713 HTTP " + res.status + " \u2014 supprime + ajoute a la blocklist", "ok");
+        biToast("Supprime + blockliste"); closeBotItem(); gcLoad();
+      } else {
+        biLog("  \u2717 HTTP " + res.status + " \u2014 " + (d.msg || "erreur"), "err");
+        biToast("Echec : " + (d.msg || "erreur"), true);
+      }
     } catch (e) { biToast("Erreur : " + e.message, true); }
   }
   // ── Console : recherche texte ET filtres d'audit sur une seule liste. ──
@@ -1085,8 +1114,13 @@
       var url = "/dashboard/admin/console?filter=" + encodeURIComponent(gcS.filter) +
                 "&type=" + encodeURIComponent(gcS.type) +
                 "&q=" + encodeURIComponent(gcS.q) + "&limit=300";
-      var d = await (await fetch(url)).json();
-      if (!d.ok) { tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Erreur : ' + gcEsc(d.msg || "inconnue") + '</td></tr>'; return; }
+      var rc = await fetch(url);
+      var d = await rc.json();
+      if (!d.ok) {
+        if (typeof consoleLine === "function") consoleLine("\u2717 console HTTP " + rc.status + " \u2014 " + (d.msg || "erreur"), "err");
+        tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Erreur : ' + gcEsc(d.msg || "inconnue") + '</td></tr>'; return;
+      }
+      if (typeof consoleLine === "function") consoleLine("$ console filter=" + gcS.filter + " type=" + gcS.type + (gcS.q ? " q=\"" + gcS.q + "\"" : "") + " \u2192 " + d.trouves + " trouve(s)", "cmd");
       var t = d.totaux || {};
       ["all","critical","incomplete","no-platform","hotlink","no-trailer"].forEach(function(k) {
         var e = document.getElementById("gc-n-" + k);
@@ -1752,10 +1786,16 @@
 <!-- BOT AUDITEUR -->
 <div class="bi-modal" id="biModal">
   <div class="bi-head">
-    <button class="bi-back" onclick="closeBotItem()">&lsaquo;</button>
-    <div class="bi-title" id="biTitle">Item</div>
-    <span class="bi-type" id="biType"></span>
+    <span class="bi-br tl"></span><span class="bi-br tr"></span>
+    <div class="bi-avatar"><svg width="27" height="27" viewBox="0 0 32 32" fill="none"><rect x="7" y="10" width="18" height="15" rx="4.5" fill="#d9a978"/><rect x="9.5" y="13" width="13" height="8" rx="2" fill="#0c0a10"/><circle class="bi-eye" cx="13" cy="17" r="2.1" fill="#ffe8c0"/><circle class="bi-eye" cx="19" cy="17" r="2.1" fill="#ffe8c0"/><rect x="14.5" y="4.5" width="3" height="4.5" rx="1.5" fill="#d9a978"/><circle cx="16" cy="3.6" r="2.1" fill="#ffe8c0"/><rect x="3.5" y="15" width="2.6" height="6" rx="1.3" fill="#a87d54"/><rect x="25.9" y="15" width="2.6" height="6" rx="1.3" fill="#a87d54"/></svg></div>
+    <div class="bi-htx">
+      <div class="bi-title" id="biTitle">Item</div>
+      <div class="bi-meta"><i class="bi-led"></i><span id="biType"></span></div>
+    </div>
+    <button class="bi-close" onclick="closeBotItem()">&times;</button>
   </div>
+  <div class="bi-sep"></div>
+  <div class="bi-diag" id="biDiag" style="display:none"></div>
   <div id="biContent"></div>
   <div class="bi-actions">
     <button class="bi-btn rep" id="biRepairBtn2" onclick="biRepair()">Reparer auto</button>
