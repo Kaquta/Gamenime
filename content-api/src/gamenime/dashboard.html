@@ -789,36 +789,6 @@
   </div>
 
   <!-- ═══ RECHERCHE GLOBALE FLOTTANTE (bas-gauche) ═══ -->
-  <button class="search-fab" id="search-fab" onclick="toggleSearch()">
-    <span class="search-fab-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></svg></span><span>Recherche</span>
-  </button>
-  <div class="search-float" id="search-float">
-    <div class="search-bar-row">
-      <span class="search-bar-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle"><path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z"/></svg></span>
-      <input type="text" class="search-bar-input" id="search-input" placeholder="Rechercher dans toute la base..." onkeydown="if(event.key==='Enter')doGlobalSearch()" />
-      <button class="search-x" onclick="toggleSearch()">&#10005;</button>
-    </div>
-    <div class="search-pills">
-      <button class="search-pill active" data-type="all" onclick="setSearchType('all')">Tous</button>
-      <button class="search-pill" data-type="anime" onclick="setSearchType('anime')">Anime</button>
-      <button class="search-pill" data-type="game" onclick="setSearchType('game')">Jeux</button>
-    </div>
-    <div class="search-split">
-      <div class="search-left">
-        <div class="search-list" id="search-results">
-          <div class="search-empty">Tape un titre et lance la recherche</div>
-        </div>
-        <div class="search-preview" id="search-preview" style="display:none">
-          <div class="sp-label" id="sp-label">▶ APERÇU</div>
-          <div class="sp-video" id="sp-video"></div>
-          <div class="sp-hint">Clique ▶ sur une proposition pour la jouer ici</div>
-        </div>
-      </div>
-      <div class="search-detail" id="search-detail">
-        <div class="search-empty">Sélectionne un résultat</div>
-      </div>
-    </div>
-  </div>
 
   <div class="foot">GameNime · monitoring · mise à jour temps réel</div>
 </div>
@@ -897,91 +867,6 @@
       hf.style.display = "none";
       closeHist();
     }
-  }
-  // ═══ BOT AUDITEUR ═══
-  var botData = null;
-  function updateBotFab() {
-    var bf = document.getElementById("botFabWrap");
-    if (!bf) return;
-    // Le robot n'apparait que sur la page Administration
-    if (adminOpen) { bf.style.display = "block"; }
-    else { bf.style.display = "none"; closeBot(); }
-  }
-  function openBot() {
-    document.getElementById("botOverlay").classList.add("open");
-    document.getElementById("botModal").classList.add("open");
-  }
-  // Drag du bouton robot (souris + tactile) — attend que le DOM soit chargé
-  window.addEventListener("load", function() {
-    var fab = document.getElementById("botFabWrap");
-    var handle = document.getElementById("botFab");
-    if (!fab || !handle) return;
-    var dragging = false, moved = false;
-    var startX = 0, startY = 0, origX = 0, origY = 0;
-    function getPoint(e) {
-      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
-      return { x: e.clientX, y: e.clientY };
-    }
-    function onDown(e) {
-      dragging = true; moved = false;
-      var p = getPoint(e);
-      startX = p.x; startY = p.y;
-      var rect = fab.getBoundingClientRect();
-      origX = rect.left; origY = rect.top;
-      fab.style.transition = "none";
-    }
-    function onMove(e) {
-      if (!dragging) return;
-      var p = getPoint(e);
-      var dx = p.x - startX, dy = p.y - startY;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
-      var nx = origX + dx, ny = origY + dy;
-      // Rester dans la fenetre
-      nx = Math.max(4, Math.min(window.innerWidth - fab.offsetWidth - 4, nx));
-      ny = Math.max(4, Math.min(window.innerHeight - fab.offsetHeight - 4, ny));
-      fab.style.left = nx + "px";
-      fab.style.top = ny + "px";
-      fab.style.right = "auto";
-      fab.style.bottom = "auto";
-      if (e.cancelable) e.preventDefault();
-    }
-    function onUp() {
-      if (!dragging) return;
-      dragging = false;
-      fab.style.transition = "";
-    }
-    handle.addEventListener("mousedown", onDown);
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    handle.addEventListener("touchstart", onDown, { passive: true });
-    document.addEventListener("touchmove", onMove, { passive: false });
-    document.addEventListener("touchend", onUp);
-    // Empecher le clic d'ouvrir le panneau si on a deplace
-    handle.addEventListener("click", function(e) {
-      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; }
-    }, true);
-  });
-  function closeBot() {
-    var o = document.getElementById("botOverlay"), m = document.getElementById("botModal");
-    if (o) o.classList.remove("open");
-    if (m) m.classList.remove("open");
-  }
-  function botChkHtml(item) {
-    var fields = item.type === "anime"
-      ? [["cover","cover"],["platform","plateforme"],["trailer","trailer"],["description","desc"]]
-      : [["cover","cover"],["platform","plateforme"],["description","desc"]];
-    var html = "";
-    fields.forEach(function(f) {
-      if (item.manque.indexOf(f[0] === "platform" ? "plateforme" : (f[0]==="description"?"description":f[0])) !== -1
-          || (f[0]==="platform" && item.manque.indexOf("plateforme")!==-1)) {
-        html += '<span class="bot-chk miss">✗ ' + f[1] + '</span>';
-      }
-    });
-    // Simplification : afficher juste les manques
-    html = "";
-    item.manque.forEach(function(m) { html += '<span class="bot-chk miss">✗ ' + m + '</span>'; });
-    if (item.dateImprecise) html += '<span class="bot-chk" style="background:rgba(255,159,10,0.1);color:#ffb340">📅 date à venir</span>';
-    return html;
   }
   // ── Panneau de controle total d'un item ──
   var biCtx = null;      // { id, type, title, current, sources }
@@ -1219,81 +1104,6 @@
       tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Erreur : ' + gcEsc(e.message) + '</td></tr>';
     }
   }
-  function botItemHtml(item) {
-    var emoji = item.type === "anime" ? "🎌" : "🎮";
-    var daysClass = (item.jours !== null && item.jours <= 3) ? "urgent" : "soon";
-    var daysLabel = item.jours !== null ? ("J-" + item.jours) : "?";
-    var dateStr = item.release_date || "";
-    return '<div class="bot-item" onclick="openBotItem(' + item.id + ',\'' + item.type + '\')">' +
-      '<div class="bot-ithumb">' + emoji + '</div>' +
-      '<div class="bot-ibody">' +
-        '<div class="bot-iname">' + (item.title || "Sans titre") + '</div>' +
-        '<div class="bot-imeta">' + dateStr + ' · ' + (item.type === "anime" ? "Anime" : "Jeu") + '</div>' +
-        '<div class="bot-ichecks">' + botChkHtml(item) + '</div>' +
-      '</div>' +
-      '<span class="bot-idays ' + daysClass + '">' + daysLabel + '</span>' +
-      '<span class="bi-chev">&rsaquo;</span>' +
-    '</div>';
-  }
-  async function lancerAudit() {
-    var btn = document.getElementById("botScanBtn");
-    btn.disabled = true; btn.textContent = "⏳ Scan...";
-    try {
-      var res = await fetch("/dashboard/admin/audit-report", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      var d = await res.json();
-      botData = d;
-      var r = d.resume || {};
-      var html = '<div class="bot-summary">' +
-        '<div class="bot-scard ok"><div class="bot-snum ok">' + (r.complets||0) + '</div><div class="bot-slbl">Complets</div></div>' +
-        '<div class="bot-scard warn"><div class="bot-snum warn">' + (r.incomplets||0) + '</div><div class="bot-slbl">Incomplets</div></div>' +
-        '<div class="bot-scard crit"><div class="bot-snum crit">' + (r.critiques_j7||0) + '</div><div class="bot-slbl">Critiques J-7</div></div>' +
-      '</div>';
-      var crit = d.critique_j7 || [];
-      if (crit.length) {
-        html += '<div class="bot-sectitle crit">🔴 Critique — sortent bientôt <span class="bot-pill">priorité</span></div>';
-        crit.forEach(function(it) { html += botItemHtml(it); });
-      }
-      var inc = d.incomplets || [];
-      if (inc.length) {
-        html += '<div class="bot-sectitle warn">🟠 Autres incomplets <span class="bot-pill">' + inc.length + ' items</span></div>';
-        inc.slice(0, 40).forEach(function(it) { html += botItemHtml(it); });
-        if (inc.length > 40) html += '<div class="bot-empty">... et ' + (inc.length - 40) + ' autres</div>';
-      }
-      if (!crit.length && !inc.length) html += '<div class="bot-empty">✨ Tout est complet !</div>';
-      document.getElementById("botContent").innerHTML = html;
-      document.getElementById("botScanDate").textContent = "Scan : " + new Date().toLocaleString("fr-FR", {day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
-      var badge = document.getElementById("botBadge");
-      var fab = document.getElementById("botFab");
-      var totalCrit = r.critiques_j7 || 0;
-      if (totalCrit > 0) {
-        badge.textContent = totalCrit; badge.style.display = "flex";
-        if (fab) fab.classList.add("has-alert");
-      } else {
-        badge.style.display = "none";
-        if (fab) fab.classList.remove("has-alert");
-      }
-      document.getElementById("botRepairBtn").disabled = ((r.incomplets||0) + (r.critiques_j7||0)) === 0;
-    } catch (e) {
-      document.getElementById("botContent").innerHTML = '<div class="bot-empty">✗ Erreur : ' + e.message + '</div>';
-    } finally {
-      btn.disabled = false; btn.textContent = "Lancer le scan";
-    }
-  }
-  async function lancerReparation() {
-    var btn = document.getElementById("botRepairBtn");
-    if (!confirm("Lancer la reparation des items incomplets ? Cela peut prendre plusieurs minutes.")) return;
-    btn.disabled = true; btn.textContent = "🔧 Reparation...";
-    try {
-      var res = await fetch("/dashboard/admin/audit-repair", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      var d = await res.json();
-      alert("Reparation terminee : " + (d.repares||0) + " reparés, " + (d.echecs||0) + " sans donnees dispo.");
-      lancerAudit(); // rescan pour rafraichir
-    } catch (e) {
-      alert("Erreur : " + e.message);
-    } finally {
-      btn.disabled = false; btn.textContent = "Reparer proprement";
-    }
-  }
   function switchView() {
     if (currentView === "surveillance") {
       currentView = "traffic";
@@ -1307,7 +1117,6 @@
       document.getElementById("toggle-label").textContent = "Trafic";
     }
     updateHistFab();
-    updateBotFab();
   }
 
   // ═══ Navigation Administration ═══
@@ -1322,16 +1131,10 @@
       document.getElementById("admin-btn").classList.add("active");
       document.getElementById("toggle-btn").style.display = "none";
       document.getElementById("console-fab").classList.add("visible");
-      document.getElementById("search-fab").classList.add("visible");
       updateHistFab();
-      updateBotFab();
-    updateBotFab();
     } else {
       adminOpen = false;
       document.getElementById("console-fab").classList.remove("visible");
-      document.getElementById("search-fab").classList.remove("visible");
-      var sf = document.getElementById("search-float");
-      if (sf) sf.classList.remove("open");
       var fl = document.getElementById("console-float");
       if (fl) fl.classList.remove("open");
       document.getElementById("page-admin").className = "page";
@@ -1344,8 +1147,6 @@
       document.getElementById("admin-btn").classList.remove("active");
       document.getElementById("toggle-btn").style.display = "";
       updateHistFab();
-      updateBotFab();
-    updateBotFab();
     }
   }
 
@@ -1766,21 +1567,6 @@
   var incompleteData = [];
   var incompleteFilter = "all";
 
-  async function loadIncomplete() {
-    var list = document.getElementById("inc-list");
-    list.innerHTML = '<div class="inc-empty">Chargement...</div>';
-    try {
-      var typeEl = document.getElementById("inc-type");
-      var selType = typeEl ? typeEl.value : "all";
-      var res = await fetch("/dashboard/admin/incomplete-items?type=" + selType + "&limit=500");
-      var data = await res.json();
-      incompleteData = data.items || [];
-      document.getElementById("inc-count").textContent = incompleteData.length;
-      renderIncomplete();
-    } catch (err) {
-      list.innerHTML = '<div class="inc-empty">Erreur : ' + err.message + '</div>';
-    }
-  }
 
   function matchFilter(item, f) {
     if (f === "all") return true;
@@ -1856,359 +1642,31 @@
     }
   }
 
-  function renderIncomplete() {
-    var list = document.getElementById("inc-list");
-    var searchEl = document.getElementById("inc-search");
-    var q = searchEl ? searchEl.value.trim().toLowerCase() : "";
-    var filtered = incompleteData.filter(function(it) {
-      if (!matchFilter(it, incompleteFilter)) return false;
-      if (q && (!it.title || it.title.toLowerCase().indexOf(q) === -1)) return false;
-      return true;
-    });
-    if (!filtered.length) {
-      list.innerHTML = '<div class="inc-empty">Aucun item dans ce filtre ✓</div>';
-      return;
-    }
-    list.innerHTML = "";
-    filtered.forEach(function(item) {
-      var row = document.createElement("div");
-      row.className = "inc-item";
-      var miss = (item.missing || []).join(", ") || "incomplet";
-      var pc = priColor(item.priority);
 
-      var idEl = document.createElement("span");
-      idEl.className = "inc-id"; idEl.textContent = "#" + item.id;
-      var info = document.createElement("div"); info.className = "inc-info";
-      var typeEl = document.createElement("div"); typeEl.className = "inc-type " + item.type; typeEl.textContent = item.type;
-      var titleEl = document.createElement("div"); titleEl.className = "inc-title"; titleEl.textContent = item.title || "";
-      info.appendChild(typeEl); info.appendChild(titleEl);
-      var probEl = document.createElement("span");
-      probEl.className = "inc-problem"; probEl.style.color = pc; probEl.textContent = miss;
-      var btn = document.createElement("button");
-      btn.className = "inc-repair"; btn.textContent = "⟳ Réparer";
-      btn.onclick = function() { repairFromList(btn, item.id, item.type); };
 
-      row.appendChild(idEl); row.appendChild(info); row.appendChild(probEl); row.appendChild(btn);
-      list.appendChild(row);
-    });
-  }
-
-  function filterIncomplete(f) {
-    incompleteFilter = f;
-    var btns = document.querySelectorAll(".inc-filter");
-    btns.forEach(function(b) { b.classList.toggle("active", b.getAttribute("data-filter") === f); });
-    renderIncomplete();
-  }
-
-  async function repairFromList(btn, id, type) {
-    ensureConsoleOpen();
-    btn.disabled = true; btn.textContent = "⏳";
-    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
-    try {
-      var res = await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      var data = await res.json();
-      if (data.ok === false) consoleLine("  ✗ " + (data.msg || "erreur"), "err");
-      else if (!data.found) consoleLine("  ⚠ #" + id + " introuvable", "warn");
-      else if (data.enriched) consoleLine("  ✓ #" + id + " réparé : " + data.fields.join(" + "), "ok");
-      else consoleLine("  ℹ #" + id + " déjà complet (sources sans nouvelle donnée)", "info");
-    } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
-    finally { btn.disabled = false; btn.textContent = "⟳ Réparer"; }
-  }
 
   // ── SESSION 18 : Recherche globale FLOTTANTE (split + actions) ──
   var searchType = "all";
   var searchSelected = null;
 
-  function toggleSearch() {
-    var fl = document.getElementById("search-float");
-    if (fl) fl.classList.toggle("open");
-  }
 
-  function setSearchType(t) {
-    searchType = t;
-    var pills = document.querySelectorAll(".search-pill");
-    pills.forEach(function(p) { p.classList.toggle("active", p.getAttribute("data-type") === t); });
-    var input = document.getElementById("search-input");
-    if (input && input.value.trim()) doGlobalSearch();
-  }
 
-  function escHtml(s) {
-    return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  }
 
-  async function doGlobalSearch() {
-    var input = document.getElementById("search-input");
-    var q = input ? input.value.trim() : "";
-    if (!q) return;
-    var list = document.getElementById("search-results");
-    var detail = document.getElementById("search-detail");
-    list.innerHTML = '<div class="search-empty">Recherche...</div>';
-    detail.innerHTML = '<div class="search-empty">Sélectionne un résultat</div>';
-    searchSelected = null;
-    try {
-      var res = await fetch("/api/feed/search?q=" + encodeURIComponent(q) + "&type=" + searchType);
-      var data = await res.json();
-      var items = data.items || [];
-      if (!items.length) {
-        list.innerHTML = '<div class="search-empty">Aucun résultat pour « ' + escHtml(q) + ' »</div>';
-        return;
-      }
-      list.innerHTML = "";
-      items.forEach(function(item, idx) {
-        var row = document.createElement("div");
-        row.className = "sr-item";
-        row.id = "sr-" + idx;
-        // cover ou placeholder
-        if (item.cover) {
-          var img = document.createElement("img");
-          img.className = "sr-cover"; img.src = item.cover; img.loading = "lazy";
-          row.appendChild(img);
-        } else {
-          var ph = document.createElement("div");
-          ph.className = "sr-cover sr-cover-ph"; ph.textContent = "?";
-          row.appendChild(ph);
-        }
-        var info = document.createElement("div"); info.className = "sr-info";
-        var typeEl = document.createElement("div"); typeEl.className = "sr-type " + item.type; typeEl.textContent = item.type === "anime" ? "ANIME" : "JEU";
-        var titleEl = document.createElement("div"); titleEl.className = "sr-title"; titleEl.textContent = item.title || "";
-        info.appendChild(typeEl); info.appendChild(titleEl);
-        row.appendChild(info);
-        row.onclick = function() { selectSearchItem(item, row); };
-        list.appendChild(row);
-      });
-    } catch (err) {
-      list.innerHTML = '<div class="search-empty">Erreur : ' + escHtml(err.message) + '</div>';
-    }
-  }
 
-  function selectSearchItem(item, el) {
-    searchSelected = item;
-    document.querySelectorAll(".sr-item").forEach(function(r) { r.classList.remove("selected"); });
-    if (el) el.classList.add("selected");
-    renderDetail(item);
-    // reset l'aperçu vidéo
-    var preview = document.getElementById("search-preview");
-    var video = document.getElementById("sp-video");
-    if (preview) preview.style.display = "none";
-    if (video) video.innerHTML = "";
-    // charger les propositions de trailers
-    loadTrailerProps(item);
-  }
 
-  function renderDetail(item) {
-    var detail = document.getElementById("search-detail");
-    var checks = [
-      { lbl: "Cover", ok: !!(item.cover && item.cover !== "") },
-      { lbl: "Description", ok: !!(item.description && item.description !== "") },
-      { lbl: "Plateforme", ok: !!(item.platform && item.platform !== "") },
-      { lbl: "Trailer", ok: !!(item.trailerUrl && item.trailerUrl !== "") },
-    ];
-    var checksHtml = checks.map(function(c) {
-      return '<span class="sd-check ' + (c.ok ? "ok" : "no") + '">' + (c.ok ? "\u2713 " : "\u2717 ") + c.lbl + '</span>';
-    }).join("");
-    var coverHtml = item.cover
-      ? '<img class="sd-cover" src="' + escHtml(item.cover) + '" />'
-      : '<div class="sd-cover" style="display:flex;align-items:center;justify-content:center;color:#4a4038;font-size:1.6rem">?</div>';
-    var typeLabel = item.type === "anime" ? "ANIME" : "JEU";
-    var date = item.releaseDate || "—";
-    var plat = item.platform || "—";
-    var genre = item.genre || "";
-    detail.innerHTML =
-      '<div class="sd-head">' +
-        coverHtml +
-        '<div class="sd-meta">' +
-          '<div class="sd-type">' + typeLabel + '</div>' +
-          '<div class="sd-title">' + escHtml(item.title || "") + '</div>' +
-          '<div class="sd-id">#' + item.id + ' \u00b7 ' + escHtml(date) + '</div>' +
-          '<div class="sd-sub">\ud83d\udcfa ' + escHtml(plat) + '</div>' +
-          (genre ? '<div class="sd-sub" style="color:#5a5048">' + escHtml(genre) + '</div>' : '') +
-        '</div>' +
-      '</div>' +
-      '<div class="sd-section-label">ÉTAT DU CONTENU</div>' +
-      '<div class="sd-checks">' + checksHtml + '</div>' +
-      '<div class="sd-section-label">TRAILER ACTUEL</div>' +
-      '<div class="sd-trailer-current">' +
-        '<input type="text" class="sd-tc-input" id="sd-tc-input" value="' + escHtml(item.trailerUrl || "") + '" placeholder="https://youtube.com/watch?v=..." />' +
-        '<button class="sd-tc-apply" onclick="searchEditTrailer(' + item.id + ',\'' + item.type + '\')">\u270e Appliquer</button>' +
-      '</div>' +
-      '<div class="sd-section-label">PROPOSITIONS</div>' +
-      '<div class="sd-props" id="sd-props"><div class="sd-prop-none">Chargement des sources...</div></div>' +
-      '<div class="sd-actions">' +
-        '<button class="sd-btn sd-btn-repair" onclick="searchRepair(' + item.id + ',\'' + item.type + '\')">\u27f3 Forcer le refetch</button>' +
-        '<div class="sd-btn-row">' +
-          '<button class="sd-btn sd-btn-raw" onclick="searchRawSources(' + item.id + ',\'' + item.type + '\')">\ud83d\udc41 Donnée brute</button>' +
-          '<button class="sd-btn sd-btn-delete" onclick="searchDelete(' + item.id + ',\'' + item.type + '\',\'' + escHtml((item.title||"").replace(/\'/g,"")) + '\')">\ud83d\uddd1 Supprimer</button>' +
-        '</div>' +
-        '<div id="sd-raw" style="display:none"></div>' +
-      '</div>';
-  }
 
-  async function searchRepair(id, type) {
-    ensureConsoleOpen();
-    consoleLine("$ Réparer #" + id + " (" + type + ")...", "cmd");
-    try {
-      var res = await fetch("/dashboard/admin/refetch-one?id=" + id + "&type=" + type, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      var data = await res.json();
-      if (data.ok === false) consoleLine("  \u2717 " + (data.msg || "erreur"), "err");
-      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable", "warn");
-      else if (data.enriched) consoleLine("  \u2713 #" + id + " réparé : " + data.fields.join(" + "), "ok");
-      else consoleLine("  \u2139 #" + id + " déjà complet", "info");
-    } catch (err) { consoleLine("  \u2717 " + err.message, "err"); }
-  }
 
-  async function searchRawSources(id, type) {
-    var box = document.getElementById("sd-raw");
-    if (!box) return;
-    box.style.display = "block";
-    box.className = "sd-raw-box";
-    box.textContent = "Récupération des sources...";
-    try {
-      var res = await fetch("/dashboard/admin/item-raw-sources?id=" + id + "&type=" + type);
-      var data = await res.json();
-      if (!data.found) { box.textContent = "Item introuvable."; return; }
-      var lines = [];
-      var src = data.sources || {};
-      Object.keys(src).forEach(function(name) {
-        var s = src[name];
-        lines.push("── " + name.toUpperCase() + " ──");
-        if (!s) { lines.push("  (pas d'ID externe ou aucune réponse)"); return; }
-        lines.push("  cover: " + (s.cover ? "\u2713 " + s.cover.slice(0, 50) : "\u2717 vide"));
-        lines.push("  trailer: " + (s.trailerUrl ? "\u2713 " + s.trailerUrl.slice(0, 40) : "\u2717 vide"));
-        lines.push("  platform: " + (s.platform ? "\u2713 " + s.platform.slice(0, 50) : "\u2717 vide"));
-        lines.push("  desc: " + (s.description ? "\u2713 (" + s.description.length + " car.)" : "\u2717 vide"));
-      });
-      box.textContent = lines.join("\n");
-    } catch (err) { box.textContent = "Erreur : " + err.message; }
-  }
 
-  async function searchDelete(id, type, title) {
-    if (!confirm("Supprimer définitivement « " + title + " » (#" + id + ") ?\n\nL'item sera supprimé ET ajouté à la blocklist (ne pourra plus revenir).")) return;
-    ensureConsoleOpen();
-    consoleLine("$ Suppression #" + id + " (" + type + ")...", "cmd");
-    try {
-      var res = await fetch("/dashboard/admin/items/" + type + "/" + id, { method: "DELETE", headers: { "Content-Type": "application/json" } });
-      var data = await res.json();
-      if (data.ok === false) consoleLine("  \u2717 " + (data.msg || "erreur"), "err");
-      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable", "warn");
-      else {
-        consoleLine("  \u2713 #" + id + " supprimé + blocklisté", "ok");
-        // retirer de la liste affichée
-        var detail = document.getElementById("search-detail");
-        detail.innerHTML = '<div class="search-empty">Item supprimé \u2713</div>';
-        doGlobalSearch();
-      }
-    } catch (err) { consoleLine("  \u2717 " + err.message, "err"); }
-  }
 
   // Editer le trailer manuellement (force le remplacement)
-  async function searchEditTrailer(id, type) {
-    ensureConsoleOpen();
-    var input = document.getElementById("sd-tc-input");
-    if (!input) { consoleLine("  \u2717 Champ trailer introuvable", "err"); return; }
-    var url = input.value.trim();
-    consoleLine("$ Application trailer #" + id + " (" + type + ")...", "cmd");
-    consoleLine("  URL : " + (url || "(vide \u2192 effacement)"), "info");
-    try {
-      var res = await fetch("/dashboard/admin/item-trailer", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: id, type: type, trailerUrl: url })
-      });
-      var data = await res.json();
-      if (data.ok === false) consoleLine("  \u2717 Refus\u00e9 : " + (data.msg || "erreur"), "err");
-      else if (!data.found) consoleLine("  \u26a0 #" + id + " introuvable en base", "warn");
-      else {
-        consoleLine("  \u2713 #" + id + " trailer " + (data.trailerUrl ? "appliqu\u00e9 \u2713" : "effac\u00e9"), "ok");
-        if (data.trailerUrl) consoleLine("  \u2192 " + data.trailerUrl, "ok");
-        // mettre à jour l'item en mémoire + rerender (recharge aussi les propositions)
-        if (searchSelected && searchSelected.id === id) {
-          searchSelected.trailerUrl = data.trailerUrl;
-          renderDetail(searchSelected);
-          loadTrailerProps(searchSelected);
-        }
-      }
-    } catch (err) { consoleLine("  \u2717 Erreur r\u00e9seau : " + err.message, "err"); }
-  }
 
   // Extraire l'ID YouTube depuis une URL
-  function ytId(url) {
-    if (!url) return null;
-    var m = String(url).match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{6,})/);
-    return m ? m[1] : null;
-  }
 
   // Jouer un trailer dans le carré aperçu (colonne gauche)
-  function playTrailer(url, source) {
-    var preview = document.getElementById("search-preview");
-    var video = document.getElementById("sp-video");
-    var label = document.getElementById("sp-label");
-    if (!preview || !video) return;
-    var id = ytId(url);
-    preview.style.display = "block";
-    if (label) label.textContent = "\u25b6 APERÇU — " + (source || "");
-    if (!id) {
-      video.innerHTML = '<div class="sp-video-empty">URL YouTube invalide</div>';
-      return;
-    }
-    video.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>';
-  }
 
   // Choisir un trailer (remplit le champ TRAILER ACTUEL)
-  function chooseTrailer(url) {
-    var input = document.getElementById("sd-tc-input");
-    if (input) { input.value = url; input.focus(); }
-  }
 
   // Charger les propositions de trailers (depuis les sources)
-  async function loadTrailerProps(item) {
-    var box = document.getElementById("sd-props");
-    if (!box) return;
-    box.innerHTML = '<div class="sd-prop-none">Chargement des sources...</div>';
-    var props = [];
-    // Toujours : le trailer actuel (s'il existe)
-    if (item.trailerUrl) props.push({ name: "Actuel", url: item.trailerUrl, col: "#7a6e60" });
-    try {
-      var res = await fetch("/dashboard/admin/item-raw-sources?id=" + item.id + "&type=" + item.type);
-      var data = await res.json();
-      if (data.found && data.sources) {
-        var srcColors = { anilist: "#5fb88a", jikan: "#7a8cc9", rawg: "#c99a6a", igdb: "#d96aff" };
-        Object.keys(data.sources).forEach(function(name) {
-          var s = data.sources[name];
-          var tUrl = s ? s.trailerUrl : null;
-          if (tUrl) {
-            // éviter doublon avec actuel
-            if (!props.some(function(p) { return p.url === tUrl; })) {
-              props.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url: tUrl, col: srcColors[name] || "#d9a978" });
-            } else {
-              // marquer que l'actuel vient de cette source
-              props.forEach(function(p) { if (p.url === tUrl && p.name === "Actuel") p.name = "Actuel (" + name + ")"; });
-            }
-          } else if (s !== undefined) {
-            // source existe mais pas de trailer
-            props.push({ name: name.charAt(0).toUpperCase() + name.slice(1), url: null, col: "#5a5048" });
-          }
-        });
-      }
-    } catch (e) { /* silencieux */ }
-    if (!props.length) {
-      box.innerHTML = '<div class="sd-prop-none">Aucune source avec trailer</div>';
-      return;
-    }
-    box.innerHTML = props.map(function(p) {
-      if (!p.url) {
-        return '<div class="sd-prop"><div class="sd-prop-info"><div class="sd-prop-name" style="color:' + p.col + '">' + escHtml(p.name) + '</div><div class="sd-prop-url sd-prop-none">(aucun trailer)</div></div></div>';
-      }
-      var safeUrl = escHtml(p.url).replace(/'/g, "&#39;");
-      return '<div class="sd-prop">' +
-        '<div class="sd-prop-info">' +
-          '<div class="sd-prop-name" style="color:' + p.col + '">' + escHtml(p.name) + '</div>' +
-          '<div class="sd-prop-url">' + escHtml(p.url) + '</div>' +
-        '</div>' +
-        '<button class="sd-prop-play" onclick="playTrailer(&#39;' + safeUrl + '&#39;,&#39;' + escHtml(p.name) + '&#39;)">\u25b6 voir</button>' +
-        '<button class="sd-prop-choose" onclick="chooseTrailer(&#39;' + safeUrl + '&#39;)">choisir</button>' +
-      '</div>';
-    }).join("");
-  }
 
   // ── Outils diagnostic ──
   async function outilDoublons() {
@@ -2292,30 +1750,6 @@
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
 </button>
 <!-- BOT AUDITEUR -->
-<div class="bot-fab-wrap" id="botFabWrap">
-  <button class="bot-fab" id="botFab" onclick="openBot()" aria-label="Bot Auditeur" title="Bot Auditeur">
-    <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><rect x="7" y="10" width="18" height="15" rx="4" fill="#d9a978"/><rect x="9.5" y="13" width="13" height="8" rx="2" fill="#0d0d12"/><circle class="bot-eye" cx="13" cy="17" r="2" fill="#ffe8c0"/><circle class="bot-eye" cx="19" cy="17" r="2" fill="#ffe8c0"/><rect x="14.5" y="5" width="3" height="4" rx="1.5" fill="#d9a978"/><circle cx="16" cy="4" r="2" fill="#ffe8c0"/><rect x="4" y="15" width="2.5" height="6" rx="1.25" fill="#b8895c"/><rect x="25.5" y="15" width="2.5" height="6" rx="1.25" fill="#b8895c"/></svg>
-  </button>
-  <span class="bot-badge" id="botBadge" style="display:none">0</span>
-</div>
-<div class="bot-overlay" id="botOverlay" onclick="closeBot()"></div>
-<div class="bot-modal" id="botModal">
-  <div class="bot-mhead">
-    <div class="bot-mico"><svg width="24" height="24" viewBox="0 0 32 32" fill="none"><rect x="7" y="10" width="18" height="15" rx="4" fill="#d9a978"/><rect x="9.5" y="13" width="13" height="8" rx="2" fill="#0d0d12"/><circle cx="13" cy="17" r="2" fill="#ffe8c0"/><circle cx="19" cy="17" r="2" fill="#ffe8c0"/><rect x="14.5" y="5" width="3" height="4" rx="1.5" fill="#d9a978"/><circle cx="16" cy="4" r="2" fill="#ffe8c0"/></svg></div>
-    <div>
-      <div class="bot-mtitle">GameNime Auditeur</div>
-      <div class="bot-msub"><span class="bot-sdot"></span> <span id="botScanDate">Pret a scanner</span></div>
-    </div>
-    <button class="bot-mclose" onclick="closeBot()">&times;</button>
-  </div>
-  <div id="botContent">
-    <div class="bot-empty">Clique sur "Lancer le scan" pour analyser le site.</div>
-  </div>
-  <div class="bot-actions">
-    <button class="bot-btn scan" id="botScanBtn" onclick="lancerAudit()">Lancer le scan</button>
-    <button class="bot-btn repair" id="botRepairBtn" onclick="lancerReparation()" disabled>Reparer proprement</button>
-  </div>
-</div>
 <div class="bi-modal" id="biModal">
   <div class="bi-head">
     <button class="bi-back" onclick="closeBotItem()">&lsaquo;</button>
