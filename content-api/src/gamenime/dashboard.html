@@ -480,6 +480,46 @@
   .inc-controls { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
   .inc-search-input { flex: 1; min-width: 200px; width: auto; }
   .inc-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  /* ── Console : tableau des items (recherche + audit fusionnes) ── */
+  .gc-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .gc-input { flex: 1; min-width: 160px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 9px 13px; color: #f5f2ee; font-size: 0.8rem; font-family: inherit; outline: none; }
+  .gc-input:focus { border-color: rgba(217,169,120,.5); }
+  .gc-types { display: flex; gap: 5px; }
+  .gc-type { font-size: 0.7rem; font-weight: 700; padding: 7px 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: #8a8580; cursor: pointer; font-family: inherit; }
+  .gc-type.on { background: rgba(217,169,120,.15); border-color: rgba(217,169,120,.5); color: #ffe8c0; }
+  .gc-chips { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 10px; }
+  .gc-chips::-webkit-scrollbar { height: 0; }
+  .gc-chip { white-space: nowrap; font-size: 0.72rem; font-weight: 600; padding: 7px 11px; border-radius: 9px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); color: #9a9590; cursor: pointer; font-family: inherit; display: flex; align-items: center; gap: 6px; transition: all .18s ease; }
+  .gc-chip:hover { border-color: rgba(217,169,120,.35); color: #d9c9b8; }
+  .gc-chip.on { background: linear-gradient(135deg,rgba(217,169,120,.18),rgba(217,169,120,.05)); border-color: rgba(217,169,120,.55); color: #ffe8c0; }
+  .gc-chip b { font-size: 0.62rem; padding: 1px 6px; border-radius: 6px; background: rgba(255,255,255,.09); font-weight: 800; }
+  .gc-chip.crit b { background: rgba(255,69,58,.2); color: #ff8b82; }
+  .gc-chip.on b { background: rgba(217,169,120,.25); color: #ffe8c0; }
+  .gc-meta { font-size: 0.68rem; color: #6a6560; display: flex; align-items: center; margin-bottom: 8px; }
+  .gc-reload { margin-left: auto; color: #d9a978; cursor: pointer; font-weight: 700; }
+  .gc-wrap { max-height: 60vh; overflow-y: auto; overflow-x: auto; border-radius: 12px; border: 1px solid rgba(255,255,255,.05); }
+  .gc-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; min-width: 560px; }
+  .gc-table thead th { position: sticky; top: 0; z-index: 2; background: #14131a; text-align: left; font-size: 0.6rem; text-transform: uppercase; letter-spacing: .7px; color: #6a6560; padding: 10px 8px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .gc-table th.ctr, .gc-table td.ctr { text-align: center; }
+  .gc-table th.c1, .gc-table td.c1 { width: 4px; padding: 0; }
+  .gc-table tbody tr { border-bottom: 1px solid rgba(255,255,255,.035); cursor: pointer; transition: background .15s ease; }
+  .gc-table tbody tr:hover { background: rgba(217,169,120,.07); }
+  .gc-table td { padding: 9px 8px; vertical-align: middle; }
+  .gc-bar { width: 3px; height: 32px; border-radius: 2px; display: block; }
+  .gc-bar.c { background: #ff453a; } .gc-bar.w { background: #ff9f0a; } .gc-bar.o { background: #30d16c; }
+  .gc-tt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; display: block; }
+  .gc-dt { color: #8a8580; font-size: 0.7rem; white-space: nowrap; }
+  .gc-mk { display: flex; gap: 3px; justify-content: center; }
+  .gc-cel { width: 21px; height: 21px; border-radius: 5px; font-size: 0.58rem; font-style: normal; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; background: rgba(48,209,108,.13); color: #4ade80; }
+  .gc-cel.no { background: rgba(255,69,58,.16); color: #ff7b72; }
+  .gc-cel.hot { background: rgba(255,159,10,.16); color: #ffb340; }
+  .gc-jr { font-size: 0.65rem; font-weight: 800; padding: 3px 8px; border-radius: 8px; white-space: nowrap; }
+  .gc-jr.u { background: rgba(255,69,58,.15); color: #ff6b6b; }
+  .gc-jr.s { background: rgba(255,255,255,.05); color: #8a8580; }
+  .gc-empty { text-align: center; padding: 28px 14px; color: #6a6560; font-size: 0.76rem; }
+  .gc-legend { display: flex; gap: 13px; flex-wrap: wrap; align-items: center; margin-top: 10px; font-size: 0.64rem; color: #6a6560; }
+  .gc-legend span { display: flex; align-items: center; gap: 5px; }
+  .gc-lg-end { margin-left: auto; }
   .inc-filter { padding: 7px 14px; border-radius: 9px; background: #0d0d0f; border: 1px solid #232328; color: #8c8c92; font-size: 0.74rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; font-family: inherit; }
   .inc-filter.active { background: #1a1a1f; border-color: #d9a978; color: #ffe8c0; }
   .inc-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
@@ -663,26 +703,36 @@
         <span class="adm-title">Items incomplets</span>
         <span class="adm-count" id="inc-count">—</span>
       </div>
-      <div class="adm-body">
-        <div class="inc-controls">
-          <select class="adm-select" id="inc-type" onchange="loadIncomplete()">
-            <option value="all">Tous types</option>
-            <option value="anime">Anime</option>
-            <option value="game">Jeux</option>
-          </select>
-          <input type="text" class="adm-input inc-search-input" id="inc-search" placeholder="Rechercher par titre..." oninput="renderIncomplete()" />
-        </div>
-        <div class="inc-filters">
-          <button class="inc-filter active" data-filter="all" onclick="filterIncomplete('all')">Tous</button>
-          <button class="inc-filter" data-filter="no-cover" onclick="filterIncomplete('no-cover')">Sans cover</button>
-          <button class="inc-filter" data-filter="no-platform" onclick="filterIncomplete('no-platform')">Sans plateforme</button>
-          <button class="inc-filter" data-filter="orphan" onclick="filterIncomplete('orphan')">Orphelins</button>
-        </div>
-        <div class="inc-list" id="inc-list">
-          <div class="inc-empty">Clique sur "Rafraîchir" pour charger la liste</div>
-        </div>
-        <button class="adm-action-btn" style="margin-top:12px;background:#1a1a1f;color:#d9a978;border:1px solid #232328" onclick="loadIncomplete()">↻ Rafraîchir la liste</button>
+  <div class="adm-body">
+    <div class="gc-tools">
+      <input type="text" class="gc-input" id="gc-q" placeholder="Rechercher un titre..." oninput="gcDebounce()" />
+      <div class="gc-types">
+        <button class="gc-type on" onclick="gcType('all',this)">Tous</button>
+        <button class="gc-type" onclick="gcType('anime',this)">Anime</button>
+        <button class="gc-type" onclick="gcType('game',this)">Jeux</button>
       </div>
+    </div>
+    <div class="gc-chips">
+      <button class="gc-chip on" onclick="gcFilter('incomplete',this)">Incomplets <b id="gc-n-incomplete">&mdash;</b></button>
+      <button class="gc-chip crit" onclick="gcFilter('critical',this)">Critiques J-7 <b id="gc-n-critical">&mdash;</b></button>
+      <button class="gc-chip" onclick="gcFilter('no-platform',this)">Sans plateforme <b id="gc-n-no-platform">&mdash;</b></button>
+      <button class="gc-chip" onclick="gcFilter('hotlink',this)">Cover hotlink <b id="gc-n-hotlink">&mdash;</b></button>
+      <button class="gc-chip" onclick="gcFilter('no-trailer',this)">Sans trailer <b id="gc-n-no-trailer">&mdash;</b></button>
+      <button class="gc-chip" onclick="gcFilter('all',this)">Tout <b id="gc-n-all">&mdash;</b></button>
+    </div>
+    <div class="gc-meta"><span id="gc-info">&nbsp;</span><span class="gc-reload" onclick="gcLoad()">Rafraichir</span></div>
+    <div class="gc-wrap">
+      <table class="gc-table">
+        <thead><tr><th class="c1"></th><th></th><th>Titre</th><th>Sortie</th><th class="ctr">Compl&eacute;tude</th><th class="ctr">Pop.</th><th></th></tr></thead>
+        <tbody id="gc-tbody"><tr><td colspan="7" class="gc-empty">Chargement...</td></tr></tbody>
+      </table>
+    </div>
+    <div class="gc-legend">
+      <span><i class="gc-cel">C</i>cover</span><span><i class="gc-cel">P</i>plateforme</span>
+      <span><i class="gc-cel">T</i>trailer</span><span><i class="gc-cel">D</i>description</span>
+      <span class="gc-lg-end">vert = pr&eacute;sent &middot; rouge = manquant &middot; orange = hotlink</span>
+    </div>
+  </div>
     </div>
 
     <!-- SECTION 5 : OUTILS -->
@@ -1086,6 +1136,88 @@
       if (d.ok && d.deleted) { biToast("Supprime + blockliste"); closeBotItem(); }
       else biToast("Echec : " + (d.msg || "erreur"), true);
     } catch (e) { biToast("Erreur : " + e.message, true); }
+  }
+  // ── Console : recherche texte ET filtres d'audit sur une seule liste. ──
+  // Source unique /admin/console, destination unique openBotItem().
+  var gcS = { q: "", type: "all", filter: "incomplete" };
+  var gcT = null;
+  function gcEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function gcFilter(f, el) {
+    gcS.filter = f;
+    document.querySelectorAll(".gc-chip").forEach(function(c) { c.classList.remove("on"); });
+    if (el) el.classList.add("on");
+    gcLoad();
+  }
+  function gcType(t, el) {
+    gcS.type = t;
+    document.querySelectorAll(".gc-type").forEach(function(c) { c.classList.remove("on"); });
+    if (el) el.classList.add("on");
+    gcLoad();
+  }
+  function gcDebounce() {
+    clearTimeout(gcT);
+    gcT = setTimeout(function() {
+      var e = document.getElementById("gc-q");
+      gcS.q = e ? e.value.trim() : "";
+      gcLoad();
+    }, 320);
+  }
+  function gcCel(lettre, manquant, hotlink) {
+    var cls = hotlink ? "gc-cel hot" : (manquant ? "gc-cel no" : "gc-cel");
+    return '<i class="' + cls + '">' + lettre + '</i>';
+  }
+  function gcTableRow(it) {
+    var m = it.manque || [];
+    var sev = it.severite === "critical" ? "c" : (m.length ? "w" : "o");
+    var emoji = it.type === "anime" ? "\ud83c\udf8c" : "\ud83c\udfae";
+    var jr = "";
+    if (it.jours === null || it.jours === undefined) jr = '<span class="gc-jr s">&mdash;</span>';
+    else if (it.jours < 0) jr = '<span class="gc-jr s">sorti</span>';
+    else if (it.jours <= 7) jr = '<span class="gc-jr u">J-' + it.jours + '</span>';
+    else jr = '<span class="gc-jr s">J-' + it.jours + '</span>';
+    var date = gcEsc(it.release_date || "?") + (it.dateImprecise ? " ~" : "");
+    // Les jeux n'ont pas de critere trailer : case neutralisee plutot que fausse.
+    var tCel = it.type === "anime" ? gcCel("T", m.indexOf("trailer") !== -1, false)
+                                   : '<i class="gc-cel" style="opacity:.25">T</i>';
+    return '<tr onclick="openBotItem(' + it.id + ',\'' + it.type + '\')">' +
+      '<td class="c1"><span class="gc-bar ' + sev + '"></span></td>' +
+      '<td>' + emoji + '</td>' +
+      '<td><span class="gc-tt">' + gcEsc(it.title || "Sans titre") + '</span></td>' +
+      '<td class="gc-dt">' + date + '</td>' +
+      '<td class="ctr"><div class="gc-mk">' +
+        gcCel("C", m.indexOf("cover") !== -1, !!it.hotlink) +
+        gcCel("P", m.indexOf("plateforme") !== -1, false) + tCel +
+        gcCel("D", m.indexOf("description") !== -1, false) +
+      '</div></td>' +
+      '<td class="ctr gc-dt">' + (it.popularity || 0) + '</td>' +
+      '<td>' + jr + '</td></tr>';
+  }
+  async function gcLoad() {
+    var tb = document.getElementById("gc-tbody");
+    if (!tb) return;
+    tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Chargement...</td></tr>';
+    try {
+      var url = "/dashboard/admin/console?filter=" + encodeURIComponent(gcS.filter) +
+                "&type=" + encodeURIComponent(gcS.type) +
+                "&q=" + encodeURIComponent(gcS.q) + "&limit=300";
+      var d = await (await fetch(url)).json();
+      if (!d.ok) { tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Erreur : ' + gcEsc(d.msg || "inconnue") + '</td></tr>'; return; }
+      var t = d.totaux || {};
+      ["all","critical","incomplete","no-platform","hotlink","no-trailer"].forEach(function(k) {
+        var e = document.getElementById("gc-n-" + k);
+        if (e) e.textContent = (t[k] != null ? t[k] : "\u2014");
+      });
+      var cnt = document.getElementById("inc-count");
+      if (cnt) cnt.textContent = (t.incomplete != null ? t.incomplete : "\u2014");
+      var info = document.getElementById("gc-info");
+      if (info) info.textContent = d.trouves + " r\u00e9sultat" + (d.trouves > 1 ? "s" : "") +
+        (d.trouves > d.retournes ? " \u00b7 " + d.retournes + " affich\u00e9s" : "");
+      var items = d.items || [];
+      tb.innerHTML = items.length ? items.map(gcTableRow).join("")
+                                  : '<tr><td colspan="7" class="gc-empty">Aucun r\u00e9sultat</td></tr>';
+    } catch (e) {
+      tb.innerHTML = '<tr><td colspan="7" class="gc-empty">Erreur : ' + gcEsc(e.message) + '</td></tr>';
+    }
   }
   function botItemHtml(item) {
     var emoji = item.type === "anime" ? "🎌" : "🎮";
