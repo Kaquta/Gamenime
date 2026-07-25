@@ -10,6 +10,7 @@
  */
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { getTwitchToken, igdbLog, setIgdbWarnPool } from "./twitch.js";
 import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000; // 1h
@@ -75,57 +76,6 @@ export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
  * IGDB : recupere via Twitch OAuth + IGDB API
  * Token Twitch cache ~60 jours (re-fetch automatique a l expiration)
  */
-let TWITCH_TOKEN: { token: string; expiresAt: number } | null = null;
-
-// Log dedie aux appels IGDB/Twitch. Ces fonctions sont hors de la portee de
-// 'app', d'ou un logger autonome. Objectif : ne plus confondre "IGDB ne
-// connait pas ce jeu" (info, normal) avec "auth cassee" ou "HTTP en erreur"
-// (warn, demande une action). C'est ce qui rendait le 20/07 indiagnosticable.
-let igdbWarnPool: any = null;
-export function setIgdbWarnPool(pool: any): void { igdbWarnPool = pool; }
-function igdbLog(level: "info" | "warn", event: string, extra?: Record<string, any>): void {
-  try {
-    const line = { level: level === "warn" ? 40 : 30, time: Date.now(), src: "igdb-lookup", event, ...(extra || {}) };
-    process.stdout.write(JSON.stringify(line) + "\n");
-  } catch { /* le log ne doit jamais faire echouer un lookup */ }
-  // Un warn d'auth/HTTP remonte dans la carte IGDB de la page Surveillance.
-  // Colonne dediee : le health-check-cron ne l'ecrase jamais.
-  if (level === "warn" && igdbWarnPool) {
-    const msg = event + (extra && extra.status ? " (HTTP " + extra.status + ")" : "");
-    igdbWarnPool.query(
-      "UPDATE source_health SET last_lookup_warn = NOW(), last_lookup_warn_msg = ? WHERE source = 'igdb'",
-      [msg.slice(0, 255)]
-    ).catch(() => { /* jamais bloquant */ });
-  }
-}
-async function getTwitchToken(): Promise<string | null> {
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET || "";
-  if (!clientId || !clientSecret) { igdbLog("warn", "twitch_credentials_absentes"); return null; }
-
-  // Token valide encore ?
-  if (TWITCH_TOKEN && TWITCH_TOKEN.expiresAt > Date.now() + 60000) {
-    return TWITCH_TOKEN.token;
-  }
-
-  try {
-    const res = await fetch(
-      `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
-      { method: "POST" }
-    );
-    if (!res.ok) { igdbLog("warn", "twitch_token_http", { status: res.status }); return null; }
-    const data = await res.json() as any;
-    if (!data?.access_token) { igdbLog("warn", "twitch_token_sans_access_token"); return null; }
-    TWITCH_TOKEN = {
-      token: data.access_token,
-      expiresAt: Date.now() + (data.expires_in || 5184000) * 1000,
-    };
-    return TWITCH_TOKEN.token;
-  } catch (e) {
-    igdbLog("warn", "twitch_token_exception", { err: (e as any)?.message });
-    return null;
-  }
-}
 
 /**
  * Cherche un jeu IGDB par son SLUG RAWG (ancre fiable, pas de match par titre).

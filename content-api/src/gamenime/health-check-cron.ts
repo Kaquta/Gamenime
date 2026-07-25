@@ -6,6 +6,7 @@
 // "avalent" silencieusement.
 // ════════════════════════════════════════════════════════
 import type { FastifyInstance } from "fastify";
+import { getTwitchToken, fetchWithTimeout } from "./twitch.js";
 
 type Pool = any;
 
@@ -17,37 +18,8 @@ interface PingResult {
 }
 
 // ── Helper : fetch avec timeout ──
-async function fetchWithTimeout(url: string, opts: any = {}, timeoutMs = 15000): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...opts, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
 
 // ── Twitch token pour IGDB (meme flow que refetch-games-cron) ──
-let TWITCH_TOKEN: { token: string; expiresAt: number } | null = null;
-async function getTwitchToken(): Promise<string | null> {
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
-  const clientSecret = process.env.TWITCH_CLIENT_SECRET || "";
-  if (!clientId || !clientSecret) return null;
-  if (TWITCH_TOKEN && TWITCH_TOKEN.expiresAt > Date.now() + 60000) return TWITCH_TOKEN.token;
-  try {
-    const res = await fetchWithTimeout(
-      `https://id.twitch.tv/oauth2/token?client_id=${clientId}&client_secret=${clientSecret}&grant_type=client_credentials`,
-      { method: "POST" }
-    );
-    if (!res.ok) return null;
-    const data: any = await res.json();
-    if (!data.access_token) return null;
-    TWITCH_TOKEN = { token: data.access_token, expiresAt: Date.now() + (data.expires_in || 3600) * 1000 };
-    return TWITCH_TOKEN.token;
-  } catch {
-    return null;
-  }
-}
 
 // ── Ping RAWG ──
 async function pingRawg(): Promise<PingResult> {
@@ -121,7 +93,7 @@ async function pingAnimeSchedule(): Promise<PingResult> {
   try {
     const headers: any = { Accept: "application/json" };
     if (token) headers.Authorization = `Bearer ${token}`;
-    const res = await fetchWithTimeout("https://animeschedule.net/api/v3/anime?mt=all&page=1", { headers });
+    const res = await fetchWithTimeout("https://animeschedule.net/api/v3/anime?q=one%20piece", { headers });
     const ms = Date.now() - t0;
     if (res.ok) return { status: "UP", httpCode: res.status, errorMsg: null, responseMs: ms };
     return { status: "DOWN", httpCode: res.status, errorMsg: `HTTP ${res.status}`, responseMs: ms };
@@ -142,7 +114,7 @@ async function saveResult(pool: Pool, source: string, r: PingResult) {
 }
 
 // ── Lancer tous les pings ──
-export async function runHealthCheck(app: FastifyInstance, pool: Pool): Promise<void> {
+export async function runHealthCheck(app: FastifyInstance, pool: Pool, only?: string): Promise<void> {
   const checks: Array<[string, () => Promise<PingResult>]> = [
     ["rawg", pingRawg],
     ["igdb", pingIgdb],
@@ -150,7 +122,8 @@ export async function runHealthCheck(app: FastifyInstance, pool: Pool): Promise<
     ["jikan", pingJikan],
     ["animeschedule", pingAnimeSchedule],
   ];
-  for (const [source, fn] of checks) {
+  const list = only ? checks.filter(function(c) { return c[0] === only; }) : checks;
+  for (const [source, fn] of list) {
     try {
       const r = await fn();
       await saveResult(pool, source, r);
