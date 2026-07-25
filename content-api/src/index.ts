@@ -8,7 +8,7 @@ import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
 import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
 import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
-import { normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
+import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug } from "./gamenime/refetch-games-cron.js";
@@ -1781,6 +1781,115 @@ app.post("/admin/run-health-check", async (req: any, reply) => {
   );
   return reply.send({ ok: true, sources: rows });
 });
+// ── Criteres d'audit : DEFINITION UNIQUE ──
+// Calibres en session 27 (2 rounds) puis partages par /admin/audit-report et
+// /admin/console. Il ne doit jamais exister deux definitions concurrentes de
+// ce qu'est un item "incomplet" : c'est ce qui faisait diverger l'ancien
+// /admin/incomplete-items (123 items) et /admin/audit-report (202).
+// gnIsMissing attrape en plus les sentinelles ("null", "n/a", "unknown"...).
+function gnAuditAnime(a: any): string[] {
+  const m: string[] = [];
+  const cover = String(a.cover || "");
+  if (gnIsMissing(a.cover) || cover.includes("myanimelist.net") || cover.includes("animeschedule.net")) m.push("cover");
+  if (gnIsMissing(a.platform) || String(a.platform || "").trim() === "YouTube") m.push("plateforme");
+  if (gnIsMissing(a.trailer_url)) m.push("trailer");
+  if (gnIsMissing(a.description) || String(a.description || "").trim().length < 10) m.push("description");
+  // NB : date imprecise = info, PAS un manque bloquant.
+  return m;
+}
+function gnAuditGame(g: any): string[] {
+  const m: string[] = [];
+  // Cover : vide seulement (media.rawg.io / images.igdb.com sont de VRAIES covers).
+  if (gnIsMissing(g.cover)) m.push("cover");
+  if (gnIsMissing(g.platform)) m.push("plateforme");
+  if (gnIsMissing(g.description) || String(g.description || "").trim().length < 10) m.push("description");
+  // NB : trailer non teste pour les jeux, note et game_type NULL = normal.
+  return m;
+}
+// Severite : l'urgence n'a de sens que pour un item a venir. Un item deja sorti
+// avec des manques est de la dette, pas une urgence — d'ou le palier "sorti",
+// sans quoi tout le passe basculerait en "critical" (jours negatifs <= 7).
+function gnSeverite(manque: string[], jours: number | null): string {
+  if (manque.length === 0) return "ok";
+  if (jours === null || jours === undefined) return "low";
+  if (jours < 0) return "sorti";
+  if (jours <= 7) return "critical";
+  if (jours <= 30) return "high";
+  if (jours <= 90) return "medium";
+  return "low";
+}
+// Console d'administration : recherche texte ET filtres d'audit dans une seule
+// liste. Remplace les trois chemins de donnees du dashboard (/api/feed/search,
+// /admin/incomplete-items, /admin/audit-report cote UI).
+app.get("/admin/console", async (req: any, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const auth = requireApiKey(expected, req.headers["x-api-key"]);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const q = String(req.query?.q || "").trim().toLowerCase();
+  const filter = String(req.query?.filter || "all");
+  const type = String(req.query?.type || "all");
+  const VALID_FILTERS = ["all", "critical", "incomplete", "no-platform", "hotlink", "no-trailer"];
+  if (VALID_FILTERS.indexOf(filter) === -1) return reply.code(400).send({ ok: false, msg: "filter invalide" });
+  if (["anime", "game", "all"].indexOf(type) === -1) return reply.code(400).send({ ok: false, msg: "type invalide" });
+  let limit = parseInt(String(req.query?.limit || "100"), 10);
+  if (isNaN(limit)) limit = 100;
+  limit = Math.min(Math.max(limit, 1), 500);
+  const pool = (app as any).pool;
+  try {
+    const sel = (table: string, kind: string) =>
+      "SELECT CAST(id AS UNSIGNED) AS id, '" + kind + "' AS type, title, title_english, cover, platform, " +
+      "trailer_url, description, genre, popularity, release_precision, " +
+      "DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, " +
+      "DATEDIFF(release_date, CURDATE()) AS jours FROM " + table;
+    const animes: any[] = (type === "game") ? [] : await pool.query(sel("anime_items", "anime"));
+    const games: any[] = (type === "anime") ? [] : await pool.query(sel("game_items", "game"));
+    const build = (r: any, kind: string) => {
+      const manque = kind === "anime" ? gnAuditAnime(r) : gnAuditGame(r);
+      const cover = String(r.cover || "");
+      return {
+        id: r.id, type: kind, title: r.title, title_english: r.title_english,
+        cover: r.cover, platform: r.platform, trailer_url: r.trailer_url,
+        release_date: r.release_date, release_precision: r.release_precision,
+        popularity: r.popularity, jours: r.jours,
+        manque, severite: gnSeverite(manque, r.jours),
+        dateImprecise: r.release_precision !== "day",
+        hotlink: kind === "anime" && (cover.includes("myanimelist.net") || cover.includes("animeschedule.net")),
+      };
+    };
+    const all = animes.map((a) => build(a, "anime")).concat(games.map((g) => build(g, "game")));
+    // Compteurs des filtres : calcules sur TOUT le catalogue (hors recherche
+    // texte), pour que les pastilles restent stables quand on tape.
+    const totaux = {
+      all: all.length,
+      critical: all.filter((x) => x.severite === "critical").length,
+      incomplete: all.filter((x) => x.manque.length > 0).length,
+      "no-platform": all.filter((x) => x.manque.indexOf("plateforme") !== -1).length,
+      hotlink: all.filter((x) => x.hotlink).length,
+      "no-trailer": all.filter((x) => x.manque.indexOf("trailer") !== -1).length,
+    };
+    let out = all;
+    if (filter === "critical") out = out.filter((x) => x.severite === "critical");
+    else if (filter === "incomplete") out = out.filter((x) => x.manque.length > 0);
+    else if (filter === "no-platform") out = out.filter((x) => x.manque.indexOf("plateforme") !== -1);
+    else if (filter === "hotlink") out = out.filter((x) => x.hotlink);
+    else if (filter === "no-trailer") out = out.filter((x) => x.manque.indexOf("trailer") !== -1);
+    if (q) {
+      out = out.filter((x) =>
+        String(x.title || "").toLowerCase().indexOf(q) !== -1 ||
+        String(x.title_english || "").toLowerCase().indexOf(q) !== -1);
+    }
+    const rang: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, sorti: 4, ok: 5 };
+    out.sort((x, y) => {
+      const d = (rang[x.severite] ?? 9) - (rang[y.severite] ?? 9);
+      if (d !== 0) return d;
+      return (y.popularity ?? 0) - (x.popularity ?? 0);
+    });
+    return reply.send({ ok: true, totaux, retournes: Math.min(out.length, limit), trouves: out.length, items: out.slice(0, limit) });
+  } catch (e) {
+    app.log.error({ err: (e as any)?.message }, "admin.console failed");
+    return reply.code(500).send({ ok: false, msg: (e as any)?.message || "erreur" });
+  }
+});
 // BOT AUDITEUR : rapport d'etat du site (lecture seule, aucune modification)
 app.post("/admin/audit-report", async (req: any, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
@@ -1805,25 +1914,10 @@ app.post("/admin/audit-report", async (req: any, reply) => {
       "FROM game_items WHERE release_date IS NOT NULL"
     );
 
-    function auditAnime(a: any): string[] {
-      const m: string[] = [];
-      if (!a.cover || a.cover === "" || String(a.cover).includes("myanimelist.net") || String(a.cover).includes("animeschedule.net")) m.push("cover");
-      if (!a.platform || a.platform === "" || String(a.platform).trim() === "YouTube") m.push("plateforme");
-      if (!a.trailer_url || a.trailer_url === "") m.push("trailer");
-      if (!a.description || String(a.description).trim().length < 10) m.push("description");
-      // NB : date imprecise = info, PAS un manque bloquant (source pas encore a jour)
-      return m;
-    }
-    function auditGame(g: any): string[] {
-      const m: string[] = [];
-      // Cover : vide seulement (les URLs media.rawg.io/images.igdb.com sont les VRAIES covers, pas des defauts)
-      if (!g.cover || g.cover === "") m.push("cover");
-      if (!g.platform || g.platform === "") m.push("plateforme");
-      if (!g.description || String(g.description).trim().length < 10) m.push("description");
-      // NB : note (pas de reviews avant sortie) et game_type (NULL = jeu normal, pas DLC)
-      // ne sont PAS des manques bloquants.
-      return m;
-    }
+    // Criteres hisses au niveau module et partages avec /admin/console :
+    // une seule definition de "incomplet" dans tout le systeme.
+    const auditAnime = gnAuditAnime;
+    const auditGame = gnAuditGame;
 
     const critique: any[] = [];
     const incomplets: any[] = [];
@@ -1984,6 +2078,7 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
       ]);
       return reply.send({ ok: true, found: true, type, id, title: it.title,
         ids: { rawg_id: it.rawg_id, igdb_id: it.igdb_id },
+        current: { cover: it.cover, platform: it.platform, trailer_url: it.trailer_url, description: it.description },
         sources: { rawg, igdb } });
     }
   } catch (e) {

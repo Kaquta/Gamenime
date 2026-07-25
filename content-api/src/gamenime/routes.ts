@@ -17,6 +17,7 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { expandSearchTerm } from "./search-aliases.js";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { z } from "zod";
 import {
@@ -273,12 +274,13 @@ function applyFeedFilters(items: GameNimeItem[], q: any): GameNimeItem[] {
   }
   // Search : texte dans le titre (romaji ou anglais)
   if (q.search) {
-    const needle = String(q.search).trim().toLowerCase();
-    if (needle) {
+    // Recherche avec surnoms : "gta" trouve aussi "grand theft auto", "jjk" -> "jujutsu kaisen".
+    const terms = expandSearchTerm(String(q.search));
+    if (terms.length > 0 && terms[0]) {
       out = out.filter((it) => {
         const t1 = ((it as any).title || "").toLowerCase();
         const t2 = ((it as any).titleEnglish || "").toLowerCase();
-        return t1.includes(needle) || t2.includes(needle);
+        return terms.some((term) => t1.includes(term) || t2.includes(term));
       });
     }
   }

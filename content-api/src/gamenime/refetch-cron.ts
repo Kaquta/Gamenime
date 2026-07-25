@@ -4,6 +4,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { sanitizePlatform } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000;
 const REFETCH_BATCH_SIZE = 200;
@@ -100,9 +101,17 @@ export async function fetchJikan(malId: number): Promise<SourceData | null> {
   if (!malId) return null;
 
   try {
-    const res = await fetch("https://api.jikan.moe/v4/anime/" + malId);
-    if (!res.ok) return null;
-    const json = await res.json() as any;
+    // /full contient streaming[] directement (Disney+, Hulu, ADN...) en UN seul
+    // appel, plus stable que la fiche + /streaming separes (qui declenchaient un 429).
+    let json: any = null;
+    for (let attempt = 0; attempt < 3 && !json; attempt++) {
+      if (attempt > 0) await new Promise(r => setTimeout(r, 1200));
+      try {
+        const res = await fetch("https://api.jikan.moe/v4/anime/" + malId + "/full");
+        if (res.ok) json = await res.json() as any;
+      } catch { /* retry Jikan instable */ }
+    }
+    if (!json) return null;
     const data = json?.data;
     if (!data) return null;
 
@@ -230,12 +239,22 @@ export function isAniListCover(url: string | null | undefined): boolean {
   return url.includes("anilistcdn") || url.includes("s4.anilist.co");
 }
 
+// Une plateforme est "faible" si elle est absente ou reduite au seul YouTube
+// (souvent la chaine promo, pas un vrai diffuseur). Definition unique, reutilisee
+// par le cron, le refetch unitaire et la fusion des sources.
+export function isPlatformWeak(p: string | null | undefined): boolean {
+  return !p || p.trim() === "" || p.trim() === "YouTube";
+}
 export function mergeSources(
   aniList: SourceData | null,
   jikan: SourceData | null,
   animeSchedule: SourceData | null
 ): SourceData {
   const sources = [aniList, jikan, animeSchedule].filter(s => s !== null) as SourceData[];
+  // AnimeSchedule est volontairement limitee a la date et, en dernier recours, a la
+  // plateforme : ses covers sont des hotlinks (cf. isHotlinkCover) et son vocabulaire
+  // de format n'est pas normalise sur l'enum AniList.
+  const primary = [aniList, jikan].filter(s => s !== null) as SourceData[];
   // Date : preferer la source avec la MEILLEURE precision (day > month > year).
   // AniList prioritaire a precision egale (ordre du tableau : aniList d'abord).
   const precRank: Record<string, number> = { day: 3, month: 2, year: 1 };
@@ -249,12 +268,27 @@ export function mergeSources(
       }
     }
   }
+  // Plateformes : FUSIONNER toutes les sources (pas juste la premiere).
+  // AniList a souvent que "YouTube", Jikan a les vraies (Disney+, Hulu, ADN...).
+  // On combine tout en dedupliquant.
+  const platformSet = new Set<string>();
+  const addPlatforms = (raw: string | null | undefined) => {
+    if (!raw) return;
+    for (const p of raw.split(",").map(x => x.trim()).filter(Boolean)) platformSet.add(p);
+  };
+  for (const s of primary) addPlatforms(s.platform);
+  const mergedPlatform = platformSet.size > 0 ? Array.from(platformSet).join(", ") : null;
+  // AnimeSchedule ne contribue PAS aux plateformes : sur un echantillon de 12 items
+  // sans plateforme, un seul remontait un stream, et c'etait "YouTube" — donc une
+  // valeur deja consideree comme faible, qui aurait masque le libelle "Plateforme EU
+  // non annoncee" par un diffuseur ou l'utilisateur ne trouverait rien.
+  // Perimetre de cette source : la date de sortie, et elle seule.
   return {
-    cover: sources.find(s => s.cover)?.cover ?? null,
-    platform: sources.find(s => s.platform)?.platform ?? null,
-    trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
-    description: sources.find(s => s.description)?.description ?? null,
-    format: sources.find(s => s.format)?.format ?? null,
+    cover: primary.find(s => s.cover)?.cover ?? null,
+    platform: mergedPlatform,
+    trailerUrl: primary.find(s => s.trailerUrl)?.trailerUrl ?? null,
+    description: primary.find(s => s.description)?.description ?? null,
+    format: primary.find(s => s.format)?.format ?? null,
     releaseDate: bestDate,
     releasePrecision: bestPrecision,
   };
@@ -281,7 +315,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
   try {
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -298,6 +332,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
         ]);
 
         const merged = mergeSources(aniList, jikan, animeSchedule);
+    app.log.info({ jikanPlatform: jikan?.platform, aniListPlatform: aniList?.platform, mergedPlatform: merged.platform, itemPlatform: item.platform }, "DEBUG platform merge");
 
         const updates: string[] = [];
         const params: any[] = [];
@@ -318,10 +353,12 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           params.push(aniList!.cover);
           itemChanges.push({ field: "cover", oldValue: item.cover, newValue: aniList!.cover });
         }
-        if ((!item.platform || item.platform === "") && merged.platform) {
+        const platformIsWeak = isPlatformWeak(item.platform);
+        const cleanPlatform = sanitizePlatform(merged.platform);
+        if (platformIsWeak && cleanPlatform && cleanPlatform !== item.platform) {
           updates.push("platform = ?");
-          params.push(merged.platform);
-          itemChanges.push({ field: "platform", oldValue: item.platform, newValue: merged.platform });
+          params.push(cleanPlatform);
+          itemChanges.push({ field: "platform", oldValue: item.platform, newValue: cleanPlatform });
         }
         if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
           updates.push("trailer_url = ?");
@@ -438,8 +475,10 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
     } else if (coverIsHotlinkProtected && newCoverFromAniList) {
       updates.push("cover = ?"); params.push(aniList!.cover); fields.push("cover");
     }
-    if ((!item.platform || item.platform === "") && merged.platform) {
-      updates.push("platform = ?"); params.push(merged.platform); fields.push("plateforme");
+    const platformIsWeakOne = isPlatformWeak(item.platform);
+    const cleanPlatformOne = sanitizePlatform(merged.platform);
+    if (platformIsWeakOne && cleanPlatformOne && cleanPlatformOne !== item.platform) {
+      updates.push("platform = ?"); params.push(cleanPlatformOne); fields.push("plateforme");
     }
     if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
       updates.push("trailer_url = ?"); params.push(merged.trailerUrl); fields.push("trailer");

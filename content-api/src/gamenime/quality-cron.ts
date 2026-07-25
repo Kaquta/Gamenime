@@ -13,6 +13,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { sanitizePlatform } from "./core.js";
 import {
   fetchAniList,
   fetchJikan,
@@ -139,10 +140,11 @@ export async function qualityCheckCycle(
           item.cover = aniList!.cover;
         }
 
-        if ((!item.platform || item.platform === "") && merged.platform) {
+        const cleanPlat = sanitizePlatform(merged.platform);
+        if ((!item.platform || item.platform === "") && cleanPlat) {
           updates.push("platform = ?");
-          params.push(merged.platform);
-          item.platform = merged.platform;
+          params.push(cleanPlat);
+          item.platform = cleanPlat;
         }
 
         if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {

@@ -68,6 +68,15 @@ function getStatusLabel(item) {
   if (item.isRecentlyReleased) return "Récent";
   return "Sorti";
 }
+// Libelle de repli quand un ANIME n'a pas encore de plateforme renseignee.
+// Calcul au runtime : une fois la date passee, l'oeuvre est diffusee au Japon
+// mais aucun diffuseur EU n'est connu -> on le dit sans pretendre "Japon uniquement".
+function platformFallback(item) {
+  if (!item.releaseDate || item.releasePrecision === "year") return "Plateforme EU non annoncée";
+  var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
+  var now = new Date(); now.setHours(0,0,0,0);
+  return rel <= now ? "Sortie Japon · EU à confirmer" : "Plateforme EU non annoncée";
+}
 
 function getCountdownHtml(item) {
   // Countdown UNIQUEMENT si date precise (day). Sinon (month/year), date approximative -> pas de compte a rebours trompeur
@@ -155,7 +164,7 @@ function renderCard(item, domain, rank) {
   var media = item.cover
     ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" loading="lazy" />'
     : '<div class="item-placeholder">Aucune image</div>';
-  var info = simplifyPlatform(item.platform) || item.genre || "Information à venir";
+  var info = simplifyPlatform(item.platform) || (String(domain).indexOf("anime") !== -1 ? platformFallback(item) : (item.genre || "Information à venir"));
   var countdown = getCountdownHtml(item);
   var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
   var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
@@ -173,6 +182,7 @@ function renderCard(item, domain, rank) {
     (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
     '<div class="item-media">' + media + '</div>' +
     '<div class="item-hover-video"></div>' +
+    (hasTrailer ? '<div class="trailer-band top" data-band-id="' + item.id + '" data-band-domain="' + domain + '"></div><div class="trailer-band bottom" data-band-id="' + item.id + '" data-band-domain="' + domain + '"></div>' : '') +
     '<div class="item-hover-slides"></div>' +
     '<div class="item-overlay"></div>' +
     contentTagBadge +
@@ -305,7 +315,17 @@ function setupDetailModal() {
         var infos = [];
         if (fmtMatch) infos.push('<span class="info-tag">📺 ' + (formatLabels[fmtMatch[1]] || fmtMatch[1]) + '</span>');
         if (epMatch) infos.push('<span class="info-tag">🎬 ' + epMatch[1] + ' épisodes</span>');
-        if (statMatch) infos.push('<span class="info-tag">📡 ' + (statusLabels[statMatch[1]] || statMatch[1]) + '</span>');
+        if (statMatch) {
+          var st = statMatch[1];
+          // Le [STATUS:] de la description peut etre perime (fige au fetch).
+          // La releaseDate est fiable : si l'anime est deja sorti, on corrige.
+          if (st === "NOT_YET_RELEASED" && item.releaseDate && item.releasePrecision !== "year") {
+            var relSt = new Date(item.releaseDate); relSt.setHours(0,0,0,0);
+            var todaySt = new Date(); todaySt.setHours(0,0,0,0);
+            if (relSt <= todaySt) st = "RELEASING";
+          }
+          infos.push('<span class="info-tag">📡 ' + (statusLabels[st] || st) + '</span>');
+        }
         if (seaMatch) infos.push('<span class="info-tag">📅 ' + seaMatch[1] + '</span>');
         if (nextMatch) infos.push('<span class="info-tag countdown-info">⏳ Prochain : Épisode ' + nextMatch[1] + '</span>');
         animeInfoHtml = '<div class="detail-anime-info">' + infos.join('') + '</div>';
@@ -397,15 +417,55 @@ function setupDetailModal() {
     }
   };
 
-  // Handler click existant: delegue a la fonction globale
+  // Detection tactile : sur mobile, clic carte = trailer ; sur desktop = modale
+  var GN_isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  // Handler click : desktop ouvre la modale, mobile lance le trailer
   document.addEventListener("click", function(e) {
-    var card = (e.target as HTMLElement).closest(".item-card");
+    if ((e.target as HTMLElement).closest(".trailer-band")) return; // bande geree separement
     if ((e.target as HTMLElement).closest(".fav-heart")) return;
-    if (!card) return;
+    var card = (e.target as HTMLElement).closest(".item-card");
+    if (!card) {
+      // Clic ailleurs -> ferme le trailer (mobile)
+      if (GN_isTouch && activeCard) killHover(activeCard);
+      return;
+    }
     var id = (card as HTMLElement).dataset.id;
     var domain = (card as HTMLElement).dataset.domain;
     if (!id || !domain) return;
-    (window as any).__openItemModal(domain, id);
+    if (GN_isTouch) {
+      // MOBILE : clic carte = lance le trailer (le glow des bandes sert d'indice pour la modale)
+      if (activeCard !== card) {
+        var videoId = (card as HTMLElement).dataset.yt;
+        if (videoId) {
+          if (activeCard) killHover(activeCard);
+          var box = card.querySelector(".item-hover-video");
+          if (box) {
+            box.innerHTML = '<iframe src="https://www.youtube.com/embed/' + videoId + '?autoplay=1&mute=1&controls=0&loop=1&playlist=' + videoId + '&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1" frameborder="0" allow="autoplay" allowfullscreen></iframe>';
+            box.classList.add("active");
+            activeCard = card;
+          }
+        } else {
+          // Pas de trailer sur cette carte -> ouvre directement la modale
+          (window as any).__openItemModal(domain, id);
+        }
+      }
+    } else {
+      // DESKTOP : clic carte = modale
+      (window as any).__openItemModal(domain, id);
+    }
+  });
+  // Scroll -> ferme le trailer (mobile)
+  window.addEventListener("scroll", function() {
+    if (GN_isTouch && activeCard) killHover(activeCard);
+  }, { passive: true });
+  // Clic sur les bandes du trailer -> ouvre la modale
+  document.addEventListener("click", function(e) {
+    var band = (e.target as HTMLElement).closest(".trailer-band");
+    if (!band) return;
+    e.stopPropagation();
+    var id = (band as HTMLElement).dataset.bandId;
+    var domain = (band as HTMLElement).dataset.bandDomain;
+    if (id && domain) (window as any).__openItemModal(domain, id);
   });
 }
 
