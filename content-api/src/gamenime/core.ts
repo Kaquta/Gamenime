@@ -547,16 +547,15 @@ export function normalizeTitleStrict(title: string | null | undefined): string {
     }
   }
 
-  if (!seasonSuffix) {
-    const numMatch = s.match(/\s+(\d{1,2})\s*$/);
-    if (numMatch) {
-      const num = parseInt(numMatch[1], 10);
-      if (num >= 1 && num <= 12) {
-        seasonSuffix = "_s" + numMatch[1];
-        s = s.replace(/\s+\d{1,2}\s*$/, "");
-      }
-    }
-  }
+  // NOTE (fix "Final Fantasy 7") : on NE traite PLUS un chiffre nu trailing comme
+  // saison. Un chiffre isole en fin de titre est le plus souvent un NUMERO de suite
+  // (Nioh 3, Forza Horizon 6, Final Fantasy 7, Lords of the Fallen 2...), pas une
+  // saison. La quasi-totalite des jeux numerotes tombaient dans ce faux positif, et
+  // aucune fusion existante ne dependait de cette regle (verifie : 0 collision sur les
+  // 34 animes en chiffre nu). Les vraies saisons restent captees par les marqueurs
+  // EXPLICITES ci-dessus : "Season N", "Nth Season", "SN", "Part N", romains I-VI.
+  // Le chiffre reste dans le titre (Nioh 3 -> "nioh3"), donc un doublon exact matche
+  // toujours par titre exact / titre+date.
 
   const courPatterns: RegExp[] = [
     /\b(\d{1,2})(?:st|nd|rd|th)\s+(?:cour|part)\b/i,
