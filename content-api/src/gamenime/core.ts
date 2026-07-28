@@ -106,6 +106,43 @@ export function getReleaseWindow(now: Date = new Date()): ReleaseWindow {
 }
 
 /**
+ * Largeur de la fenêtre d'appariement par titre, en jours, selon la précision de la date.
+ *
+ * Plus la date connue est précise, plus on cible serré : une date exacte (`day`)
+ * discrimine mieux qu'un simple « 2026 ». La tolérance absorbe les désaccords
+ * entre sources (ex. RAWG dit le 27, Steam le 28).
+ *
+ * DÉTECTION PLACEHOLDER : une date au 31/12 ou au 01/01 marquée `day` est presque
+ * toujours un faux « précis » — la valeur par défaut posée quand seule l'année est
+ * connue. On la traite alors comme `year` (fenêtre large), sinon un candidat IGDB
+ * daté en janvier de l'année suivante serait écarté à tort.
+ *
+ * Exemples :
+ *   matchWindowDays("2026-09-30", "day")   → 45   (vraie date exacte, ciblage serré)
+ *   matchWindowDays("2026-12-31", "day")   → 366  (placeholder fin d'année → year)
+ *   matchWindowDays("2026-01-01", "day")   → 366  (placeholder début d'année → year)
+ *   matchWindowDays("2026-09", "month")    → 120
+ *   matchWindowDays("2026", "year")        → 366
+ */
+export function matchWindowDays(
+  date: string | null | undefined,
+  precision: ReleasePrecision | null | undefined,
+): number {
+  let effective: ReleasePrecision = precision ?? "year";
+  // Placeholder déguisé : 12-31 ou 01-01 marqué "day" = fausse précision
+  if (
+    effective === "day" &&
+    date &&
+    (/-12-31$/.test(date) || /-01-01$/.test(date))
+  ) {
+    effective = "year";
+  }
+  if (effective === "day") return 45;
+  if (effective === "month") return 120;
+  return 366; // year
+}
+
+/**
  * Returns true if the date string falls inside the current window.
  * Returns false for invalid or missing dates.
  */

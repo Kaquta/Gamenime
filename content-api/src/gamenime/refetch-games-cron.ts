@@ -11,11 +11,14 @@
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { getTwitchToken, igdbLog, setIgdbWarnPool } from "./twitch.js";
-import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform } from "./core.js";
+import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform, matchWindowDays as gnMatchWindowDays } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000; // 1h
 const REFETCH_BATCH_SIZE = 100;
 const REFETCH_DELAY_MS = 800;
+// Appariement des orphelins : filet de rattrapage, pas temps-reel.
+// De nouveaux gros titres sans ID n'arrivent pas toutes les heures -> 3h.
+const ORPHAN_MATCH_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3h
 
 interface IncompleteGame {
   id: number;
@@ -115,7 +118,11 @@ export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
 // Garde-fous : titre normalise STRICTEMENT identique, et un seul candidat.
 // Zero candidat = inconnu, deux ou plus = ambigu — dans les deux cas on
 // n'ecrit rien. Un champ vide vaut mieux qu'une plateforme fausse.
-export async function lookupIgdbByTitle(title: string): Promise<number | null> {
+export async function lookupIgdbByTitle(
+  title: string,
+  releaseDate?: string | null,
+  releasePrecision?: string | null,
+): Promise<number | null> {
   if (!title) return null;
   const token = await getTwitchToken();
   const clientId = process.env.TWITCH_CLIENT_ID || "";
@@ -129,14 +136,36 @@ export async function lookupIgdbByTitle(title: string): Promise<number | null> {
         Authorization: `Bearer ${token}`,
         "Content-Type": "text/plain",
       },
-      body: `search "${safe}"; fields id, name; limit 10;`,
+      body: `search "${safe}"; fields id, name, first_release_date; limit 20;`,
     });
     if (!res.ok) { igdbLog("warn", "titre_http", { title, status: res.status }); return null; }
     const data = await res.json() as any;
     if (!Array.isArray(data) || data.length === 0) { igdbLog("info", "titre_aucun_resultat", { title }); return null; }
     const wanted = gnNormalizeTitleStrict(title);
     if (!wanted) return null;
-    const exact = data.filter((g: any) => gnNormalizeTitleStrict(String(g?.name || "")) === wanted);
+    let exact = data.filter((g: any) => gnNormalizeTitleStrict(String(g?.name || "")) === wanted);
+    // Filtre par fenetre de dates dynamique (largeur selon precision, detection placeholder 12-31/01-01).
+    // Applique seulement si une date de reference existe ET s'il reste plusieurs candidats a departager.
+    // Filtre par fenetre de dates : s'applique des qu'il y a AU MOINS un candidat
+    // exact (pas seulement plusieurs). Sinon un candidat unique hors periode passait
+    // sans controle (cas Dusk : entree 2026 vs seul "Dusk" IGDB date 2018).
+    if (releaseDate && exact.length >= 1) {
+      const refMs = new Date(releaseDate + "T00:00:00Z").getTime();
+      const tolMs = gnMatchWindowDays(releaseDate, releasePrecision as any) * 86400000;
+      const withDate = exact.filter((g: any) => g.first_release_date);
+      const windowed = withDate.filter((g: any) =>
+        Math.abs(g.first_release_date * 1000 - refMs) <= tolMs
+      );
+      //  - Au moins un candidat DANS la fenetre -> on resserre dessus.
+      //  - Des candidats ONT une date mais AUCUN dans la fenetre -> ces dates disent
+      //    "hors periode" : REJET (exact=[]) -> "ambigu ou absent", zero ecriture (Dusk).
+      //  - Aucun candidat n'a de date IGDB -> donnee manquante, on garde tel quel.
+      if (windowed.length > 0) {
+        exact = windowed;
+      } else if (withDate.length > 0) {
+        exact = [];
+      }
+    }
     if (exact.length !== 1) { igdbLog("info", "titre_ambigu_ou_absent", { title, candidats_exacts: exact.length, resultats: data.length }); return null; }
     igdbLog("info", "titre_rattache", { title, igdbId: exact[0].id });
     return Number(exact[0].id) || null;
@@ -437,6 +466,62 @@ export async function adminRefetchGamesHandler(req: any, reply: any) {
   return reply.send({ ok: true, ...result });
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Appariement des jeux ORPHELINS (sans aucun ID source).
+// Un jeu sans rawg_id NI igdb_id echappe a toute la dedup par ID et n'est
+// jamais enrichi (le refetch principal exige un ID de depart). On tente de
+// lui attribuer un igdb_id par appariement titre + fenetre de dates dynamique
+// (largeur selon release_precision, detection placeholder 12-31/01-01).
+// Une fois l'igdb_id pose, le jeu bascule sous le match-par-ID (filet fort).
+// LECTURE SEULE pour l'instant : logue sans ecrire (DRY_RUN=true).
+// ─────────────────────────────────────────────────────────────────────────
+export async function matchOrphanGamesCycle(app: FastifyInstance): Promise<{
+  scanned: number;
+  matched: number;
+  changes: Array<{ id: number; title: string; igdbId: number }>;
+}> {
+  const DRY_RUN = false; // ECRITURE ACTIVE (valide sur 90 apparies : Dusk-like rejetes, Parallel->bon, 0 sans-date)
+  const pool = (app as any).pool;
+  if (!pool) {
+    app.log.error("Match orphans cycle: pool DB introuvable");
+    return { scanned: 0, matched: 0, changes: [] };
+  }
+  const conn = await pool.getConnection();
+  let scanned = 0, matched = 0;
+  const changes: Array<{ id: number; title: string; igdbId: number }> = [];
+  try {
+    const items: any[] = await conn.query(
+      "SELECT id, title, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
+      "FROM game_items " +
+      "WHERE igdb_id IS NULL AND rawg_id IS NULL " +
+      "AND title IS NOT NULL AND title != '' " +
+      "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+    );
+    scanned = items.length;
+    app.log.info({ scanned, dryRun: DRY_RUN }, "Match orphans cycle: jeux sans ID scannes");
+    for (const item of items) {
+      const igdbId = await lookupIgdbByTitle(item.title, item.release_date, item.release_precision);
+      if (igdbId) {
+        matched++;
+        changes.push({ id: item.id, title: item.title, igdbId });
+        if (DRY_RUN) {
+          app.log.info({ id: item.id, title: item.title, igdbId }, "[DRY_RUN] apparierait");
+        } else {
+          await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [igdbId, item.id]);
+          app.log.info({ id: item.id, title: item.title, igdbId }, "orphelin rattache par titre");
+        }
+      }
+      await new Promise(r => setTimeout(r, REFETCH_DELAY_MS));
+    }
+    app.log.info({ scanned, matched, dryRun: DRY_RUN }, "Match orphans cycle: termine");
+  } catch (e: any) {
+    app.log.error({ err: e?.message }, "Match orphans cycle: erreur");
+  } finally {
+    conn.release();
+  }
+  return { scanned, matched, changes };
+}
+
 export function startRefetchGamesCron(app: FastifyInstance) {
   app.post("/admin/refetch-incomplete-games", adminRefetchGamesHandler);
   setIgdbWarnPool((app as any).pool);
@@ -446,5 +531,13 @@ export function startRefetchGamesCron(app: FastifyInstance) {
   setInterval(() => {
     refetchIncompleteGamesCycle(app).catch(e => app.log.error(e, "Games refetch cycle failed"));
   }, REFETCH_INTERVAL_MS);
-  app.log.info({ intervalMs: REFETCH_INTERVAL_MS, batchSize: REFETCH_BATCH_SIZE }, "Refetch Games cron demarre");
+  // Appariement des jeux orphelins (sans aucun ID) : premier run a 30 min, puis toutes les 3h.
+  // Attribue un igdb_id par titre + fenetre dynamique -> le jeu bascule sous le match-par-ID.
+  setTimeout(() => {
+    matchOrphanGamesCycle(app).catch(e => app.log.error(e, "First orphan match cycle failed"));
+  }, 30 * 60 * 1000);
+  setInterval(() => {
+    matchOrphanGamesCycle(app).catch(e => app.log.error(e, "Orphan match cycle failed"));
+  }, ORPHAN_MATCH_INTERVAL_MS);
+  app.log.info({ intervalMs: REFETCH_INTERVAL_MS, batchSize: REFETCH_BATCH_SIZE, orphanMatchMs: ORPHAN_MATCH_INTERVAL_MS }, "Refetch Games cron demarre");
 }

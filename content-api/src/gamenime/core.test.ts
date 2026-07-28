@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeReleaseDatetime, isLikelyJapaneseAnime, normalizeTitleStrict } from "./core.js";
+import { sanitizeReleaseDatetime, isLikelyJapaneseAnime, normalizeTitleStrict, matchWindowDays } from "./core.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Tests sanitizeReleaseDatetime (session 12)
@@ -249,5 +249,32 @@ describe("normalizeTitleStrict", () => {
       expect(typeof once).toBe("string");
       expect(once.length).toBeGreaterThan(0);
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tests matchWindowDays : fenêtre d'appariement dynamique + détection placeholder
+// ═══════════════════════════════════════════════════════════════════════════
+describe("matchWindowDays", () => {
+  it("vraie date exacte (day) → fenêtre serrée 45j", () => {
+    expect(matchWindowDays("2026-09-30", "day")).toBe(45);
+  });
+  it("placeholder 12-31 marqué day → traité comme year (366j)", () => {
+    expect(matchWindowDays("2026-12-31", "day")).toBe(366);
+  });
+  it("placeholder 01-01 marqué day → traité comme year (366j)", () => {
+    expect(matchWindowDays("2026-01-01", "day")).toBe(366);
+  });
+  it("précision month → 120j", () => {
+    expect(matchWindowDays("2026-09", "month")).toBe(120);
+  });
+  it("précision year → 366j", () => {
+    expect(matchWindowDays("2026", "year")).toBe(366);
+  });
+  it("précision absente (null) → year par défaut 366j", () => {
+    expect(matchWindowDays("2026-05-15", null)).toBe(366);
+  });
+  it("date absente + day → reste 45j (pas de placeholder détectable)", () => {
+    expect(matchWindowDays(null, "day")).toBe(45);
   });
 });
