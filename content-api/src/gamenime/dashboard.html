@@ -628,7 +628,7 @@
       <div class="adm-head">
         <span class="adm-chevron">▼</span>
         <span class="adm-title">Process — Lancement manuel</span>
-        <span class="adm-count">6</span>
+        <span class="adm-count">7</span>
       </div>
       <div class="adm-body">
         <div class="proc-grid">
@@ -673,6 +673,12 @@
             <div class="proc-name">Cleanup niches</div>
             <div class="proc-desc">Retire les jeux niches (dry-run d'abord)</div>
             <button class="proc-launch" style="background:#ff453a" onclick="lancerCleanup(this)">▶ Dry-run</button>
+          </div>
+          <div class="proc-card">
+            <div class="proc-stripe" style="background:#1d9e75"></div>
+            <div class="proc-name">Appariement orphelins</div>
+            <div class="proc-desc">Attribue un igdb_id aux jeux sans ID (titre + fenetre)</div>
+            <button class="proc-launch" style="background:#1d9e75" onclick="lancerProcess(this,'match-orphan-games','Appariement orphelins')">▶ Lancer</button>
           </div>
         </div>
       </div>
