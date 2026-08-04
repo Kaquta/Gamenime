@@ -4,6 +4,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { resoudreDistributeurYouTube } from "./youtube-verify.js";
 import { sanitizePlatform } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000;
@@ -56,7 +57,15 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
     if (Array.isArray(media.externalLinks)) {
       for (const link of media.externalLinks) {
         if (link?.type === "STREAMING" && link?.site) {
-          platforms.add(link.site);
+          if (link.site === "YouTube") {
+            // AniList etiquette "YouTube" sans preciser le distributeur.
+            // On resout la vraie chaine : distributeur officiel -> son nom
+            // (Muse Asia, Ani-One...) ; promo/PV -> retire (null).
+            const distributeur = await resoudreDistributeurYouTube(link.url);
+            if (distributeur) platforms.add(distributeur);
+          } else {
+            platforms.add(link.site);
+          }
         }
       }
     }
@@ -243,7 +252,13 @@ export function isAniListCover(url: string | null | undefined): boolean {
 // (souvent la chaine promo, pas un vrai diffuseur). Definition unique, reutilisee
 // par le cron, le refetch unitaire et la fusion des sources.
 export function isPlatformWeak(p: string | null | undefined): boolean {
-  return !p || p.trim() === "" || p.trim() === "YouTube";
+  // Weak si vide, OU si contient "YouTube" brut (seul ou en liste). AniList
+  // etiquette "YouTube" sans distributeur ; un re-fetch resout ce YouTube en
+  // nom de distributeur (Muse Asia...) ou le retire. Detecter YouTube n'importe
+  // ou dans la chaine permet au re-fetch de corriger les 103 animes pollues.
+  // Converge : apres resolution, plus de "YouTube" brut -> plus weak.
+  if (!p || p.trim() === "") return true;
+  return /(^|,\s*)YouTube(\s*,|\s*$)/.test(p.trim());
 }
 export function mergeSources(
   aniList: SourceData | null,
