@@ -2543,9 +2543,20 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         // different d'un vrai, echappant a la dedup titre+date). REJET : pas d'INSERT.
         // Empeche les doublons type Saijo (crees le 4 juillet). Un vrai anime a
         // TOUJOURS un anilist_id ou mal_id (il existe sur AniList/MAL).
-        if (!before && !b.anilistId && !b.malId) {
-          app.log.warn({ title: b.title }, "Orphelin sans ID rejete (AnimeSchedule enrichit, ne cree pas)");
-          continue;
+        // ANIME : rejet orphelin si ni anilist_id ni mal_id (un vrai anime en a toujours un).
+        // GAME  : rejet orphelin si ni igdb_id ni rawg_id (un jeu est identifie par ces IDs,
+        //         JAMAIS par anilist/mal). Sans cette distinction, TOUS les jeux nouveaux
+        //         etaient rejetes comme "orphelins" (bug du 6 juillet : plus aucun jeu insere).
+        if (itemType === "anime") {
+          if (!before && !b.anilistId && !b.malId) {
+            app.log.warn({ title: b.title }, "Orphelin sans ID rejete (AnimeSchedule enrichit, ne cree pas)");
+            continue;
+          }
+        } else {
+          if (!before && !(b as any).igdbId && !(b as any).rawgId) {
+            app.log.warn({ title: b.title }, "Jeu orphelin sans ID (igdb/rawg) rejete");
+            continue;
+          }
         }
 
         // ETAT CLEAN: when updating an existing item, GameNime API merges
