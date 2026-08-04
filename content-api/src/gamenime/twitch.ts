@@ -69,3 +69,34 @@ export async function getTwitchToken(): Promise<string | null> {
     return null;
   }
 }
+
+// Invalide le token en cache (a appeler sur 401 IGDB : le token a ete revoque
+// cote Twitch AVANT sa date d'expiration calculee). Le prochain getTwitchToken()
+// en redemandera un frais. Corrige le bug ou un token mort etait servi jusqu'a
+// son expiresAt de 60j, cassant IGDB (health check + enrichissement + appariement)
+// jusqu'a un restart manuel.
+export function invalidateTwitchToken(): void {
+  TWITCH_TOKEN = null;
+  igdbLog("info", "twitch_token_invalide_sur_401");
+}
+
+// Appel IGDB avec retry automatique sur 401 : si le token en cache est mort,
+// on l'invalide, on en regenere un, et on rejoue l'appel UNE fois.
+export async function igdbFetch(path: string, init: RequestInit): Promise<Response> {
+  const clientId = process.env.TWITCH_CLIENT_ID || "";
+  const doFetch = async (): Promise<Response> => {
+    const token = await getTwitchToken();
+    const headers = {
+      "Client-ID": clientId,
+      Authorization: `Bearer ${token}`,
+      ...(init.headers || {}),
+    };
+    return fetchWithTimeout(path, { ...init, headers });
+  };
+  let res = await doFetch();
+  if (res.status === 401) {
+    invalidateTwitchToken();
+    res = await doFetch(); // un seul retry avec token frais
+  }
+  return res;
+}

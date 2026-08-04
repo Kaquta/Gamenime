@@ -6,7 +6,7 @@
 // "avalent" silencieusement.
 // ════════════════════════════════════════════════════════
 import type { FastifyInstance } from "fastify";
-import { getTwitchToken, fetchWithTimeout } from "./twitch.js";
+import { getTwitchToken, fetchWithTimeout, igdbFetch } from "./twitch.js";
 
 type Pool = any;
 
@@ -38,14 +38,13 @@ async function pingRawg(): Promise<PingResult> {
 
 // ── Ping IGDB (via Twitch) ──
 async function pingIgdb(): Promise<PingResult> {
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
   const t0 = Date.now();
-  const token = await getTwitchToken();
-  if (!token || !clientId) return { status: "DOWN", httpCode: 401, errorMsg: "Twitch auth echouee", responseMs: Date.now() - t0 };
   try {
-    const res = await fetchWithTimeout("https://api.igdb.com/v4/games", {
+    // igdbFetch gere token + Client-ID + Authorization, ET le retry sur 401
+    // (token revoque avant expiration -> invalide + regenere + rejoue).
+    const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
-      headers: { "Client-ID": clientId, Authorization: `Bearer ${token}`, "Content-Type": "text/plain" },
+      headers: { "Content-Type": "text/plain" },
       body: "fields id; limit 1;",
     });
     const ms = Date.now() - t0;

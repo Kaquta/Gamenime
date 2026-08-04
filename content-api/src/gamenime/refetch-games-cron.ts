@@ -10,7 +10,7 @@
  */
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
-import { getTwitchToken, igdbLog, setIgdbWarnPool } from "./twitch.js";
+import { igdbLog, setIgdbWarnPool, igdbFetch } from "./twitch.js";
 import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform, matchWindowDays as gnMatchWindowDays } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000; // 1h
@@ -87,18 +87,11 @@ export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
  */
 export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
   if (!slug) return null;
-  const token = await getTwitchToken();
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
-  if (!token || !clientId) { igdbLog("warn", "slug_pas_de_token", { slug }); return null; }
   const safe = slug.replace(/["\\]/g, "");
   try {
-    const res = await fetch("https://api.igdb.com/v4/games", {
+    const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
-      headers: {
-        "Client-ID": clientId,
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "text/plain",
-      },
+      headers: { "Content-Type": "text/plain" },
       body: `fields id, slug; where slug = "${safe}"; limit 2;`,
     });
     if (!res.ok) { igdbLog("warn", "slug_http", { slug, status: res.status }); return null; }
@@ -124,18 +117,11 @@ export async function lookupIgdbByTitle(
   releasePrecision?: string | null,
 ): Promise<number | null> {
   if (!title) return null;
-  const token = await getTwitchToken();
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
-  if (!token || !clientId) { igdbLog("warn", "titre_pas_de_token", { title }); return null; }
   const safe = String(title).replace(/["\\]/g, "");
   try {
-    const res = await fetch("https://api.igdb.com/v4/games", {
+    const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
-      headers: {
-        "Client-ID": clientId,
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "text/plain",
-      },
+      headers: { "Content-Type": "text/plain" },
       body: `search "${safe}"; fields id, name, first_release_date; limit 20;`,
     });
     if (!res.ok) { igdbLog("warn", "titre_http", { title, status: res.status }); return null; }
@@ -177,19 +163,10 @@ export async function lookupIgdbByTitle(
 
 export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
   if (!igdbId) return null;
-  const clientId = process.env.TWITCH_CLIENT_ID || "";
-  if (!clientId) return null;
-  const token = await getTwitchToken();
-  if (!token) return null;
-
   try {
-    const res = await fetch("https://api.igdb.com/v4/games", {
+    const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
-      headers: {
-        "Client-ID": clientId,
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "text/plain",
-      },
+      headers: { "Content-Type": "text/plain" },
       body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type; where id = ${igdbId};`,
     });
     if (!res.ok) return null;
