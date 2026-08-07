@@ -145,7 +145,10 @@ export const VALID_PLATFORMS = Object.freeze([
   // Streaming anime
   "Crunchyroll",
   "Netflix",
-  "YouTube",
+  "Muse Asia",
+  "Ani-One Asia",
+  "Ani-One",
+  "Medialink",
   "Bilibili TV",
   "Tencent Video",
   "iQ",
