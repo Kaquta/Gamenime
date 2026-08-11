@@ -167,7 +167,7 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
     const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type; where id = ${igdbId};`,
+      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type, videos.video_id, videos.name; where id = ${igdbId};`,
     });
     if (!res.ok) return null;
     const data = await res.json() as any;
@@ -194,12 +194,21 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
     // 0=Main, 3=Bundle, 5=Mod, 8=Remake, 9=Remaster, 10=Expanded, 11=Port, 12=Fork.
     const gt = game.game_type;
     const gameType = [1, 2, 4, 6, 7, 13, 14].includes(gt) ? "DLC" : null;
+    // Trailer IGDB : priorite "Launch", puis dernier "Trailer", sinon derniere
+    // video. Ne comble que les trous (le code appelant n ecrit que si vide).
+    let trailerUrl: string | null = null;
+    if (Array.isArray(game.videos) && game.videos.length > 0) {
+      const par = (re: RegExp) => game.videos.filter((v: any) => re.test(String(v?.name || "")));
+      const choix = par(/launch/i)[0] || par(/trailer/i).slice(-1)[0] || game.videos[game.videos.length - 1];
+      if (choix?.video_id) trailerUrl = "https://www.youtube.com/watch?v=" + choix.video_id;
+    }
     return {
       cover,
       platform: platforms,
       description: description ? String(description).substring(0, 2000) : null,
       ratingScore,
       gameType,
+      trailerUrl,
     };
   } catch {
     return null;
@@ -214,6 +223,7 @@ function mergeSources(rawg: SourceData | null, igdb: SourceData | null): SourceD
     description: sources.find(s => s.description)?.description ?? null,
     ratingScore: sources.find(s => s.ratingScore != null)?.ratingScore ?? null,
     gameType: sources.find(s => s.gameType)?.gameType ?? null,
+    trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
   };
 }
 
@@ -415,6 +425,9 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
     }
     if ((item.game_type == null || item.game_type === "") && merged.gameType) {
       updates.push("game_type = ?"); params.push(merged.gameType); fields.push("type");
+    }
+    if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
+      updates.push("trailer_url = ?"); params.push(merged.trailerUrl); fields.push("trailer");
     }
     if (updates.length > 0) {
       params.push(item.id);
