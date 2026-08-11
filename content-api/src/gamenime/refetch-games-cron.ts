@@ -41,6 +41,8 @@ interface SourceData {
   ratingScore?: number | null;
   gameType?: string | null;
   slug?: string | null;
+  releaseDate?: string | null;        // "YYYY-MM-DD" (jour=01 si precision month/year)
+  releasePrecision?: "day" | "month" | "year" | null;  // precision reelle selon la source
 }
 
 /**
@@ -63,12 +65,27 @@ export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
       ? data.platforms.map((p: any) => p?.platform?.name).filter(Boolean)
       : [];
     const platform = platforms.length > 0 ? platforms.join(", ") : null;
+    // RAWG : "released" = YYYY-MM-DD, "tba" = date non annoncee. RAWG n'expose
+    // AUCUNE precision : un jeu "prevu 2027" y apparait souvent au 31/12. On ne
+    // peut donc pas certifier le jour -> precision "day" seulement si la date
+    // n'est pas un placeholder (31/12 ou 01/01), sinon "year". IGDB (qui a le
+    // champ human) prime de toute facon dans mergeSources a precision egale.
+    let releaseDate: string | null = null;
+    let releasePrecision: "day" | "month" | "year" | null = null;
+    if (!data?.tba && typeof data?.released === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.released)) {
+      releaseDate = data.released;
+      const mmdd = data.released.slice(5);
+      releasePrecision = (mmdd === "12-31" || mmdd === "01-01") ? "year" : "day";
+      if (releasePrecision === "year") releaseDate = data.released.slice(0, 4) + "-01-01";
+    }
     return {
       cover,
       platform,
       description: description ? String(description).substring(0, 2000) : null,
       ratingScore: ratingMetacritic,
       slug: data?.slug ?? null,
+      releaseDate,
+      releasePrecision,
     };
   } catch {
     return null;
@@ -167,7 +184,7 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
     const res = await igdbFetch("https://api.igdb.com/v4/games", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
-      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type, videos.video_id, videos.name; where id = ${igdbId};`,
+      body: `fields name, summary, storyline, cover.image_id, platforms.name, rating, total_rating, game_type, videos.video_id, videos.name, release_dates.human, release_dates.date; where id = ${igdbId};`,
     });
     if (!res.ok) return null;
     const data = await res.json() as any;
@@ -209,10 +226,44 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
       ratingScore,
       gameType,
       trailerUrl,
+      ...(() => { const dd = choisirDateIgdb(game.release_dates); return { releaseDate: dd.date, releasePrecision: dd.precision }; })(),
     };
   } catch {
     return null;
   }
+}
+
+
+// Parse le champ "human" d'IGDB pour deduire la VRAIE precision :
+// "2027"=year, "Q1 2027"=year, "Feb 2027"=month, "Feb 18, 2027"=day.
+// IGDB stocke un placeholder au 31/12 quand il ne connait que l'annee : sans ce
+// parsing on presenterait "31 decembre 2027" comme une date ferme (mensonge).
+function parseDateIgdb(human: string, ts: number | null): { date: string | null; precision: "day" | "month" | "year" | null } {
+  if (!ts) return { date: null, precision: null };
+  const d = new Date(ts * 1000);
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
+  const h = String(human || "").trim();
+  if (/^[A-Za-z]{3,}\s+\d{1,2},\s+\d{4}/.test(h)) {
+    return { date: y + "-" + pad2(m) + "-" + pad2(day), precision: "day" };
+  }
+  if (/^[A-Za-z]{3,}\s+\d{4}/.test(h)) {
+    return { date: y + "-" + pad2(m) + "-01", precision: "month" };
+  }
+  return { date: y + "-01-01", precision: "year" };
+}
+
+// Choisit la meilleure date parmi les release_dates IGDB : la plus PRECOCE encore
+// a venir (evite la date asiatique passee, cf. Aion 2 : KR nov 2025 vs EU sep 2026).
+// Si toutes sont passees, prend la plus recente.
+function choisirDateIgdb(rds: any[]): { date: string | null; precision: "day" | "month" | "year" | null } {
+  if (!Array.isArray(rds) || rds.length === 0) return { date: null, precision: null };
+  const now = Math.floor(Date.now() / 1000);
+  const valides = rds.filter(r => r?.date);
+  if (valides.length === 0) return { date: null, precision: null };
+  const futures = valides.filter(r => r.date > now).sort((a, b) => a.date - b.date);
+  const choix = futures[0] || valides.sort((a, b) => b.date - a.date)[0];
+  return parseDateIgdb(choix.human, choix.date);
 }
 
 function mergeSources(rawg: SourceData | null, igdb: SourceData | null): SourceData {
@@ -224,6 +275,17 @@ function mergeSources(rawg: SourceData | null, igdb: SourceData | null): SourceD
     ratingScore: sources.find(s => s.ratingScore != null)?.ratingScore ?? null,
     gameType: sources.find(s => s.gameType)?.gameType ?? null,
     trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
+    ...(() => {
+      // Date : preferer la source avec la MEILLEURE precision (day > month > year).
+      // IGDB prime a precision egale (il a le champ human, RAWG ne l'a pas).
+      const rang: Record<string, number> = { day: 3, month: 2, year: 1 };
+      let best: SourceData | null = null;
+      for (const s of [igdb, rawg]) {
+        if (!s?.releaseDate || !s?.releasePrecision) continue;
+        if (!best || rang[s.releasePrecision] > rang[best.releasePrecision!]) best = s;
+      }
+      return { releaseDate: best?.releaseDate ?? null, releasePrecision: best?.releasePrecision ?? null };
+    })(),
   };
 }
 
@@ -246,7 +308,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
   try {
     const items: IncompleteGame[] = await conn.query(
-      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type " +
+      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
       "FROM game_items " +
       // Criteres calibres (session 27, repris de gnAuditGame) : seuls cover,
       // plateforme et description sont de vrais manques. rating_score NULL est
@@ -381,7 +443,7 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
   const conn = await pool.getConnection();
   try {
     const rows: IncompleteGame[] = await conn.query(
-      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type FROM game_items WHERE id = ? LIMIT 1",
+      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision FROM game_items WHERE id = ? LIMIT 1",
       [id]
     );
     if (!rows || rows.length === 0) {
@@ -428,6 +490,26 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
     }
     if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
       updates.push("trailer_url = ?"); params.push(merged.trailerUrl); fields.push("trailer");
+    }
+    // DATE : la source fait autorite, MAIS on ne regresse jamais en precision
+    // (day acquis ne redevient pas year). On ecrit si la date OU la precision
+    // change, pour capter un report ou une date qui se precise.
+    if (merged.releaseDate && merged.releasePrecision) {
+      const rang: Record<string, number> = { day: 3, month: 2, year: 1 };
+      const ancienne = (item as any).release_date || null;
+      const ancienneP = (item as any).release_precision || null;
+      // Un 31/12 ou 01/01 stocke en precision "day" est un PLACEHOLDER IGDB
+      // ("prevu 2027" fige au 31 decembre), pas une vraie date au jour pres.
+      // On autorise donc la regression dans ce cas precis, sinon un faux "day"
+      // se protegerait lui-meme et resterait faux a vie.
+      const mmdd = String(ancienne || "").slice(5);
+      const ancienneEstPlaceholder = ancienneP === "day" && (mmdd === "12-31" || mmdd === "01-01");
+      const regresse = ancienneP && !ancienneEstPlaceholder && rang[merged.releasePrecision] < rang[ancienneP];
+      if (!regresse && (merged.releaseDate !== ancienne || merged.releasePrecision !== ancienneP)) {
+        updates.push("release_date = ?"); params.push(merged.releaseDate);
+        updates.push("release_precision = ?"); params.push(merged.releasePrecision);
+        fields.push("date:" + merged.releaseDate + "(" + merged.releasePrecision + ")");
+      }
     }
     if (updates.length > 0) {
       params.push(item.id);
