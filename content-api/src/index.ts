@@ -712,6 +712,7 @@ app.post("/premium/generate-reminders", async (req, reply) => {
            INNER JOIN users u ON u.id = f.user_id
            WHERE f.item_type = ?
              AND DATE(i.release_date) = ?
+             AND i.release_precision = 'day'
              AND u.notifications_enabled = 1
              AND NOT EXISTS (
                SELECT 1 FROM reminder_log r
