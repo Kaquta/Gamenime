@@ -987,6 +987,82 @@ body::before {
 
 .item-card { cursor: pointer; }
 
+
+/* ── Modal palette B : encre & vermillon (SESSION 33) ────────
+   Fond neutre : les jaquettes portent la couleur au lieu de lutter
+   contre un fond deja rouge. Le vermillon 朱色 ne sert qu'a deux
+   choses : le compte a rebours et le bouton d'alerte. */
+.detail-content {
+  background: linear-gradient(180deg, #15171D, #101218) !important;
+  border-color: #2A2E39 !important;
+}
+.detail-close { border-color: #2A2E39 !important; }
+.detail-close:hover { background: rgba(227,66,52,.55) !important; }
+.detail-content::-webkit-scrollbar-thumb { background: rgba(227,66,52,.35) !important; }
+.detail-info h2 { color: #F0F1F4 !important; }
+.genre-tag {
+  background: rgba(227,66,52,.13) !important;
+  border-color: #3D4351 !important;
+  color: #C6CBD4 !important;
+}
+
+/* Bloc date : la barre montre la LARGEUR de l'incertitude */
+.detail-dateblock {
+  background: #1D2029; border: 1px solid #2A2E39;
+  border-radius: 12px; padding: 11px 13px 12px; margin: 0 0 14px;
+}
+.detail-dateline { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+.detail-datevalue { font-size: 1rem; font-weight: 700; color: #F0F1F4; }
+.detail-datevalue.soft { color: #9AA0AD; font-weight: 500; }
+.detail-datevalue.soft b { color: #F0F1F4; font-weight: 700; }
+.detail-countdown {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 7px;
+  font-size: .8rem; font-weight: 700; color: #E34234;
+  background: rgba(227,66,52,.14); border: 1px solid rgba(227,66,52,.4);
+  padding: 4px 11px; border-radius: 999px;
+}
+.detail-countdown.is-out { color: #9AA0AD; background: #1D2029; border-color: #2A2E39; }
+.detail-countdown .cd-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #E34234;
+  animation: cdping 1.6s ease-in-out infinite;
+}
+@keyframes cdping { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+.detail-window {
+  margin-top: 10px; height: 5px; border-radius: 3px;
+  background: rgba(0,0,0,.35); border: 1px solid #2A2E39;
+  position: relative; overflow: hidden;
+}
+.detail-window span {
+  position: absolute; top: 0; bottom: 0; border-radius: 3px; min-width: 3px;
+  background: linear-gradient(90deg, #E34234, #B32D2E);
+}
+.detail-window.wide span { opacity: .42; }
+.detail-windowlegend {
+  display: flex; justify-content: space-between; margin-top: 5px;
+  font-size: .62rem; color: #9AA0AD; opacity: .85;
+}
+
+/* Plateformes en chips */
+.detail-section-label {
+  font-size: .68rem; letter-spacing: .05em; text-transform: uppercase;
+  color: #9AA0AD; margin: 0 0 7px;
+}
+.detail-platforms { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 14px; }
+.plat-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .82rem; font-weight: 600; color: #F0F1F4;
+  background: #1D2029; border: 1px solid #2A2E39;
+  padding: 6px 12px; border-radius: 10px;
+}
+.plat-chip .plat-yt {
+  font-style: normal; font-size: .58rem; letter-spacing: .04em;
+  color: #9AA0AD; border-left: 1px solid #3D4351; padding-left: 6px;
+}
+.plat-chip.tbc {
+  border-style: dashed; border-color: #3D4351;
+  color: #9AA0AD; background: transparent; font-weight: 500;
+}
+
 /* ── Detail modal ──────────────────────────────────── */
 
 .detail-modal {

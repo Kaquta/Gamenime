@@ -55,6 +55,56 @@ function dateLabel(item) {
   if (item && item.releaseDateLabel) return item.releaseDateLabel;
   return formatDate(item ? item.releaseDate : null);
 }
+// Bloc date du modal : la barre montre la LARGEUR de l'incertitude a l'echelle
+// de l'annee. Le compte a rebours n'apparait qu'en precision "day" — sans jour
+// confirme, un J-x serait invente (et le rappel serveur ne partirait pas non plus).
+function detailDateBlock(item) {
+  if (!item || !item.releaseDate) {
+    return '<div class="detail-dateblock"><div class="detail-dateline">' +
+      '<span class="detail-datevalue soft">Date non annoncee</span></div></div>';
+  }
+  var prec = item.releasePrecision || "day";
+  var parts = String(item.releaseDate).split("-");
+  var y = parseInt(parts[0], 10), m = parseInt(parts[1], 10), d = parseInt(parts[2], 10);
+  var left, width, note, wide = "";
+  if (prec === "year") {
+    left = 0; width = 100; note = "mois non annonce"; wide = " wide";
+  } else if (prec === "month") {
+    left = ((m - 1) / 12) * 100; width = 100 / 12; note = "jour non annonce";
+  } else {
+    var doy = Math.round((new Date(y, m - 1, d).getTime() - new Date(y, 0, 1).getTime()) / 86400000);
+    left = (doy / 365) * 100; width = 1.5; note = "jour confirme";
+  }
+  if (left + width > 100) left = 100 - width;
+  var cd = "";
+  if (prec === "day") {
+    var rel = new Date(item.releaseDate); rel.setHours(0, 0, 0, 0);
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var j = Math.round((rel.getTime() - now.getTime()) / 86400000);
+    if (j > 0) cd = '<span class="detail-countdown"><span class="cd-dot"></span>J-' + j + '</span>';
+    else if (j === 0) cd = '<span class="detail-countdown"><span class="cd-dot"></span>Sortie aujourd\u0027hui</span>';
+    else cd = '<span class="detail-countdown is-out">Sorti</span>';
+  }
+  var soft = prec === "day" ? "" : " soft";
+  return '<div class="detail-dateblock">' +
+    '<div class="detail-dateline"><span class="detail-datevalue' + soft + '">' + dateLabel(item) + '</span>' + cd + '</div>' +
+    '<div class="detail-window' + wide + '"><span style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%"></span></div>' +
+    '<div class="detail-windowlegend"><span>janv. ' + y + '</span><span>' + note + '</span><span>dec. ' + y + '</span></div>' +
+  '</div>';
+}
+// Plateformes en chips. Un distributeur YouTube officiel (Muse Asia, Ani-One,
+// Medialink) s'affiche par son NOM avec un marqueur discret : jamais "YouTube" seul.
+function detailPlatforms(item) {
+  var raw = (item && item.platform) ? String(item.platform) : "";
+  var list = raw.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+  if (!list.length) {
+    return '<div class="detail-platforms"><span class="plat-chip tbc">Aucune plateforme annoncee</span></div>';
+  }
+  return '<div class="detail-platforms">' + list.map(function(name) {
+    var yt = /muse asia|ani-one|medialink/i.test(name) ? '<i class="plat-yt">YOUTUBE</i>' : '';
+    return '<span class="plat-chip">' + name + yt + '</span>';
+  }).join("") + '</div>';
+}
 
 function getStatusLabel(item) {
   if (!item.releaseDate) return "À surveiller";
@@ -359,7 +409,9 @@ function setupDetailModal() {
           '<div class="detail-cover">' + (item.cover ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" />' : '') + '</div>' +
           '<div class="detail-info">' +
             '<h2>' + displayTitle(item) + '</h2>' +
-            '<p class="detail-meta">' + dateLabel(item) + ' · ' + (item.platform || 'À confirmer') + '</p>' +
+            detailDateBlock(item) +
+            '<div class="detail-section-label">' + (domain === 'games' ? 'Ou y jouer' : 'Ou le regarder') + '</div>' +
+            detailPlatforms(item) +
             '<div class="detail-genres">' +
               genres.map(function(g) { return '<span class="genre-tag">⭐ ' + g + '</span>'; }).join("") +
               ratingHtml +
