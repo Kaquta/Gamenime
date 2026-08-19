@@ -206,6 +206,10 @@ export function normalizeTitle(title: string | null | undefined): string {
   };
 
   const preNorm = title
+    // Article initial : les sources cataloguent le meme titre avec ou sans article
+    // ("The Sinking City 2" RAWG 1018100 vs "Sinking City 2" RAWG 979038).
+    // La date de sortie devant matcher a l'identique, le risque de faux positif est nul.
+    .replace(/^\s*(?:the|an|a)\s+/i, "")
     // Strip "(YYYY)" trailing AVANT tout (sinon le 4 de 2024 serait pris pour saison 4)
     .replace(/\s*\(\d{4}\)\s*$/, "")
     // "4th/1st/2nd/3rd Season" → "_s4"

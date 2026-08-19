@@ -2492,26 +2492,44 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         }
         if (blocklistReject) { continue; }
 
+        // Criteres 9/10 : IDs externes jeux. Les params rawgId/igdbId etaient
+        // passes depuis la session 13.3 mais AUCUNE clause SQL ne les consommait
+        // -> 16 params pour 12 placeholders. Le connecteur ignore les extras en
+        // silence, donc les criteres 1 a 4 recevaient les mauvaises valeurs et ne
+        // matchaient jamais. Les clauses manquantes sont ecrites ici.
+        const dedupIdClauses = itemType === "game"
+          ? `
+             /* Critere 9 : rawg_id */
+             OR (? IS NOT NULL AND rawg_id = ?)
+             /* Critere 10 : igdb_id */
+             OR (? IS NOT NULL AND igdb_id = ?)`
+          : "";
+        const dedupIdParams = itemType === "game"
+          ? [(b as any).rawgId ?? null, (b as any).rawgId ?? null, (b as any).igdbId ?? null, (b as any).igdbId ?? null]
+          : [];
         const beforeRows: any = blocklistRedirect ? [blocklistRedirect] : await conn.query(
           `SELECT id, title, title_english AS titleEnglish, title_normalized_strict AS titleNormalizedStrict, anilist_id AS anilistId, mal_id AS malId, anime_schedule_route AS animeScheduleRoute${itemType === "game" ? ", rawg_id AS rawgId, igdb_id AS igdbId" : ""}, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
            FROM ${table}
            WHERE (
-             /* SESSION 12.7 — Critère 7 : anilist_id (clé d'identification stable AniList) */
+             /* Critere 7 : anilist_id */
              (? IS NOT NULL AND anilist_id = ?)
-             /* SESSION 12.7 — Critère 8 : mal_id (clé d'identification stable MAL/Jikan) */
-             OR (? IS NOT NULL AND mal_id = ?)
-             /* Critère 1 : titre exact */
+             /* Critere 8 : mal_id */
+             OR (? IS NOT NULL AND mal_id = ?)${dedupIdClauses}
+             /* Critere 1 : titre exact */
              OR title = ?
+             /* Critere 2 : normalize_strict + date */
              OR (
                release_date = ?
                AND title_normalized_strict IS NOT NULL
                AND title_normalized_strict != ''
                AND title_normalized_strict = ?
              )
+             /* Critere 3 : regex + date */
              OR (
                release_date = ?
                AND LOWER(REGEXP_REPLACE(title, '[^[:alnum:]]', '')) = ?
              )
+             /* Critere 4 : cover + date (non generique) */
              OR (
                ? IS NOT NULL
                AND release_date = ?
@@ -2520,20 +2538,12 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
            )
            LIMIT 1`,
           [
-            /* Critère 7 : anilist_id (NULL-check + match) */
             b.anilistId, b.anilistId,
-            /* Critère 8 : mal_id (NULL-check + match) */
             b.malId, b.malId,
-            /* PHASE B GAMES : rawg_id + igdb_id (lossless append) */
-            (b as any).rawgId ?? null, (b as any).rawgId ?? null,
-            (b as any).igdbId ?? null, (b as any).igdbId ?? null,
-            /* Critère 1 : titre exact */
+            ...dedupIdParams,
             b.title,
-            /* Critère 2 : normalize_strict + date */
             b.releaseDate || null, normalizedStrictIncoming,
-            /* Critère 3 : regex + date */
             b.releaseDate || null, normalizedIncoming,
-            /* Critère 4 : cover + date (non-générique) */
             lookupCover, b.releaseDate || null, lookupCover,
           ]
         );

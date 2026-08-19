@@ -345,6 +345,11 @@ function buildDuplicateGroups(
   // titres differents (romaji vs english vs translit) mais meme anilist_id ou mal_id.
   const anilistIdx = new Map<string, GameNimeItem[]>();
   const malIdx = new Map<string, GameNimeItem[]>();
+  // Un jeu n'a ni anilist_id ni mal_id : rawg_id/igdb_id sont ses SEULS
+  // identifiants stables. Sans ces cles, les jeux ne sont dedoublonnes que
+  // par titre et cover (cas "The Sinking City 2" vs "Sinking City 2").
+  const rawgIdx = new Map<string, GameNimeItem[]>();
+  const igdbIdx = new Map<string, GameNimeItem[]>();
 
   for (const item of items) {
     const titleKey = `${item.type}:T:${normalizeTitle(item.title)}:${item.releaseDate || "no-date"}`;
@@ -382,6 +387,18 @@ function buildDuplicateGroups(
       const midKey = `${item.type}:M:${mid}`;
       (malIdx.get(midKey) || malIdx.set(midKey, []).get(midKey)!).push(item);
     }
+
+    const rid = (item as any).rawgId;
+    if (rid && rid > 0) {
+      const ridKey = `${item.type}:R:${rid}`;
+      (rawgIdx.get(ridKey) || rawgIdx.set(ridKey, []).get(ridKey)!).push(item);
+    }
+
+    const gid = (item as any).igdbId;
+    if (gid && gid > 0) {
+      const gidKey = `${item.type}:G:${gid}`;
+      (igdbIdx.get(gidKey) || igdbIdx.set(gidKey, []).get(gidKey)!).push(item);
+    }
   }
 
   // Union-find by item id
@@ -401,7 +418,7 @@ function buildDuplicateGroups(
   for (const item of items) parent.set(item.id, item.id);
 
   // For every shared key (title, cover, or titleEnglish), union items together
-  for (const list of [...titleIdx.values(), ...coverIdx.values(), ...englishIdx.values(), ...anilistIdx.values(), ...malIdx.values()]) {
+  for (const list of [...titleIdx.values(), ...coverIdx.values(), ...englishIdx.values(), ...anilistIdx.values(), ...malIdx.values(), ...rawgIdx.values(), ...igdbIdx.values()]) {
     if (list.length < 2) continue;
     for (let i = 1; i < list.length; i++) union(list[0].id, list[i].id);
   }
@@ -825,6 +842,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
              DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
              CAST(anilist_id AS SIGNED) AS anilistId,
              CAST(mal_id AS SIGNED) AS malId,
+             ${kind === "game" ? "CAST(rawg_id AS SIGNED) AS rawgId, CAST(igdb_id AS SIGNED) AS igdbId," : "NULL AS rawgId, NULL AS igdbId,"}
              '${kind}' AS type
       FROM ${table}
     `;
@@ -932,6 +950,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
              DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
              CAST(anilist_id AS SIGNED) AS anilistId,
              CAST(mal_id AS SIGNED) AS malId,
+             ${kind === "game" ? "CAST(rawg_id AS SIGNED) AS rawgId, CAST(igdb_id AS SIGNED) AS igdbId," : "NULL AS rawgId, NULL AS igdbId,"}
              '${kind}' AS type
       FROM ${table}
     `;
