@@ -563,16 +563,25 @@ export async function matchOrphanGamesCycle(app: FastifyInstance): Promise<{
   const changes: Array<{ id: number; title: string; igdbId: number }> = [];
   try {
     const items: any[] = await conn.query(
-      "SELECT id, title, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
+      "SELECT id, title, rawg_id, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
       "FROM game_items " +
-      "WHERE igdb_id IS NULL AND rawg_id IS NULL " +
+      // Elargi : tout jeu sans igdb_id, qu'il ait un rawg_id ou non. Les items
+      // rawg_seul n'etaient jamais rattaches, donc jamais dedoublonnes par ID
+      // face aux items IGDB (cas Exodus 984070 / 973389).
+      "WHERE igdb_id IS NULL " +
       "AND title IS NOT NULL AND title != '' " +
       "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
     scanned = items.length;
     app.log.info({ scanned, dryRun: DRY_RUN }, "Match orphans cycle: jeux sans ID scannes");
     for (const item of items) {
-      const igdbId = await lookupIgdbByTitle(item.title, item.release_date, item.release_precision);
+      // Slug d'abord quand un rawg_id existe : ancre exacte, pas de quota IGDB search.
+      let igdbId: number | null = null;
+      if (item.rawg_id) {
+        const rawg = await fetchRawg(Number(item.rawg_id));
+        if (rawg?.slug) igdbId = await lookupIgdbBySlug(rawg.slug);
+      }
+      if (!igdbId) igdbId = await lookupIgdbByTitle(item.title, item.release_date, item.release_precision);
       if (igdbId) {
         matched++;
         changes.push({ id: item.id, title: item.title, igdbId });
