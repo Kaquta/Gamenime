@@ -2422,7 +2422,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           const releaseDate = (b as any).releaseDate;
           if (releaseDate) {
             const ageDays = (Date.now() - new Date(releaseDate).getTime()) / 86400000;
-            const isNiche = pop < 10 && ageDays > 30 && (ratingScore === null || ratingScore < 70);
+            const isNiche = pop < 10 && ageDays > 7 && (ratingScore === null || ratingScore < 70);
             if (isNiche) {
               app.log.info({ title: b.title, popularity: pop, ratingScore, ageDays: Math.round(ageDays) }, "game rejected: niche");
               continue;
