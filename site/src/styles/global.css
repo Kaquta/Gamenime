@@ -3989,3 +3989,42 @@ body.is-authenticated .fav-heart {
   border-color:rgba(255,140,58,.28);
   color:#ffb066;font-weight:700;
 }
+
+
+/* ── Radar mobile : bande des jours en défilement horizontal ──
+   Plutot que compresser 7 pastilles dans 380 px, on les laisse a
+   74 px et on fait glisser. Le degrade a droite signale la suite,
+   scroll-snap evite de s'arreter a cheval entre deux jours. */
+@media (max-width:640px){
+  .wr{max-width:100%;overflow:hidden}
+  .wr-days{
+    display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;
+    scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .wr-days::-webkit-scrollbar{display:none}
+  .wr-day{flex:0 0 auto;width:74px;scroll-snap-align:center;padding:9px 4px 8px}
+  .wr-dn{font-size:.58rem;letter-spacing:.13em}
+  .wr-dd{font-size:1.16rem}
+  .wr-db{margin:7px 8px 0;height:3px}
+
+  /* le texte des lignes se tronque au lieu de pousser le bloc */
+  .wr-feed,.wr-daylab{min-width:0}
+  .wr-row{min-width:0;max-width:100%}
+  .wr-b{min-width:0;overflow:hidden}
+  .wr-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wr-m{min-width:0;overflow:hidden;flex-wrap:nowrap}
+  .wr-p{min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wr-ep{flex:0 0 auto}
+  .wr-daylab > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+
+/* ── Radar mobile : dégradé signalant la suite du rail ── */
+.wr-days-wrap{position:relative}
+@media (max-width:640px){
+  .wr-days-wrap::after{
+    content:"";position:absolute;top:0;bottom:0;right:0;width:26px;
+    pointer-events:none;border-radius:0 11px 11px 0;
+    background:linear-gradient(90deg,transparent,rgba(45,17,10,.9));
+  }
+}

@@ -10,7 +10,7 @@
     <h2 class="wr-title">Cette semaine <span class="wr-chev">›</span></h2>
     <span class="wr-sub" id="wrSub"></span>
   </div>
-  <div class="wr-days" id="wrDays"></div>
+  <div class="wr-days-wrap"><div class="wr-days" id="wrDays"></div></div>
   <div class="wr-daylab" id="wrDayLab"></div>
   <div class="wr-feed" id="wrFeed"></div>
 </section>
@@ -60,6 +60,18 @@ function prochaine() {
     if (t > now && t < best) { best = t; cle = d.date + "#" + i; }
   }));
   return cle;
+}
+
+// Rail mobile : amener le jour actif dans le champ de vision.
+function centrerJour() {
+  const rail = document.getElementById("wrDays");
+  if (!rail) return;
+  const actif = rail.querySelector(".wr-day.on");
+  if (!actif) return;
+  rail.scrollTo({
+    left: actif.offsetLeft - (rail.clientWidth - actif.offsetWidth) / 2,
+    behavior: "smooth"
+  });
 }
 
 function rendreJours() {
@@ -167,6 +179,7 @@ async function monter() {
     rendreJours();
     rendreListe();
     root.hidden = false;
+    centrerJour();
 
     if (timer) clearInterval(timer);
     timer = setInterval(rafraichir, 60000);
@@ -177,6 +190,7 @@ async function monter() {
       sel = Number(b.getAttribute("data-i"));
       rendreJours();
       rendreListe();
+      centrerJour();
     });
 
     document.getElementById("wrFeed").addEventListener("click", ev => {
