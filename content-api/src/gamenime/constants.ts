@@ -12,8 +12,8 @@
  * SESSION 10 REFACTOR:
  * - Scoring simplifié à popularity + rating_score (signal social + qualitatif)
  * - Suppression de freshness/completeness/out_of_window/popularity_cap :
- *   le Top 150 doit refléter le mérite pur, pas la fraîcheur ou la complétude.
- * - Capacités explicites : Top 25 homepage, Top 150 catalogues + à venir.
+ *   le Top 200 doit refléter le mérite pur, pas la fraîcheur ou la complétude.
+ * - Capacités explicites : Top 25 homepage, Top 200 catalogues + à venir.
  */
 
 // ============================================================
@@ -21,10 +21,10 @@
 // ============================================================
 
 /** Max number of anime displayed in /feed/anime endpoints (catalogue Sortis). */
-export const CAPACITY_ANIME = 150;
+export const CAPACITY_ANIME = 200;
 
 /** Max number of games displayed in /feed/games endpoints (catalogue Sortis). */
-export const CAPACITY_GAMES = 150;
+export const CAPACITY_GAMES = 200;
 
 /** Max number of upcoming anime displayed in /feed/anime?status=upcoming. */
 export const CAPACITY_UPCOMING_ANIME = 300;
