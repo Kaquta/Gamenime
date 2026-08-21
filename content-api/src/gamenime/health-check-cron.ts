@@ -7,6 +7,7 @@
 // ════════════════════════════════════════════════════════
 import type { FastifyInstance } from "fastify";
 import { getTwitchToken, fetchWithTimeout, igdbFetch } from "./twitch.js";
+import { getLastRun } from "./dashboard.js";
 
 type Pool = any;
 
@@ -131,7 +132,56 @@ export async function runHealthCheck(app: FastifyInstance, pool: Pool, only?: st
       app.log.error({ source, err: String(e?.message || e) }, "Health check erreur inattendue");
     }
   }
+  if (!only) await verifierCyclesInternes(app);
   app.log.info("Health check cycle termine");
+}
+
+// ── Silence radio : on ne parle que si un cycle s'est tu ──────────────
+// Un cron mort et un cron sans travail se ressemblent dans les logs.
+// trackLastRun est appele a CHAQUE passage, meme a zero rattachement :
+// son absence prolongee signale donc un vrai arret, pas une accalmie.
+const CYCLES_SURVEILLES: Array<{ cle: string; nom: string; toleranceH: number }> = [
+  { cle: "match-anime-routes", nom: "Routes AnimeSchedule", toleranceH: 48 },
+  { cle: "refetch-cron", nom: "Refetch Phase B", toleranceH: 6 },
+];
+
+async function verifierCyclesInternes(app: FastifyInstance): Promise<void> {
+  const muets: string[] = [];
+  for (const c of CYCLES_SURVEILLES) {
+    const run = getLastRun(c.cle);
+    if (!run) {
+      muets.push(`**${c.nom}** — aucun passage enregistré depuis le démarrage`);
+      continue;
+    }
+    const heures = (Date.now() - run.ts) / 3600000;
+    if (heures > c.toleranceH) {
+      muets.push(`**${c.nom}** — silencieux depuis ${Math.round(heures)} h (seuil ${c.toleranceH} h)`);
+    }
+  }
+  if (!muets.length) {
+    app.log.info({ cycles: CYCLES_SURVEILLES.length }, "Health check: cycles internes OK");
+    return;
+  }
+  app.log.error({ muets }, "Health check: cycles internes silencieux");
+  const url = process.env.DISCORD_WEBHOOK_ERRORS;
+  if (!url) return;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title: "\u26a0\ufe0f Cycle interne silencieux",
+          description: muets.join("\n"),
+          color: 15158332,
+          footer: { text: "GameNime \u00b7 Health check quotidien" },
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+    });
+  } catch {
+    /* le suivi ne doit jamais faire echouer le health check */
+  }
 }
 
 // ── Cron : lance a 00h00 chaque jour ──

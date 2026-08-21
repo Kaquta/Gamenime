@@ -28,6 +28,9 @@ export function pushActivity(event: Omit<ActivityEvent, "ts">) {
 
 interface LastRun { ts: number; duration_ms?: number; details?: Record<string, any>; }
 const LAST_RUNS: Record<string, LastRun> = {};
+export function getLastRun(name: string): LastRun | undefined {
+  return LAST_RUNS[name];
+}
 export function trackLastRun(name: string, details?: Record<string, any>, duration_ms?: number) {
   LAST_RUNS[name] = { ts: Date.now(), duration_ms, details };
 }

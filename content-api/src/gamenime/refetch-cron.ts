@@ -5,7 +5,7 @@
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { resoudreDistributeurYouTube } from "./youtube-verify.js";
-import { sanitizePlatform } from "./core.js";
+import { sanitizePlatform, normalizeTitleStrict } from "./core.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000;
 const REFETCH_BATCH_SIZE = 200;
@@ -166,6 +166,142 @@ export async function fetchJikan(malId: number): Promise<SourceData | null> {
   } catch (e) {
     return null;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Rattachement des routes AnimeSchedule (session 33)
+// ─────────────────────────────────────────────────────────────────────────
+// refetch-cron UTILISE anime_schedule_route mais ne la CREE jamais : 243 animes
+// sur 392 n'en ont pas, dont 91 avec popularity > 10000 (Frieren S2, Dandadan
+// S3, Oshi no Ko S3...). Sans route, impossible de les croiser avec le
+// timetable — ils n'apparaissent pas dans le radar hebdo.
+// Validation stricte, comme lookupIgdbByTitle : titre normalise identique ET
+// annee a plus ou moins 1. Plus d'un candidat -> on n'ecrit rien.
+export async function lookupAnimeScheduleRoute(
+  titre: string,
+  annee: number | null,
+  apiToken: string
+): Promise<string | null> {
+  if (!titre || !apiToken) return null;
+  try {
+    const url = "https://animeschedule.net/api/v3/anime?q=" + encodeURIComponent(titre);
+    const res = await fetch(url, { headers: { Authorization: "Bearer " + apiToken } });
+    if (!res.ok) return null;
+    const txt = await res.text();
+    if (!txt || txt.trim()[0] !== "{" && txt.trim()[0] !== "[") return null;
+    const data = JSON.parse(txt) as any;
+    const liste: any[] = Array.isArray(data) ? data : (data?.anime || []);
+    if (!liste.length) return null;
+
+    const vise = normalizeTitleStrict(titre);
+    if (!vise) return null;
+    let cands = liste.filter((a) => normalizeTitleStrict(String(a?.title || "")) === vise);
+    if (annee) {
+      const dansAnnee = cands.filter((a) => {
+        const y = Number(a?.year || 0);
+        return y > 0 && Math.abs(y - annee) <= 1;
+      });
+      if (dansAnnee.length > 0) cands = dansAnnee;
+    }
+    if (cands.length !== 1) return null;
+    return String(cands[0].route || "") || null;
+  } catch {
+    return null;
+  }
+}
+
+// Discord : silence quand il n'y a rien a signaler. Un message quotidien
+// "0 route trouvee" polluerait le salon — on ne parle que si on a rattache
+// quelque chose, ou si le cycle a echoue.
+async function notifierRoutes(scanned: number, matched: number, erreur: string | null): Promise<void> {
+  const url = erreur
+    ? process.env.DISCORD_WEBHOOK_ERRORS
+    : process.env.DISCORD_WEBHOOK_WORKFLOWS;
+  if (!url) return;
+  if (!erreur && matched === 0) return;
+  const titre = erreur ? "❌ Routes AnimeSchedule" : "✅ Routes AnimeSchedule";
+  const desc = erreur
+    ? `Échec après ${scanned} anime(s) scanné(s), ${matched} rattaché(s).\n\`${erreur}\``
+    : `**${matched}** route(s) rattachée(s) sur **${scanned}** anime(s) sans route.`;
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [{
+          title: titre,
+          description: desc,
+          color: erreur ? 15158332 : 3066993,
+          footer: { text: "GameNime · Cron quotidien" },
+          timestamp: new Date().toISOString(),
+        }],
+      }),
+    });
+  } catch {
+    /* le suivi ne doit jamais faire echouer le cycle */
+  }
+}
+
+export async function matchAnimeRoutesCycle(app: FastifyInstance): Promise<{
+  scanned: number;
+  matched: number;
+}> {
+  const DRY_RUN = false;
+  const token = process.env.ANIMESCHEDULE_TOKEN || "";
+  const pool = (app as any).pool;
+  if (!pool || !token) {
+    app.log.warn("Match routes cycle: pool ou token absent");
+    return { scanned: 0, matched: 0 };
+  }
+  const debut = Date.now();
+  const conn = await pool.getConnection();
+  let scanned = 0, matched = 0;
+  try {
+    const items: any[] = await conn.query(
+      "SELECT id, title, YEAR(release_date) AS annee FROM anime_items " +
+      "WHERE (anime_schedule_route IS NULL OR anime_schedule_route = '') " +
+      "AND title IS NOT NULL AND title != '' " +
+      "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+    );
+    scanned = items.length;
+    for (const it of items) {
+      const route = await lookupAnimeScheduleRoute(it.title, it.annee || null, token);
+      if (route) {
+        matched++;
+        if (DRY_RUN) {
+          app.log.info({ id: it.id, title: it.title, route }, "[DRY_RUN] route trouvee");
+        } else {
+          await conn.query("UPDATE anime_items SET anime_schedule_route = ? WHERE id = ?", [route, it.id]);
+          app.log.info({ id: it.id, title: it.title, route }, "route AnimeSchedule rattachee");
+        }
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    app.log.info({ scanned, matched, dryRun: DRY_RUN }, "Match routes cycle: termine");
+    trackLastRun("match-anime-routes", { scanned, matched, dryRun: DRY_RUN }, Date.now() - debut);
+    if (matched > 0) {
+      pushActivity({
+        type: "routes",
+        message: `${matched} route${matched > 1 ? "s" : ""} AnimeSchedule rattachée${matched > 1 ? "s" : ""}`,
+        detail: `${scanned} anime${scanned > 1 ? "s" : ""} scanné${scanned > 1 ? "s" : ""} sans route`,
+        level: "info",
+      });
+    }
+    await notifierRoutes(scanned, matched, null);
+  } catch (e: any) {
+    app.log.error({ err: e?.message }, "Match routes cycle: erreur");
+    trackLastRun("match-anime-routes", { scanned, matched, error: e?.message }, Date.now() - debut);
+    pushActivity({
+      type: "routes",
+      message: "Échec du rattachement des routes",
+      detail: e?.message ?? "erreur inconnue",
+      level: "error",
+    });
+    await notifierRoutes(scanned, matched, e?.message ?? "erreur inconnue");
+  } finally {
+    conn.release();
+  }
+  return { scanned, matched };
 }
 
 export async function fetchAnimeSchedule(route: string, apiToken: string): Promise<SourceData | null> {
@@ -448,6 +584,18 @@ export function startRefetchCron(app: FastifyInstance): NodeJS.Timeout {
   setTimeout(() => {
     refetchIncompleteCycle(app).catch(e => app.log.error({ err: e?.message }, "Refetch cycle error"));
   }, 5 * 60 * 1000);
+
+  // Rattachement des routes AnimeSchedule (session 33).
+  // Rythme quotidien, pas horaire : il ne traite que les nouveaux entrants,
+  // et chaque item coute un appel API avec 400 ms d'attente. Une saison
+  // d'anime apporte quelques dizaines de titres tous les trois mois.
+  const ROUTES_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  setTimeout(() => {
+    matchAnimeRoutesCycle(app).catch(e => app.log.error({ err: e?.message }, "Match routes cycle error"));
+  }, 12 * 60 * 1000);
+  setInterval(() => {
+    matchAnimeRoutesCycle(app).catch(e => app.log.error({ err: e?.message }, "Match routes cycle error"));
+  }, ROUTES_INTERVAL_MS);
 
   return setInterval(() => {
     refetchIncompleteCycle(app).catch(e => app.log.error({ err: e?.message }, "Refetch cycle error"));

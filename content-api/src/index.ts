@@ -10,7 +10,7 @@ import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, se
 import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
 import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
-import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan } from "./gamenime/refetch-cron.js";
+import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan , matchAnimeRoutesCycle } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug, matchOrphanGamesCycle } from "./gamenime/refetch-games-cron.js";
 import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
@@ -1763,6 +1763,15 @@ app.post("/admin/refetch-incomplete", async (req, reply) => {
 
 // Appariement des jeux orphelins (sans aucun ID) a IGDB par titre + fenetre dynamique.
 // DRY_RUN=true dans la fonction : ne modifie RIEN, logue seulement ce qu'il apparierait.
+app.post("/admin/match-anime-routes", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const result = await matchAnimeRoutesCycle(app);
+  return reply.send({ ok: true, ...result });
+});
+
 app.post("/admin/match-orphan-games", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
