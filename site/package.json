@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "build:staging": "astro build --outDir ./dist-staging",
+    "promote": "read -p 'Publier staging en PROD ? (oui/non) ' r && [ \"$r\" = oui ] && rm -rf dist/* && cp -r dist-staging/. dist/ && echo 'promu en prod' || echo 'annule'"
   },
   "dependencies": {
     "astro": "^5.7.10"

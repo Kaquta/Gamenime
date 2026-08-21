@@ -92,6 +92,7 @@ services:
       - ./nginx/htpasswd:/etc/nginx/htpasswd:ro
       - ./nginx/static:/etc/nginx/static:ro
       - ./site/dist:/usr/share/nginx/html:ro
+      - ./site/dist-staging:/usr/share/nginx/staging:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./nginx/snippets:/etc/nginx/snippets:ro

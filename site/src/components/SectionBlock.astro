@@ -155,6 +155,72 @@ function getCountdownHtml(item) {
     '<span class="countdown-timer">' + timeStr + '</span>' +
     '<span class="countdown-tooltip">' + label + '</span></div>';
 }
+// Pastille de temps : un seul element porte le degre de certitude.
+// 5 etats — imminent (minute), proche (jours), lointain (arrondi), vague
+// (mois/annee, aucun compte a rebours), sorti. Meme regle que le modal et
+// que les rappels : pas de J- sans jour confirme.
+var MOIS_LONG = ["janvier","f\u00e9vrier","mars","avril","mai","juin","juillet","ao\u00fbt","septembre","octobre","novembre","d\u00e9cembre"];
+// Bloc date : reprend la structure du modal en miniature — valeur, compte a
+// rebours, barre de precision. Rien n'est pose sur la jaquette (ses coins sont
+// deja pris par .content-tag, .rank-badge et .fav-heart).
+function dateBox(item) {
+  if (!item.releaseDate) {
+    return '<div class="dbox"><div class="dline"><span class="dval vague">Date non annoncee</span></div></div>';
+  }
+  var prec = item.releasePrecision || "day";
+  var p = String(item.releaseDate).split("-");
+  var y = +p[0], m = +p[1], d = +p[2];
+  var val, cd = "", left, width, wide = "";
+  if (prec === "year") {
+    val = '<span class="dval vague">courant ' + y + '</span>';
+    left = 0; width = 100; wide = " wide";
+  } else if (prec === "month") {
+    val = '<span class="dval vague">courant ' + MOIS_LONG[m - 1] + '</span>';
+    left = ((m - 1) / 12) * 100; width = 100 / 12;
+  } else {
+    val = '<span class="dval">' + d + ' ' + MOIS_LONG[m - 1] + '</span>';
+    var doy = Math.round((new Date(y, m - 1, d).getTime() - new Date(y, 0, 1).getTime()) / 86400000);
+    left = (doy / 365) * 100; width = 3;
+    var rel = new Date(item.releaseDate); rel.setHours(0, 0, 0, 0);
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var j = Math.round((rel.getTime() - now.getTime()) / 86400000);
+    if (j < 0) cd = '<span class="dcd past">sorti</span>';
+    else if (j === 0) cd = '<span class="dcd"><i></i>aujourd\u0027hui</span>';
+    else if (j === 1) cd = '<span class="dcd"><i></i>demain</span>';
+    else if (j <= 15) cd = '<span class="dcd">' + j + ' j</span>';
+    else cd = '<span class="dcd far">dans ' + j + ' j</span>';
+  }
+  if (left + width > 100) left = 100 - width;
+  return '<div class="dbox"><div class="dline">' + val + cd + '</div>' +
+    '<div class="wbar' + wide + '"><i style="left:' + left.toFixed(1) + '%;width:' + width.toFixed(1) + '%"></i></div></div>';
+}
+// Plateformes en chips (comme dans le modal). Rien d'invente : si aucune
+// source ne connait de plateforme, on l'ecrit.
+function platChips(item, domain) {
+  var raw = simplifyPlatform(item.platform) || "";
+  var list = raw.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+  if (!list.length) {
+    var fb = String(domain).indexOf("anime") !== -1 ? "Plateforme EU non annoncee" : (item.genre || "Non annoncee");
+    return '<div class="chips"><span class="chip tbc">' + fb + '</span></div>';
+  }
+  return '<div class="chips">' + list.slice(0, 3).map(function(n) {
+    return '<span class="chip">' + n + '</span>';
+  }).join("") + '</div>';
+}
+// Badge popularite : seuils propres a chaque domaine. AniList compte des
+// utilisateurs (max ~687000), IGDB des hypes (max ~778) : un seuil unique
+// mettait le badge sur 98% des animes et 8% des jeux.
+function hypePill(item, domain) {
+  var pop = Number(item.popularity || 0);
+  var estAnime = String(domain).indexOf("anime") !== -1;
+  var seuil = estAnime ? 50000 : 100;
+  if (pop < seuil) return '';
+  var today = new Date().toISOString().slice(0, 10);
+  if (!item.releaseDate) return '';
+  return item.releaseDate > today
+    ? '<span class="hpill">tr\u00e8s attendu</span>'
+    : '<span class="hpill">populaire</span>';
+}
 
 function ytId(url) {
   if (!url) return null;
@@ -240,13 +306,8 @@ function renderCard(item, domain, rank) {
     '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +
     '<h3>' + displayTitle(item) + '</h3>' +
-    '<p>' + dateLabel(item) + '</p>' +
-    '<p>' + info + '</p>' +
-    countdown +
-    '<div class="item-badges-row">' +
-    '<span class="item-badge">' + status + '</span>' +
-    hypeBadge +
-    '</div></div></article>';
+    dateBox(item) + platChips(item, domain) + hypePill(item, domain) +
+    '</div></article>';
 }
 
 var hoverTimer = null;
