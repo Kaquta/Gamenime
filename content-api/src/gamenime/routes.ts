@@ -650,6 +650,132 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
   // ─────────────────────────────────────────────────
   // GET /feed/search — search across both types
   // ─────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET /feed/week — radar hebdo des episodes en diffusion (session 33)
+  // AnimeSchedule /timetables/sub donne episodeNumber + episodeDate (ISO, heure
+  // exacte). On croise sur anime_schedule_route : cle deterministe, pas de match
+  // par titre. Seuls les animes DEJA en base ressortent, donc les filtres de
+  // popularite et de qualite s'appliquent naturellement.
+  // Rien n'est stocke : l'episode courant est volatil, une colonne serait
+  // perimee entre deux crons. Cache memoire 15 min.
+  // ─────────────────────────────────────────────────────────────────────────
+  let weekCache: { at: number; data: any } | null = null;
+  const WEEK_CACHE_MS = 15 * 60 * 1000;
+
+  function isoWeek(d: Date): { week: number; year: number } {
+    const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const dayNum = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+    return { week, year: t.getUTCFullYear() };
+  }
+
+  app.get("/feed/week", async (req: FastifyRequest, reply: FastifyReply) => {
+    if (weekCache && Date.now() - weekCache.at < WEEK_CACHE_MS) {
+      return weekCache.data;
+    }
+
+    const token = process.env.ANIMESCHEDULE_TOKEN || "";
+    const now = new Date();
+    const { week, year } = isoWeek(now);
+
+    let timetable: any[] = [];
+    try {
+      const res = await fetch(
+        `https://animeschedule.net/api/v3/timetables/sub?week=${week}&year=${year}`,
+        { headers: { Authorization: "Bearer " + token } }
+      );
+      if (res.ok) {
+        const j = await res.json();
+        if (Array.isArray(j)) timetable = j;
+      } else {
+        req.log.warn({ status: res.status }, "feed/week: AnimeSchedule HTTP error");
+      }
+    } catch (e: any) {
+      req.log.warn({ err: e?.message }, "feed/week: AnimeSchedule fetch failed");
+    }
+
+    const routes = timetable.map((a) => a?.route).filter(Boolean);
+    let byRoute = new Map<string, any>();
+    if (routes.length > 0) {
+      const ph = routes.map(() => "?").join(",");
+      const rows: any[] = await pool.query(
+        `SELECT id, title, title_english AS titleEnglish, cover, platform,
+                anime_schedule_route AS route, popularity
+         FROM anime_items WHERE anime_schedule_route IN (${ph})`,
+        routes
+      );
+      for (const r of rows) byRoute.set(r.route, r);
+    }
+
+    // Lundi 00:00 UTC de la semaine courante
+    const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() || 7) - 1));
+
+    const DAY_NAMES = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+    const days: any[] = [];
+    for (let k = 0; k < 7; k++) {
+      const d = new Date(monday);
+      d.setUTCDate(d.getUTCDate() + k);
+      days.push({
+        date: d.toISOString().slice(0, 10),
+        dayName: DAY_NAMES[k],
+        dayNum: d.getUTCDate(),
+        episodes: [] as any[],
+      });
+    }
+
+    const nowMs = Date.now();
+    let total = 0;
+    for (const a of timetable) {
+      const item = byRoute.get(a?.route);
+      if (!item) continue;
+      const when = a?.episodeDate ? new Date(a.episodeDate) : null;
+      if (!when || Number.isNaN(when.getTime())) continue;
+      const idx = days.findIndex((x) => x.date === when.toISOString().slice(0, 10));
+      if (idx < 0) continue;
+      days[idx].episodes.push({
+        id: item.id,
+        title: item.title,
+        titleEnglish: item.titleEnglish,
+        cover: item.cover,
+        platform: item.platform,
+        popularity: item.popularity,
+        episodeNumber: a.episodeNumber ?? null,
+        episodeTotal: a.episodes ?? null,
+        airingAt: when.toISOString(),
+        aired: when.getTime() <= nowMs,
+      });
+      total++;
+    }
+
+    for (const d of days) {
+      d.episodes.sort((x: any, y: any) => x.airingAt.localeCompare(y.airingAt));
+      d.count = d.episodes.length;
+    }
+
+    const imminent = days
+      .flatMap((d) => d.episodes)
+      .filter((e: any) => !e.aired)
+      .sort((a: any, b: any) => a.airingAt.localeCompare(b.airingAt))
+      .slice(0, 3);
+
+    const data = {
+      generatedAt: new Date().toISOString(),
+      weekStart: days[0].date,
+      weekEnd: days[6].date,
+      today: new Date().toISOString().slice(0, 10),
+      total,
+      fetched: timetable.length,
+      days,
+      imminent,
+    };
+    weekCache = { at: Date.now(), data };
+    req.log.info({ total, fetched: timetable.length }, "feed/week");
+    return data;
+  });
+
   app.get("/feed/search", async (req: FastifyRequest, reply: FastifyReply) => {
     const parsed = searchQuerySchema.safeParse(req.query);
     if (!parsed.success) {
