@@ -15,86 +15,62 @@ const genres = domain === "games"
 const platforms = domain === "games"
   ? ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android"]
   : domain === "anime"
-  ? ["Crunchyroll", "Netflix", "YouTube", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"]
-  : ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android", "Crunchyroll", "Netflix", "YouTube", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"];
+  ? ["Crunchyroll", "Netflix", "Muse Asia", "Ani-One Asia", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"]
+  : ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android", "Crunchyroll", "Netflix", "Muse Asia", "Ani-One Asia", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"];
 ---
 <div class="filter-bar container" data-domain={domain}>
-  <div class="filter-row">
-    <div class="filter-group">
-      <select class="filter-select" id="filterMonth">
-        <option value="">Mois</option>
-        {months.map((m, i) => (
-          <option value={String(i + 1).padStart(2, "0")}>{m}</option>
-        ))}
-      </select>
-    </div>
-    <div class="filter-group">
-      <select class="filter-select" id="filterYear">
-        <option value="">Année</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-      </select>
-    </div>
-    <div class="filter-group filter-genres">
-      <button class="filter-select genre-toggle" id="genreToggle">
-        Genres ▾
-      </button>
-      <div class="genre-dropdown" id="genreDropdown">
-        {genres.map((g) => (
-          <label class="genre-option">
-            <input type="checkbox" value={g} class="genre-check" />
-            <span>{g}</span>
-          </label>
-        ))}
+  <div class="gn-panel" id="filterPanel">
+    <div class="gn-panel-clip">
+      <div class="gn-panel-body">
+        <div class="gn-grp">
+          <p class="gn-grp-label">Période</p>
+          <div class="gn-duo">
+            <select class="gn-select" id="filterMonth">
+              <option value="">Mois</option>
+              {months.map((m, i) => (<option value={String(i + 1).padStart(2, "0")}>{m}</option>))}
+            </select>
+            <select class="gn-select" id="filterYear">
+              <option value="">Année</option>
+              <option value="2026">2026</option>
+              <option value="2027">2027</option>
+            </select>
+          </div>
+        </div>
+        <div class="gn-grp">
+          <p class="gn-grp-label">Genres</p>
+          <div class="gn-chips">
+            {genres.map((g) => (
+              <label class="gn-chip"><input type="checkbox" value={g} class="genre-check" /><span>{g}</span></label>
+            ))}
+          </div>
+        </div>
+        <div class="gn-grp">
+          <p class="gn-grp-label">Plateformes</p>
+          <div class="gn-chips">
+            {platforms.map((pf) => (
+              <label class="gn-chip"><input type="checkbox" value={pf} class="platform-check" /><span>{pf}</span></label>
+            ))}
+          </div>
+        </div>
+        <div class="gn-grp">
+          <p class="gn-grp-label">Recherche</p>
+          <input type="text" class="gn-input" id="filterSearch" placeholder="Titre…" />
+        </div>
+        <div class="gn-actions">
+          <button class="gn-apply" id="filterApply" type="button">Filtrer</button>
+          <button class="gn-reset" id="filterReset" type="button">Réinitialiser</button>
+        </div>
       </div>
     </div>
-    <div class="filter-group filter-genres">
-      <button class="filter-select genre-toggle" id="platformToggle">
-        Plateformes ▾
-      </button>
-      <div class="genre-dropdown" id="platformDropdown">
-        {platforms.map((p) => (
-          <label class="genre-option">
-            <input type="checkbox" value={p} class="platform-check" />
-            <span>{p}</span>
-          </label>
-        ))}
-      </div>
-    </div>
-    <div class="filter-group filter-search">
-      <input type="text" class="filter-input" id="filterSearch" placeholder="Rechercher..." />
-    </div>
-    <button class="filter-apply" id="filterApply">Filtrer</button>
-    <button class="filter-reset" id="filterReset">✕</button>
   </div>
 </div>
 <script>
-  // Genre dropdown toggle
-  const genreToggle = document.getElementById("genreToggle");
-  const genreDropdown = document.getElementById("genreDropdown");
-  const platformToggle = document.getElementById("platformToggle");
-  const platformDropdown = document.getElementById("platformDropdown");
-
-  genreToggle?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    genreDropdown?.classList.toggle("open");
-    platformDropdown?.classList.remove("open");
-  });
-  platformToggle?.addEventListener("click", (e) => {
-    e.stopPropagation();
-    platformDropdown?.classList.toggle("open");
-    genreDropdown?.classList.remove("open");
-  });
-  document.addEventListener("click", () => {
-    genreDropdown?.classList.remove("open");
-    platformDropdown?.classList.remove("open");
-  });
-  genreDropdown?.addEventListener("click", (e) => e.stopPropagation());
-  platformDropdown?.addEventListener("click", (e) => e.stopPropagation());
-
-  // Apply filters
+  const panel = document.getElementById("filterPanel");
+  const toggle = document.getElementById("filterToggle");
+  const badge = document.getElementById("filterBadge");
   const applyBtn = document.getElementById("filterApply");
   const resetBtn = document.getElementById("filterReset");
+
   function getFilters() {
     const month = (document.getElementById("filterMonth") as HTMLSelectElement)?.value;
     const year = (document.getElementById("filterYear") as HTMLSelectElement)?.value;
@@ -126,35 +102,46 @@ const platforms = domain === "games"
     }
     return params.join("&");
   }
+  function refreshBadge() {
+    if (!badge) return;
+    const f = getFilters();
+    const n = (f.month ? 1 : 0) + (f.year ? 1 : 0) + (f.search ? 1 : 0) + f.genres.length + f.platforms.length;
+    badge.textContent = String(n);
+    (badge as HTMLElement).hidden = n === 0;
+  }
+  function setOpen(open: boolean) {
+    panel?.classList.toggle("open", open);
+    toggle?.classList.toggle("open", open);
+    toggle?.setAttribute("aria-expanded", open ? "true" : "false");
+  }
   function applyFilters() {
-    const filters = getFilters();
-    const extra = buildFilterParams(filters);
-    document.dispatchEvent(new CustomEvent("applyFilters", { detail: extra }));
-    if (genreToggle) {
-      genreToggle.textContent = filters.genres.length
-        ? `Genres (${filters.genres.length}) ▾`
-        : "Genres ▾";
-    }
-    if (platformToggle) {
-      platformToggle.textContent = filters.platforms.length
-        ? `Plateformes (${filters.platforms.length}) ▾`
-        : "Plateformes ▾";
-    }
+    document.dispatchEvent(new CustomEvent("applyFilters", { detail: buildFilterParams(getFilters()) }));
+    refreshBadge();
+    setOpen(false);
   }
   function resetFilters() {
     (document.getElementById("filterMonth") as HTMLSelectElement).value = "";
     (document.getElementById("filterYear") as HTMLSelectElement).value = "";
     (document.getElementById("filterSearch") as HTMLInputElement).value = "";
-    document.querySelectorAll(".genre-check").forEach((el) => {
+    document.querySelectorAll(".genre-check, .platform-check").forEach((el) => {
       (el as HTMLInputElement).checked = false;
     });
-    document.querySelectorAll(".platform-check").forEach((el) => {
-      (el as HTMLInputElement).checked = false;
-    });
-    if (genreToggle) genreToggle.textContent = "Genres ▾";
-    if (platformToggle) platformToggle.textContent = "Plateformes ▾";
+    refreshBadge();
     document.dispatchEvent(new CustomEvent("applyFilters", { detail: "" }));
   }
+
+  toggle?.addEventListener("click", () => setOpen(!panel?.classList.contains("open")));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+  document.querySelectorAll(".genre-check, .platform-check").forEach((el) =>
+    el.addEventListener("change", refreshBadge)
+  );
+  document.getElementById("filterMonth")?.addEventListener("change", refreshBadge);
+  document.getElementById("filterYear")?.addEventListener("change", refreshBadge);
+  document.getElementById("filterSearch")?.addEventListener("input", refreshBadge);
+  document.getElementById("filterSearch")?.addEventListener("keydown", (e) => {
+    if ((e as KeyboardEvent).key === "Enter") applyFilters();
+  });
   applyBtn?.addEventListener("click", applyFilters);
   resetBtn?.addEventListener("click", resetFilters);
+  refreshBadge();
 </script>
