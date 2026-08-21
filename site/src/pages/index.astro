@@ -65,12 +65,50 @@ function parseScreenshots(item) {
   catch(e) { return []; }
 }
 function simplifyPlatform(p) {
+  // La base garde le detail ("PlayStation 5", "Xbox Series X|S").
+  // Certaines lignes melangent generique et precis :
+  //   "PC, PlayStation, Xbox, PlayStation 5, Xbox Series X|S"
+  // Regle : des qu'une version precise existe pour une famille,
+  // le generique de cette famille disparait.
   if (!p) return "";
-  var s = p.replace(/PC \(Microsoft Windows\)/gi, "PC").replace(/PlayStation 5/gi, "PlayStation").replace(/PlayStation 4/gi, "PlayStation").replace(/Xbox Series X\|S/gi, "Xbox").replace(/Xbox Series S\/X/gi, "Xbox").replace(/Xbox One/gi, "Xbox").replace(/Nintendo Switch/gi, "Nintendo").replace(/Apple Macintosh/gi, "Mac");
-  var parts = s.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
-  var seen = {}; var unique = [];
-  for (var i = 0; i < parts.length; i++) { if (!seen[parts[i]]) { seen[parts[i]] = true; unique.push(parts[i]); } }
-  return unique.join(", ");
+  var LABELS = {
+    "playstation 6": "PS6",
+    "playstation 5": "PS5",
+    "playstation 4": "PS4",
+    "playstation 3": "PS3",
+    "xbox series x|s": "Xbox X|S",
+    "xbox series s/x": "Xbox X|S",
+    "xbox series": "Xbox X|S",
+    "xbox one": "Xbox One",
+    "nintendo switch 2": "Switch 2",
+    "nintendo switch": "Switch",
+    "pc (microsoft windows)": "PC",
+    "apple macintosh": "Mac"
+  };
+  var FAMILIES = [
+    { generic: "playstation", precise: /^playstation \d/ },
+    { generic: "xbox", precise: /^xbox (series|one)/ },
+    { generic: "nintendo", precise: /^nintendo (switch|3ds|ds|wii)/ }
+  ];
+  var parts = String(p).split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+  var lower = parts.map(function (x) { return x.toLowerCase(); });
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var fam = null;
+    for (var f = 0; f < FAMILIES.length; f++) {
+      if (lower[i] === FAMILIES[f].generic) { fam = FAMILIES[f]; break; }
+    }
+    if (fam) {
+      var precisExiste = false;
+      for (var k = 0; k < lower.length; k++) {
+        if (fam.precise.test(lower[k])) { precisExiste = true; break; }
+      }
+      if (precisExiste) continue;
+    }
+    var label = LABELS[lower[i]] || parts[i];
+    if (out.indexOf(label) === -1) out.push(label);
+  }
+  return out.join(", ");
 }
 function getHypeLabel(item) {
   if (!item) return null;

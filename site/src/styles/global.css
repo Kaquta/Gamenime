@@ -3972,3 +3972,20 @@ body.is-authenticated .fav-heart {
   border:1px solid rgba(255,165,98,.24);
   color:#d9bda3;font-weight:800;
 }
+
+/* ── Pastilles Anime / Film / Sorti JP ── */
+.kind-pills{display:flex;gap:7px;flex-wrap:wrap}
+.kind-pill{display:flex;align-items:center;gap:8px;padding:8px 15px;border-radius:999px;font-size:.8rem;font-weight:700;color:rgba(226,197,170,.46);cursor:pointer;background:rgba(0,0,0,.3);border:1px solid rgba(255,165,98,.11);font-family:inherit;transition:border-color 180ms,color 180ms,background 180ms}
+.kind-pill:hover{border-color:rgba(255,165,98,.36);color:#d9bda3}
+.kind-pill.on{background:linear-gradient(180deg,rgba(255,132,41,.95),rgba(205,74,20,.92));border-color:transparent;color:#2a110a;box-shadow:0 3px 14px -3px rgba(255,140,58,.65)}
+.kind-pill[hidden]{display:none}
+.kind-pill .kn{font-size:.68rem;font-weight:800;opacity:.7}
+.kind-pill.on .kn{opacity:.85}
+@media (max-width:640px){.kind-pills{width:100%}.kind-pill{flex:1;justify-content:center;padding:9px 8px;font-size:.76rem}}
+
+/* ── Carte : compteur des plateformes non affichées ── */
+.chip.more{
+  background:rgba(255,140,58,.12);
+  border-color:rgba(255,140,58,.28);
+  color:#ffb066;font-weight:700;
+}

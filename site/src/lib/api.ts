@@ -160,3 +160,53 @@ export interface WeekResponse {
 export async function getFeedWeek(): Promise<WeekResponse> {
   return fetchJson<WeekResponse>(`/api/feed/week`);
 }
+
+// ─────────────────────────────────────────────────────────
+// Plateformes jeux : version precise plutot que generique
+// ─────────────────────────────────────────────────────────
+// La base garde le detail ("PlayStation 5", "Xbox Series X|S").
+// Certaines lignes melangent generique et precis :
+//   "PC, PlayStation, Xbox, PlayStation 5, Xbox Series X|S"
+// Regle : des qu'une version precise existe pour une famille,
+// le generique de cette famille disparait.
+const PLATFORM_LABELS: Record<string, string> = {
+  "playstation 6": "PS6",
+  "playstation 5": "PS5",
+  "playstation 4": "PS4",
+  "playstation 3": "PS3",
+  "xbox series x|s": "Xbox X|S",
+  "xbox series s/x": "Xbox X|S",
+  "xbox series": "Xbox X|S",
+  "xbox one": "Xbox One",
+  "nintendo switch 2": "Switch 2",
+  "nintendo switch": "Switch",
+  "pc (microsoft windows)": "PC",
+  "apple macintosh": "Mac",
+};
+// Famille -> a quoi reconnait-on une version precise
+const FAMILIES: Array<{ generic: string; precise: RegExp }> = [
+  { generic: "playstation", precise: /^playstation \d/ },
+  { generic: "xbox", precise: /^xbox (series|one)/ },
+  { generic: "nintendo", precise: /^nintendo (switch|3ds|ds|wii)/ },
+];
+
+export function formatPlatforms(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const parts = String(raw).split(",").map((p) => p.trim()).filter(Boolean);
+  const lower = parts.map((p) => p.toLowerCase());
+
+  // Retirer le generique quand une version precise de la meme famille existe
+  const kept = parts.filter((p, i) => {
+    const fam = FAMILIES.find((f) => lower[i] === f.generic);
+    if (!fam) return true;
+    return !lower.some((x) => fam.precise.test(x));
+  });
+
+  // Renommer + dedupliquer en gardant l'ordre
+  const out: string[] = [];
+  for (const p of kept) {
+    const label = PLATFORM_LABELS[p.toLowerCase()] || p;
+    if (out.indexOf(label) === -1) out.push(label);
+  }
+  return out.join(", ");
+}

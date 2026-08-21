@@ -21,7 +21,7 @@ import Footer from "../components/Footer.astro";
     </div>
   </div>
 
-  <SectionBlock title="Animés à venir" source="anime-upcoming" />
+  <SectionBlock title="Animés à venir" source="anime-upcoming" kinds="upcoming" />
   <SectionBlock title="Jeux vidéo à venir" source="games-upcoming" />
   <Footer />
 </BaseLayout>
@@ -103,10 +103,20 @@ import Footer from "../components/Footer.astro";
       }
     }
 
+    // Revenir sur "Serie" a chaque bascule : sinon on retrouve la grille
+    // filtree sur Film sans forcement s'en souvenir.
+    function resetKinds() {
+      const first = document.querySelector(
+        '.section-block[data-source="anime-upcoming"] .kind-pill[data-kind="anime"]'
+      );
+      if (first) first.click();
+    }
+
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         const target = tab.getAttribute("data-target");
         if (target) activate(target);
+        if (target === "anime-upcoming") resetKinds();
       });
     });
   })();

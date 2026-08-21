@@ -4,14 +4,37 @@ interface Props {
   source: "anime" | "games" | "upcoming" | "anime-upcoming" | "games-upcoming" | "top-anime" | "top-games";
   limit?: number;
   href?: string;
+  /* Onglets Anime / Film / Sorti JP — decoupage EXCLUSIF.
+     La plateforme prime sur le format : un film sans plateforme EU
+     va dans "Sorti JP", pas dans "Film". */
+  /* "anime"    : Anime / Film / Sorti JP (3 pastilles, plateforme prime)
+     "upcoming" : Serie / Film (2 pastilles — sur du non-sorti l'absence
+                  de plateforme EU ne veut rien dire, elle n'est pas
+                  encore annoncee) */
+  kinds?: boolean | "anime" | "upcoming";
 }
-const { title, source, limit, href } = Astro.props;
+const { title, source, limit, href, kinds } = Astro.props;
 ---
 
 <section class="section-block container" data-source={source} data-limit={limit}>
   <div class="section-head">
     <h2>{title}</h2>
-    {href && <a class="see-more" href={href}>Voir plus</a>}
+    {kinds ? (
+      <div class="kind-pills" data-mode={kinds === "upcoming" ? "upcoming" : "anime"}>
+        {kinds === "upcoming" ? (
+          <>
+            <button type="button" class="kind-pill on" data-kind="anime">Série <span class="kn"></span></button>
+            <button type="button" class="kind-pill" data-kind="film">Film <span class="kn"></span></button>
+          </>
+        ) : (
+          <>
+            <button type="button" class="kind-pill on" data-kind="anime">Anime <span class="kn"></span></button>
+            <button type="button" class="kind-pill" data-kind="film">Film <span class="kn"></span></button>
+            <button type="button" class="kind-pill" data-kind="jp">Sorti JP <span class="kn"></span></button>
+          </>
+        )}
+      </div>
+    ) : (href && <a class="see-more" href={href}>Voir plus</a>)}
   </div>
   <div class="items-row">
     <p class="section-loading">Chargement…</p>
@@ -94,9 +117,38 @@ function detailDateBlock(item) {
 }
 // Plateformes en chips. Un distributeur YouTube officiel (Muse Asia, Ani-One,
 // Medialink) s'affiche par son NOM avec un marqueur discret : jamais "YouTube" seul.
+// Modal : noms COMPLETS ("PlayStation 5", "Xbox Series X|S"), contrairement
+// aux cartes qui raccourcissent en PS5 / Xbox X|S. Meme regle en revanche sur
+// le doublon : des qu'une version precise existe pour une famille, le generique
+// de cette famille disparait ("PlayStation, PlayStation 5" -> "PlayStation 5").
+function dedupeGeneric(list) {
+  var FAMILIES = [
+    { generic: "playstation", precise: /^playstation \d/ },
+    { generic: "xbox", precise: /^xbox (series|one)/ },
+    { generic: "nintendo", precise: /^nintendo (switch|3ds|ds|wii)/ }
+  ];
+  var lower = list.map(function (x) { return x.toLowerCase(); });
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var fam = null;
+    for (var f = 0; f < FAMILIES.length; f++) {
+      if (lower[i] === FAMILIES[f].generic) { fam = FAMILIES[f]; break; }
+    }
+    if (fam) {
+      var precisExiste = false;
+      for (var k = 0; k < lower.length; k++) {
+        if (fam.precise.test(lower[k])) { precisExiste = true; break; }
+      }
+      if (precisExiste) continue;
+    }
+    var label = lower[i] === "pc (microsoft windows)" ? "PC" : list[i];
+    if (out.indexOf(label) === -1) out.push(label);
+  }
+  return out;
+}
 function detailPlatforms(item) {
   var raw = (item && item.platform) ? String(item.platform) : "";
-  var list = raw.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
+  var list = dedupeGeneric(raw.split(",").map(function(x) { return x.trim(); }).filter(Boolean));
   if (!list.length) {
     return '<div class="detail-platforms"><span class="plat-chip tbc">Aucune plateforme annoncee</span></div>';
   }
@@ -203,9 +255,21 @@ function platChips(item, domain) {
     var fb = String(domain).indexOf("anime") !== -1 ? "Plateforme EU non annoncee" : (item.genre || "Non annoncee");
     return '<div class="chips"><span class="chip tbc">' + fb + '</span></div>';
   }
+  // Ordre d'affichage : PC et consoles d'abord, mobile ensuite. Sans ca le tri
+  // vient de la source et iOS/Android passent devant PS5 sur un jeu console.
+  var RANG = { "PC": 0, "PS6": 1, "PS5": 1, "PS4": 1, "PS3": 1, "PlayStation": 1,
+               "Xbox X|S": 2, "Xbox One": 2, "Xbox": 2,
+               "Switch 2": 3, "Switch": 3, "Nintendo": 3,
+               "Mac": 4, "Linux": 4, "iOS": 5, "Android": 5 };
+  list.sort(function (a, b) {
+    var ra = RANG[a] === undefined ? 9 : RANG[a];
+    var rb = RANG[b] === undefined ? 9 : RANG[b];
+    return ra - rb;
+  });
+  var reste = list.length - 3;
   return '<div class="chips">' + list.slice(0, 3).map(function(n) {
     return '<span class="chip">' + n + '</span>';
-  }).join("") + '</div>';
+  }).join("") + (reste > 0 ? '<span class="chip more">+' + reste + '</span>' : '') + '</div>';
 }
 // Badge popularite : seuils propres a chaque domaine. AniList compte des
 // utilisateurs (max ~687000), IGDB des hypes (max ~778) : un seuil unique
@@ -240,23 +304,50 @@ function parseScreenshots(item) {
 }
 
 function simplifyPlatform(p) {
+  // La base garde le detail ("PlayStation 5", "Xbox Series X|S").
+  // Certaines lignes melangent generique et precis :
+  //   "PC, PlayStation, Xbox, PlayStation 5, Xbox Series X|S"
+  // Regle : des qu'une version precise existe pour une famille,
+  // le generique de cette famille disparait.
   if (!p) return "";
-  var s = p
-    .replace(/PC \(Microsoft Windows\)/gi, "PC")
-    .replace(/PlayStation 5/gi, "PlayStation")
-    .replace(/PlayStation 4/gi, "PlayStation")
-    .replace(/Xbox Series X\|S/gi, "Xbox")
-    .replace(/Xbox Series S\/X/gi, "Xbox")
-    .replace(/Xbox One/gi, "Xbox")
-    .replace(/Nintendo Switch/gi, "Nintendo")
-    .replace(/Apple Macintosh/gi, "Mac");
-  var parts = s.split(",").map(function(x) { return x.trim(); }).filter(Boolean);
-  var seen = {};
-  var unique = [];
+  var LABELS = {
+    "playstation 6": "PS6",
+    "playstation 5": "PS5",
+    "playstation 4": "PS4",
+    "playstation 3": "PS3",
+    "xbox series x|s": "Xbox X|S",
+    "xbox series s/x": "Xbox X|S",
+    "xbox series": "Xbox X|S",
+    "xbox one": "Xbox One",
+    "nintendo switch 2": "Switch 2",
+    "nintendo switch": "Switch",
+    "pc (microsoft windows)": "PC",
+    "apple macintosh": "Mac"
+  };
+  var FAMILIES = [
+    { generic: "playstation", precise: /^playstation \d/ },
+    { generic: "xbox", precise: /^xbox (series|one)/ },
+    { generic: "nintendo", precise: /^nintendo (switch|3ds|ds|wii)/ }
+  ];
+  var parts = String(p).split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+  var lower = parts.map(function (x) { return x.toLowerCase(); });
+  var out = [];
   for (var i = 0; i < parts.length; i++) {
-    if (!seen[parts[i]]) { seen[parts[i]] = true; unique.push(parts[i]); }
+    var fam = null;
+    for (var f = 0; f < FAMILIES.length; f++) {
+      if (lower[i] === FAMILIES[f].generic) { fam = FAMILIES[f]; break; }
+    }
+    if (fam) {
+      var precisExiste = false;
+      for (var k = 0; k < lower.length; k++) {
+        if (fam.precise.test(lower[k])) { precisExiste = true; break; }
+      }
+      if (precisExiste) continue;
+    }
+    var label = LABELS[lower[i]] || parts[i];
+    if (out.indexOf(label) === -1) out.push(label);
   }
-  return unique.join(", ");
+  return out.join(", ");
 }
 
 function formatPegi(rating) {
@@ -295,6 +386,8 @@ function renderCard(item, domain, rank) {
 
   return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
     ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    ' data-format="' + (item.format || '') + '"' +
+    ' data-platform="' + String(item.platform || '').replace(/"/g, '') + '"' +
     (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
     '<div class="item-media">' + media + '</div>' +
     '<div class="item-hover-video"></div>' +
@@ -774,4 +867,65 @@ function setupFavorites() {
   checkAuthAndLoadFavorites();
   document.addEventListener("favChanged", function(e) { var d = e.detail; if (d && d.action === "remove") { var key = (d.type === "anime" ? "anime" : "game") + ":" + d.id; delete favCache[key]; updateAllHearts(); } else { checkAuthAndLoadFavorites(); } });
 }
+</script>
+
+<script>
+// ── Onglets Anime / Film / Sorti JP (session 33) ──────────────────
+// Filtrage cote client sur les items deja charges : aucun appel API en plus.
+// Decoupage EXCLUSIF, la plateforme prime sur le format.
+(function () {
+  function kindOf(card, mode) {
+    var film = (card.getAttribute("data-format") || "").toUpperCase() === "MOVIE";
+    // Mode "upcoming" : pas de categorie JP, la plateforme EU n'est pas
+    // encore annoncee sur du non-sorti — elle ne dit rien.
+    if (mode === "upcoming") return film ? "film" : "anime";
+    var p = (card.getAttribute("data-platform") || "").trim();
+    if (!p) return "jp";
+    return film ? "film" : "anime";
+  }
+
+  function apply(section, kind) {
+    var box = section.querySelector(".kind-pills");
+    var mode = box ? (box.getAttribute("data-mode") || "anime") : "anime";
+    var cards = section.querySelectorAll(".item-card");
+    var counts = { anime: 0, film: 0, jp: 0 };
+    for (var i = 0; i < cards.length; i++) {
+      var k = kindOf(cards[i], mode);
+      counts[k]++;
+      cards[i].style.display = (k === kind) ? "" : "none";
+    }
+    var pills = section.querySelectorAll(".kind-pill");
+    for (var j = 0; j < pills.length; j++) {
+      var pk = pills[j].getAttribute("data-kind");
+      var n = pills[j].querySelector(".kn");
+      if (n) n.textContent = counts[pk];
+      pills[j].classList.toggle("on", pk === kind);
+      pills[j].hidden = counts[pk] === 0;
+    }
+  }
+
+  function watch() {
+    var sections = document.querySelectorAll(".section-block");
+    for (var i = 0; i < sections.length; i++) {
+      (function (section) {
+        if (!section.querySelector(".kind-pills")) return;
+        if (section.getAttribute("data-kw")) return;
+        section.setAttribute("data-kw", "1");
+        section.addEventListener("click", function (e) {
+          var b = e.target.closest(".kind-pill");
+          if (b) apply(section, b.getAttribute("data-kind"));
+        });
+        var row = section.querySelector(".items-row");
+        if (!row) return;
+        new MutationObserver(function () {
+          if (row.querySelector(".item-card")) apply(section, "anime");
+        }).observe(row, { childList: true });
+        if (row.querySelector(".item-card")) apply(section, "anime");
+      })(sections[i]);
+    }
+  }
+
+  watch();
+  document.addEventListener("astro:page-load", watch);
+})();
 </script>
