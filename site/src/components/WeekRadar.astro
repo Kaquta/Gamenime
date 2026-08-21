@@ -1,0 +1,203 @@
+---
+// Radar hebdo — session 33.
+// Rendu client : compte a rebours et marqueur "aujourd'hui" doivent etre
+// justes a l'heure de la visite, pas a celle du build.
+// L'API renvoie de l'UTC -> conversion Europe/Paris a l'affichage.
+// Le clic reutilise window.__openItemModal exposee par SectionBlock.
+---
+<section class="wr container" id="weekRadar" hidden>
+  <div class="wr-head">
+    <h2 class="wr-title">Cette semaine <span class="wr-chev">›</span></h2>
+    <span class="wr-sub" id="wrSub"></span>
+  </div>
+  <div class="wr-days" id="wrDays"></div>
+  <div class="wr-daylab" id="wrDayLab"></div>
+  <div class="wr-feed" id="wrFeed"></div>
+</section>
+
+<script>
+import { getFeedWeek, displayTitle } from "../lib/api";
+
+const TZ = "Europe/Paris";
+const JOURS_COURT = { Lun:"Lun", Mar:"Mar", Mer:"Mer", Jeu:"Jeu", Ven:"Ven", Sam:"Sam", Dim:"Dim" };
+const JOURS_LONG = { Lun:"Lundi", Mar:"Mardi", Mer:"Mercredi", Jeu:"Jeudi", Ven:"Vendredi", Sam:"Samedi", Dim:"Dimanche" };
+const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
+
+let DATA = null;
+let sel = 0;
+let timer = null;
+
+function heure(iso) {
+  return new Date(iso).toLocaleTimeString("fr-FR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+}
+
+function reste(iso) {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (diff <= 0) return "maintenant";
+  const min = Math.floor(diff / 60000);
+  if (min < 60) return "dans " + min + " min";
+  const h = Math.floor(min / 60), r = min % 60;
+  if (h < 24) return r ? "dans " + h + " h " + String(r).padStart(2, "0") : "dans " + h + " h";
+  return "dans " + Math.floor(h / 24) + " j";
+}
+
+function plateformes(p) {
+  if (!p) return "Plateforme EU non annoncée";
+  return p.split(",").map(x => x.trim()).filter(Boolean).slice(0, 2).join(" · ");
+}
+
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+// Cle du prochain episode a venir, tous jours confondus
+function prochaine() {
+  let cle = null, best = Infinity;
+  const now = Date.now();
+  DATA.days.forEach(d => d.episodes.forEach((e, i) => {
+    const t = new Date(e.airingAt).getTime();
+    if (t > now && t < best) { best = t; cle = d.date + "#" + i; }
+  }));
+  return cle;
+}
+
+function rendreJours() {
+  const max = Math.max(1, ...DATA.days.map(d => d.count));
+  document.getElementById("wrDays").innerHTML = DATA.days.map((d, i) => {
+    const pc = Math.round(d.count / max * 100);
+    const cls = "wr-day" + (i === sel ? " on" : "") + (d.date < DATA.today && i !== sel ? " dim" : "");
+    const tod = (d.date === DATA.today && i !== sel) ? '<span class="wr-tod"></span>' : "";
+    return '<button type="button" class="' + cls + '" data-i="' + i + '">' +
+      '<span class="wr-dn">' + esc(JOURS_COURT[d.dayName] || d.dayName) + '</span>' +
+      '<span class="wr-dd">' + d.dayNum + '</span>' +
+      '<span class="wr-db"><i style="width:' + pc + '%"></i></span>' + tod + '</button>';
+  }).join("");
+}
+
+function rendreListe() {
+  const d = DATA.days[sel];
+  const cle = prochaine();
+  const now = Date.now();
+
+  const lab = document.getElementById("wrDayLab");
+  const mois = MOIS[Number(d.date.slice(5, 7)) - 1];
+  lab.className = "wr-daylab" + (d.date === DATA.today ? " now" : "");
+  lab.innerHTML = '<span>' + (d.date === DATA.today ? "Aujourd'hui · " : "") +
+    esc(JOURS_LONG[d.dayName] || d.dayName) + " " + d.dayNum + " " + mois +
+    '</span><span class="wr-ln"></span><span>' + d.count + (d.count > 1 ? ' épisodes' : ' épisode') + '</span>';
+
+  const feed = document.getElementById("wrFeed");
+  if (!d.episodes.length) {
+    feed.innerHTML = '<p class="wr-vide">Aucun épisode ce jour-là.</p>';
+    return;
+  }
+
+  const VUS = 8;
+
+  function ligne(e, i) {
+    const est = (d.date + "#" + i) === cle;
+    const fini = new Date(e.airingAt).getTime() <= now;
+    const droite = est
+      ? '<span class="wr-cd"><i></i>' + esc(reste(e.airingAt)) + '</span>'
+      : '<span class="wr-h">' + heure(e.airingAt) + '</span>';
+    const num = e.episodeTotal
+      ? 'EP ' + e.episodeNumber + '/' + e.episodeTotal
+      : (e.episodeNumber != null ? 'EP ' + e.episodeNumber : 'Épisode');
+    const art = e.cover
+      ? '<span class="wr-th" style="background-image:url(' + esc(e.cover) + ')"></span>'
+      : '<span class="wr-th wr-th-void">新</span>';
+    return '<button type="button" class="wr-row' + (fini ? " done" : "") + (est ? " next" : "") +
+      '" data-id="' + e.id + '">' + art +
+      '<span class="wr-b"><span class="wr-t">' + esc(displayTitle(e)) + '</span>' +
+      '<span class="wr-m"><span class="wr-ep">' + esc(num) + '</span>' +
+      '<span class="wr-p">' + esc(plateformes(e.platform)) + '</span></span></span>' +
+      droite + '</button>';
+  }
+
+  const visibles = d.episodes.slice(0, VUS);
+  const caches = d.episodes.slice(VUS);
+
+  let html = '<div class="wr-list">' + visibles.map(ligne).join("") + '</div>';
+
+  if (caches.length) {
+    // Tout est deja dans la reponse /feed/week : le depliage ne coute aucun appel.
+    html += '<div class="wr-extra" id="wrExtra"><div class="wr-extra-in"><div>' +
+      caches.map((e, k) => ligne(e, k + VUS)).join("") +
+      '</div></div></div>' +
+      '<button type="button" class="wr-foot" id="wrFoot">' +
+      '<span class="fx">▾</span><span id="wrFootTxt">+ ' + caches.length +
+      (caches.length > 1 ? ' autres épisodes' : ' autre épisode') + ' ce jour-là</span></button>';
+  }
+
+  feed.innerHTML = html;
+
+  const foot = document.getElementById("wrFoot");
+  if (foot) {
+    const extra = document.getElementById("wrExtra");
+    const txt = document.getElementById("wrFootTxt");
+    const libelle = '+ ' + caches.length + (caches.length > 1 ? ' autres épisodes' : ' autre épisode') + ' ce jour-là';
+    foot.addEventListener("click", () => {
+      const ouvert = extra.classList.toggle("open");
+      foot.classList.toggle("open", ouvert);
+      txt.textContent = ouvert ? "Réduire" : libelle;
+    });
+  }
+}
+
+function rafraichir() {
+  const d = DATA.days[sel];
+  if (d.date !== DATA.today) return;
+  rendreListe();
+}
+
+async function monter() {
+  const root = document.getElementById("weekRadar");
+  if (!root) return;
+  try {
+    DATA = await getFeedWeek();
+    if (!DATA || !DATA.total) return;
+
+    sel = DATA.days.findIndex(d => d.date === DATA.today);
+    if (sel < 0) sel = 0;
+
+    const sub = document.getElementById("wrSub");
+    if (sub) sub.textContent = DATA.total + " épisodes";
+
+    rendreJours();
+    rendreListe();
+    root.hidden = false;
+
+    if (timer) clearInterval(timer);
+    timer = setInterval(rafraichir, 60000);
+
+    document.getElementById("wrDays").addEventListener("click", ev => {
+      const b = ev.target.closest(".wr-day");
+      if (!b) return;
+      sel = Number(b.getAttribute("data-i"));
+      rendreJours();
+      rendreListe();
+    });
+
+    document.getElementById("wrFeed").addEventListener("click", ev => {
+      const r = ev.target.closest(".wr-row");
+      if (!r) return;
+      const id = r.getAttribute("data-id");
+      const w = window;
+      if (typeof w.__openItemModal === "function") {
+        w.__openItemModal("anime", id);
+      } else {
+        // SectionBlock pas encore initialise : on retente au tick suivant
+        setTimeout(() => {
+          if (typeof w.__openItemModal === "function") w.__openItemModal("anime", id);
+        }, 120);
+      }
+    });
+  } catch (e) {
+    console.log("week radar:", e && e.message);
+  }
+}
+
+monter();
+document.addEventListener("astro:page-load", monter);
+</script>

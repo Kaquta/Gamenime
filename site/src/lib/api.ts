@@ -124,3 +124,39 @@ export async function searchFeed(query: string, type: "anime" | "game" | "all" =
 export function displayTitle(item: { title: string; titleEnglish?: string | null }): string {
   return item.titleEnglish ?? item.title;
 }
+
+// ─────────────────────────────────────────────────────────
+// Radar hebdo — episodes en diffusion (session 33)
+// ─────────────────────────────────────────────────────────
+export interface WeekEpisode {
+  id: number;
+  title: string;
+  titleEnglish?: string | null;
+  cover: string | null;
+  platform: string | null;
+  popularity?: number;
+  episodeNumber: number | null;
+  episodeTotal: number | null;
+  airingAt: string;
+  aired: boolean;
+}
+export interface WeekDay {
+  date: string;
+  dayName: string;
+  dayNum: number;
+  count: number;
+  episodes: WeekEpisode[];
+}
+export interface WeekResponse {
+  generatedAt: string;
+  weekStart: string;
+  weekEnd: string;
+  today: string;
+  total: number;
+  fetched: number;
+  days: WeekDay[];
+  imminent: WeekEpisode[];
+}
+export async function getFeedWeek(): Promise<WeekResponse> {
+  return fetchJson<WeekResponse>(`/api/feed/week`);
+}

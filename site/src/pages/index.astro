@@ -2,6 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import HeroHeader from "../components/HeroHeader.astro";
 import SectionBlock from "../components/SectionBlock.astro";
+import WeekRadar from "../components/WeekRadar.astro";
 import Footer from "../components/Footer.astro";
 ---
 
@@ -19,6 +20,8 @@ import Footer from "../components/Footer.astro";
       <div class="items-row" id="homeSearchRow"></div>
     </section>
   </div>
+
+  <WeekRadar />
 
   <SectionBlock title="Derniers animés" source="anime" limit={25} href="/anime" />
   <SectionBlock title="Derniers jeux vidéo" source="games" limit={25} href="/games" />
