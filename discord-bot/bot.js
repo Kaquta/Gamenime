@@ -8,6 +8,7 @@ dotenv.config();
 
 const TOKEN = process.env.DISCORD_BOT_TOKEN;
 const SORTIES_CHANNEL_ID = "1513679211930587381";
+const BIENVENUE_CHANNEL_ID = "1540410859883466804";
 const ANIME_CHANNEL_ID = "1513679209426456716";
 const JEUX_CHANNEL_ID = "1513679210500067438";
 const API_BASE = process.env.API_BASE || "http://content-api:3000";
@@ -20,7 +21,12 @@ if (!TOKEN) {
   console.error("❌ DISCORD_BOT_TOKEN manquant");
   process.exit(1);
 }
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// GuildMembers est un intent PRIVILEGIE : il faut aussi l'activer sur
+// discord.com/developers > Bot > Privileged Gateway Intents, sinon Discord
+// n'envoie jamais guildMemberAdd et le bot ne verra aucune arrivee.
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+});
 
 function dateFr() {
   return new Date().toLocaleDateString("fr-FR", {
@@ -228,6 +234,27 @@ async function checkClosedPolls() {
   }
   savePolls(remaining);
 }
+
+// ── Arrivees sur le serveur ───────────────────────────────────────────
+client.on("guildMemberAdd", async (member) => {
+  try {
+    const salon = await client.channels.fetch(BIENVENUE_CHANNEL_ID);
+    if (!salon) return;
+    const rang = member.guild.memberCount;
+    const cree = Math.floor(member.user.createdTimestamp / 1000);
+    await salon.send({
+      embeds: [{
+        color: 0xff8c3a,
+        description: `**${member.user.username}** a rejoint le serveur \u2014 ${member.guild.memberCount}\u1d49 membre.`,
+        thumbnail: { url: member.user.displayAvatarURL({ size: 128 }) },
+        timestamp: new Date().toISOString(),
+      }],
+    });
+    console.log(`Arrivee : ${member.user.tag} (membre ${rang})`);
+  } catch (e) {
+    console.error("Erreur message de bienvenue :", e?.message || e);
+  }
+});
 
 client.once("clientReady", () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
