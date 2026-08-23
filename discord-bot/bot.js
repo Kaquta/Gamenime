@@ -245,7 +245,7 @@ client.on("guildMemberAdd", async (member) => {
     await salon.send({
       embeds: [{
         color: 0xff8c3a,
-        description: `**${member.user.username}** a rejoint le serveur \u2014 ${member.guild.memberCount}\u1d49 membre.`,
+        description: `${member} vient de rejoindre **GameNime** \u2014 ${member.guild.memberCount}\u1d49 membre.\n\nPasse par <#1513679202723827802> pour d\u00e9couvrir le site et les r\u00e8gles.`,
         thumbnail: { url: member.user.displayAvatarURL({ size: 128 }) },
         timestamp: new Date().toISOString(),
       }],

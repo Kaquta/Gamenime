@@ -12,19 +12,19 @@ if (!TOKEN) {
 
 const ANNONCE = `🎉 **GameNime — Nouvelle mise à jour !** 🎉
 
-Salut à tous ! On a bossé pour améliorer votre expérience. Voici les nouveautés du moment 👇
+Salut à tous ! Du nouveau sur le site 👇
 
-📅 **Page "À venir" repensée**
-Naviguez plus facilement grâce aux nouveaux onglets **🎬 Animes** et **🎮 Jeux** ! Un simple clic pour basculer entre les deux, et un catalogue élargi pour découvrir encore plus de sorties à venir. ✨
+📡 **"Cette semaine" — le radar des épisodes**
+Directement sur l'accueil : tous les épisodes qui sortent cette semaine, jour par jour. Avec l'heure française exacte et un compte à rebours sur le prochain à tomber. ⏱️
+Clique sur un jour pour voir ses sorties, sur un animé pour ouvrir sa fiche.
 
-🎨 **Page Préférences relookée**
-Un nouveau design plus clair et élégant pour gérer vos alertes et notifications. Plus agréable à utiliser au quotidien !
-
-🔔 **Rappels par email**
-Recevez désormais un rappel **7 jours avant** les sorties que vous attendez. Ne ratez plus jamais rien ! 🎯
+👀 **Une lecture plus claire**
+Les plateformes sont maintenant précises — **PS5**, **Xbox X|S**, **Switch 2** au lieu du générique. Et sur la page Animé, trois onglets pour ne plus tout mélanger : **Animé**, **Film**, et **Sorti JP** pour ce qui est diffusé au Japon sans plateforme européenne annoncée.
 
 👉 Rendez-vous sur **https://gamenime.fr** pour découvrir tout ça !
+
 Merci de faire grandir la communauté GameNime ❤️`;
+
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
