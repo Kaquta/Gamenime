@@ -622,6 +622,34 @@
 
   <!-- ═══ PAGE ADMINISTRATION ═══ -->
   <div class="page" id="page-admin">
+    <div class="sec-title">Comptes utilisateurs</div>
+    <div class="mini-traffic">
+      <div class="mini-card">
+        <div class="mini-label">COMPTES</div>
+        <div class="mini-value" id="cpt-total">—</div>
+        <div class="mini-sub" id="cpt-total-sub">—</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">ACTIFS · 30 J</div>
+        <div class="mini-value" id="cpt-actifs" style="color:#30d16c">—</div>
+        <div class="mini-sub" id="cpt-actifs-sub">—</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">EMAIL NON VERIFIE</div>
+        <div class="mini-value" id="cpt-nonverif" style="color:#ff9f0a">—</div>
+        <div class="mini-sub" id="cpt-nonverif-sub">—</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">REINIT. BLOQUEES</div>
+        <div class="mini-value" id="cpt-resets" style="color:#e24b4a">—</div>
+        <div class="mini-sub" id="cpt-resets-sub">—</div>
+      </div>
+    </div>
+    <div class="sec-title">Comptes n\u00e9cessitant une action</div>
+    <div class="panel-box">
+      <div id="cpt-attention"><div class="empty">Chargement...</div></div>
+    </div>
+
 
     <!-- SECTION 1 : PROCESS -->
     <div class="adm-section" id="sec-process">
@@ -1420,6 +1448,50 @@
     }
 
     renderTraffic();
+    renderComptes(m.comptes);
+  }
+
+  // ═══ Comptes utilisateurs (session 33) ═══
+  // Les emails arrivent deja masques du serveur : le dashboard n'a jamais
+  // l'adresse en clair. On repond a "qui est bloque", pas "qui est qui".
+  function cptSet(id, v) {
+    var e = document.getElementById(id);
+    if (e) e.textContent = String(v);
+  }
+  function renderComptes(c) {
+    if (!c || c.error) return;
+    cptSet("cpt-total", c.total);
+    cptSet("cpt-total-sub", (c.nouveaux_30j > 0 ? "+" + c.nouveaux_30j : "aucun") + " ce mois");
+    cptSet("cpt-actifs", c.actifs_30j);
+    cptSet("cpt-actifs-sub", c.total ? Math.round(c.actifs_30j / c.total * 100) + " % du total" : "—");
+    cptSet("cpt-nonverif", c.non_verifies);
+    cptSet("cpt-nonverif-sub", c.non_verifies_vieux + " depuis + de 7 j");
+    cptSet("cpt-resets", c.resets_bloques);
+    cptSet("cpt-resets-sub", c.resets_comptes + " compte(s) concern\u00e9(s)");
+
+    var box = document.getElementById("cpt-attention");
+    if (!box) return;
+    var list = c.attention || [];
+    if (!list.length) {
+      box.innerHTML = '<div class="empty">Aucun compte bloqu\u00e9</div>';
+      return;
+    }
+    box.innerHTML = list.map(function (u) {
+      var reset = u.souci === "reset";
+      var lib = reset ? "R\u00e9init. bloqu\u00e9e" : "Email non v\u00e9rifi\u00e9";
+      var col = reset ? "#e24b4a" : "#ff9f0a";
+      var det = reset
+        ? u.tentatives + " tentative(s) \u00b7 " + u.depuis_j + " j"
+        : "inscrit il y a " + u.depuis_j + " j";
+      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06)">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-weight:700;color:#e8e0d8;font-size:.9rem">' + gcEsc(u.nom) + '</div>'
+        + '<div style="font-size:.75rem;color:#8a8078;font-family:monospace">' + gcEsc(u.email_masque) + ' \u00b7 #' + u.id + '</div>'
+        + '</div>'
+        + '<div style="flex:none;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;color:' + col + ';background:' + col + '22;border:1px solid ' + col + '55">' + lib + '</div>'
+        + '<div style="flex:none;font-size:.75rem;color:#8a8078;min-width:120px;text-align:right">' + det + '</div>'
+        + '</div>';
+    }).join("");
   }
 
   function renderTraffic() {

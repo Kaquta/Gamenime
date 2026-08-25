@@ -388,12 +388,90 @@ export async function collectMetrics(pool: any) {
     traffic: await getTrafficMetrics(),
     ssl: await getSSLStatus(),
     activity: ACTIVITY_BUFFER.slice(0, 20),
+    comptes: await buildAccountsStats(pool),
   };
 }
 
 // ════════════════════════════════════════════════════════
 // SSE Stream + page HTML
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// Comptes utilisateurs (session 33)
+// ════════════════════════════════════════════════════════
+// Les emails ne sortent JAMAIS en clair : masques cote serveur avant
+// d'entrer dans la reponse. Un tableau de bord d'admin doit repondre a
+// "qui est bloque et pourquoi", pas servir de fichier client.
+function masquerEmail(email: string): string {
+  const at = String(email || "").indexOf("@");
+  if (at < 1) return "\u2022\u2022\u2022";
+  return email[0] + "\u2022\u2022\u2022" + email.slice(at);
+}
+
+export async function buildAccountsStats(pool: any) {
+  try {
+    const g: any = await pool.query(
+      "SELECT COUNT(*) AS total," +
+      " SUM(created_at >= NOW() - INTERVAL 30 DAY) AS nouveaux30," +
+      " SUM(email_verified = 0) AS non_verifies," +
+      " SUM(email_verified = 0 AND created_at < NOW() - INTERVAL 7 DAY) AS non_verifies_vieux," +
+      " SUM(is_premium = 1) AS premium FROM users"
+    );
+    const a: any = await pool.query(
+      "SELECT COUNT(DISTINCT user_id) AS actifs FROM user_sessions" +
+      " WHERE last_seen_at >= NOW() - INTERVAL 30 DAY"
+    );
+    const r: any = await pool.query(
+      "SELECT COUNT(*) AS bloquees, COUNT(DISTINCT user_id) AS comptes" +
+      " FROM password_reset_tokens WHERE used_at IS NULL AND expires_at < NOW()" +
+      " AND created_at >= NOW() - INTERVAL 30 DAY"
+    );
+    const mois: any = await pool.query(
+      "SELECT DATE_FORMAT(created_at, '%Y-%m') AS mois, COUNT(*) AS n FROM users" +
+      " WHERE created_at >= NOW() - INTERVAL 6 MONTH GROUP BY mois ORDER BY mois"
+    );
+    const bloques: any = await pool.query(
+      "SELECT u.id, u.display_name, u.email, 'reset' AS souci," +
+      " COUNT(t.id) AS tentatives, DATEDIFF(NOW(), MIN(t.created_at)) AS depuis_j" +
+      " FROM users u JOIN password_reset_tokens t ON t.user_id = u.id" +
+      " WHERE t.used_at IS NULL AND t.expires_at < NOW()" +
+      " AND t.created_at >= NOW() - INTERVAL 30 DAY" +
+      " GROUP BY u.id, u.display_name, u.email" +
+      " UNION ALL" +
+      " SELECT u.id, u.display_name, u.email, 'verif' AS souci, 0 AS tentatives," +
+      " DATEDIFF(NOW(), u.created_at) AS depuis_j FROM users u" +
+      " WHERE u.email_verified = 0 AND u.created_at < NOW() - INTERVAL 3 DAY" +
+      " ORDER BY souci, depuis_j DESC LIMIT 20"
+    );
+
+    const total = Number(g[0]?.total || 0);
+    const actifs = Number(a[0]?.actifs || 0);
+    const nonVerifies = Number(g[0]?.non_verifies || 0);
+
+    return {
+      total,
+      nouveaux_30j: Number(g[0]?.nouveaux30 || 0),
+      actifs_30j: actifs,
+      dormants: Math.max(0, total - actifs - nonVerifies),
+      non_verifies: nonVerifies,
+      non_verifies_vieux: Number(g[0]?.non_verifies_vieux || 0),
+      premium: Number(g[0]?.premium || 0),
+      resets_bloques: Number(r[0]?.bloquees || 0),
+      resets_comptes: Number(r[0]?.comptes || 0),
+      inscriptions: (mois || []).map((m: any) => ({ mois: m.mois, n: Number(m.n) })),
+      attention: (bloques || []).map((b: any) => ({
+        id: b.id,
+        nom: b.display_name || "Sans nom",
+        email_masque: masquerEmail(b.email),
+        souci: b.souci,
+        tentatives: Number(b.tentatives || 0),
+        depuis_j: Number(b.depuis_j || 0),
+      })),
+    };
+  } catch (e: any) {
+    return { error: e?.message ?? "fail" };
+  }
+}
+
 export function startDashboard(app: FastifyInstance, pool: any) {
   // Hook global pour compter les requests
   app.addHook("onRequest", async () => { trackRequest(); });

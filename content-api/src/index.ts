@@ -363,9 +363,16 @@ app.post("/auth/register", async (req, reply) => {
     const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
     const userAgent = String(req.headers["user-agent"] || "");
 
-    // Fire-and-forget: welcome + verification emails must never block registration
-    void sendWelcomeEmail({ email, displayName }).catch(() => {});
-    void sendVerificationEmail({ db: pool, userId, email, displayName, ip, userAgent }).catch(() => {});
+    // Fire-and-forget : l'envoi ne doit jamais bloquer l'inscription.
+    // MAIS le .catch(() => {}) d'origine avalait l'erreur en silence — 7 comptes
+    // sur 13 sans email verifie et aucune trace nulle part. On garde le
+    // non-bloquant, on trace l'echec.
+    void sendWelcomeEmail({ email, displayName }).catch((e: any) => {
+      req.log.error({ userId, email, err: e?.message || String(e) }, "[email] echec welcome");
+    });
+    void sendVerificationEmail({ db: pool, userId, email, displayName, ip, userAgent }).catch((e: any) => {
+      req.log.error({ userId, email, err: e?.message || String(e) }, "[email] echec verification");
+    });
 
     return reply.code(201).send({ ok: true, user: { id: userId, email, displayName, emailVerified: false } });
   } catch (err: any) {
@@ -1059,7 +1066,8 @@ app.get("/favorites", async (req, reply) => {
           COALESCE(a.genre, g.genre) AS genre,
           COALESCE(a.platform, g.platform) AS platform,
           COALESCE(DATE_FORMAT(a.release_date,'%Y-%m-%d'), DATE_FORMAT(g.release_date,'%Y-%m-%d')) AS releaseDate,
-          COALESCE(a.trailer_url, g.trailer_url) AS trailerUrl
+          COALESCE(a.trailer_url, g.trailer_url) AS trailerUrl,
+          COALESCE(a.release_precision, g.release_precision) AS releasePrecision
        FROM favorites f
        LEFT JOIN anime_items a ON f.item_type = 'anime' AND a.id = f.item_id
        LEFT JOIN game_items g ON f.item_type = 'game' AND g.id = f.item_id
@@ -1413,6 +1421,24 @@ app.delete("/notifications/:id", async (req, reply) => {
     if (err?.name === "ZodError") {
       return reply.code(400).send({ error: "Paramètres invalides", details: err.errors });
     }
+    req.log.error(err);
+    return reply.code(500).send({ error: "Erreur serveur" });
+  }
+});
+
+// Suppression en masse des notifications deja lues (session 33).
+// Pendant de read-all : l'utilisateur nettoie sa liste sans avoir a
+// supprimer une par une. Ne touche jamais aux non-lues.
+app.delete("/notifications/read", async (req, reply) => {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) return reply.code(401).send({ error: "Non authentifié" });
+    const result: any = await pool.query(
+      `DELETE FROM user_notifications WHERE user_id = ? AND is_read = 1`,
+      [user.id]
+    );
+    return reply.send({ ok: true, deleted: Number(result.affectedRows) || 0 });
+  } catch (err) {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
   }
