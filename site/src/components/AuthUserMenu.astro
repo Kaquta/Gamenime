@@ -16,12 +16,14 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
         <span class="auth-user-menu__name" id="authDisplayName"></span>
       </button>
       <div id="authUserDropdown" class="auth-user-menu__dropdown">
-        <button class="auth-user-menu__item" id="openFavDrawer" type="button">❤️ Mes favoris</button>
-        <button class="auth-user-menu__item" id="openNotifPage" type="button">🔔 Notifications</button>
-        <a class="auth-user-menu__item" href="/account/preferences">⚡ Mes préférences</a>
-        <button class="auth-user-menu__item" id="openAccountDrawer" type="button">⚙️ Compte</button>
-        <a id="premiumMenuBtn" href="/premium" class="auth-user-menu__item auth-user-menu__premium" style="display:none">✨ Passer Premium</a>
-        <button id="authLogoutBtn" class="auth-user-menu__item auth-user-menu__item--danger" type="button">🚪 Déconnexion</button>
+        <button class="auth-user-menu__item mnu" id="openFavDrawer" type="button"><svg class="mnu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8Z"/></svg><span class="mnu-tx">Mes favoris</span></button>
+        <!-- Notifications : doublon avec la cloche, qui porte en plus le badge de non-lues.
+             Le tiroir reste en place, SectionBlock le rouvre apres fermeture d'un modal. -->
+        <a class="auth-user-menu__item mnu" href="/account/preferences"><svg class="mnu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-9 12h7l-1 8 9-12h-7l1-8Z"/></svg><span class="mnu-tx">Mes préférences</span></a>
+        <button class="auth-user-menu__item mnu" id="openAccountDrawer" type="button"><svg class="mnu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg><span class="mnu-tx">Compte</span></button>
+        <!-- Premium retire : aucune offre en place -->
+        <div class="mnu-sep"></div>
+        <button id="authLogoutBtn" class="auth-user-menu__item mnu mnu--dg" type="button"><svg class="mnu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="mnu-tx">Déconnexion</span></button>
       </div>
     </div>
   </div>
@@ -30,22 +32,30 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 <!-- Favoris Drawer -->
 <div id="favOverlay" class="drawer-overlay"></div>
 <aside id="favDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2>❤️ Mes favoris</h2><button id="favDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8Z"/></svg>Mes favoris</h2><button id="favDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
   <div id="favDrawerCount" class="drawer-panel__meta"></div>
+  <div class="fav-topbar">
+    <button type="button" class="fav-lnk" id="favSelMode">Sélectionner</button>
+  </div>
   <div id="favDrawerContent" class="drawer-panel__content"></div>
+  <div class="fav-bar">
+    <span class="fav-bar-n" id="favBarN">Aucun sélectionné<small>Tape une carte pour la choisir</small></span>
+    <button type="button" class="fav-bar-b" id="favAll">Tout</button>
+    <button type="button" class="fav-bar-b fav-bar-b--del" id="favDel" disabled>Retirer</button>
+  </div>
 </aside>
 
 <!-- Compte Drawer -->
 <div id="accountOverlay" class="drawer-overlay"></div>
 <aside id="accountDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2>⚙️ Mon compte</h2><button id="accountDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Mon compte</h2><button id="accountDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
   <div id="accountDrawerContent" class="drawer-panel__content"></div>
 </aside>
 
 <!-- Notifications Drawer -->
 <div id="notifPageOverlay" class="drawer-overlay"></div>
 <aside id="notifPageDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2>🔔 Notifications</h2><button id="notifPageClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</h2><button id="notifPageClose" class="drawer-panel__close" type="button">✕</button></div>
   <button id="notifPReadAll" class="drawer-panel__readall" type="button">Tout marquer comme lu</button>
   <div id="notifPMeta" class="drawer-panel__meta"></div>
   <div id="notifPContent" class="drawer-panel__content"></div>
@@ -54,7 +64,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 <!-- Reset Password Drawer -->
 <div id="resetOverlay" class="drawer-overlay"></div>
 <aside id="resetDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2>🔑 Mot de passe oublié</h2><button id="resetDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Mot de passe oublié</h2><button id="resetDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
   <div id="resetDrawerContent" class="drawer-panel__content">
     <div id="resetError" class="auth-card__error hidden"></div>
     <div id="resetSuccess" class="account-success hidden"></div>
@@ -93,7 +103,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     if(authAvatar){authAvatar.innerHTML='<img src="'+av.img+'" alt="" class="avatar-img"/>';if(isPremium){authAvatar.classList.add("is-premium");}else{authAvatar.classList.remove("is-premium");}}
     var oldPill=document.getElementById("premiumPill");if(oldPill)oldPill.remove();
     if(isPremium&&authDisplayName){var pill=document.createElement("span");pill.id="premiumPill";pill.className="premium-pill";pill.innerHTML="<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><polygon points=\"12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8\"/></svg><span class=\"premium-pill__text\">"+escapeHtml(safeName)+"</span>";authDisplayName.after(pill);authDisplayName.style.display="none";}else if(authDisplayName){authDisplayName.style.display="";}
-    var premBtn=document.getElementById("premiumMenuBtn");
+    var premBtn=null; /* Premium desactive (session 33) : pas d'offre en place */
     if(premBtn){premBtn.style.display="none";}
   }
   async function fetchMe(){
@@ -126,7 +136,49 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     try{var res=await fetch(authEndpoint("/favorites/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];
     if(favDrawerCount)favDrawerCount.textContent=items.length+" favori"+(items.length>1?"s":"");
     if(!items.length){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.<br>Ajoute avec le ♡ !</div>';return;}
-    if(favDrawerContent)favDrawerContent.innerHTML=items.map(function(f){var info=simplifyPlatform(f.platform)||f.genre||"";var tb=f.itemType==="anime"?"🎌":"🎮";return'<div class="drawer-card" data-type="'+f.itemType+'" data-id="'+f.itemId+'" data-release-date="'+(f.releaseDate||"")+'" style="cursor:pointer"><div class="drawer-card__thumb">'+(f.cover?'<img src="'+f.cover+'" alt="" />':'')+'</div><div class="drawer-card__body"><div class="drawer-card__title">'+tb+' '+escapeHtml(f.title)+'</div><div class="drawer-card__sub">'+escapeHtml(info)+'</div></div><button class="drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer">✕</button></div>';}).join("");
+    // Favoris : titre devant, pastille de type, et surtout la DATE — elle
+    // existait dans les donnees mais n'etait jamais affichee. Sur un site de
+    // suivi de sorties, c'est l'information centrale.
+    var auj = new Date(); auj.setHours(0,0,0,0);
+    function favDate(f){
+      if(!f.releaseDate) return { j:"\u2014", c:"", etat:"none" };
+      if(f.releasePrecision === "year") return { j:"Pr\u00e9vu", c:String(f.releaseDate).slice(0,4), etat:"vague" };
+      if(f.releasePrecision === "month"){
+        var M=["janv.","f\u00e9vr.","mars","avr.","mai","juin","juil.","ao\u00fbt","sept.","oct.","nov.","d\u00e9c."];
+        var pm=String(f.releaseDate).split("-");
+        return { j:M[Number(pm[1])-1]||"", c:pm[0], etat:"vague" };
+      }
+      var d=new Date(f.releaseDate); d.setHours(0,0,0,0);
+      var diff=Math.round((d.getTime()-auj.getTime())/86400000);
+      var M2=["janv.","f\u00e9vr.","mars","avr.","mai","juin","juil.","ao\u00fbt","sept.","oct.","nov.","d\u00e9c."];
+      var lib=d.getDate()+" "+M2[d.getMonth()];
+      if(diff<0) return { j:lib, c:"sorti", etat:"out" };
+      if(diff===0) return { j:lib, c:"aujourd\u0027hui", etat:"soon" };
+      if(diff<=60) return { j:lib, c:"dans "+diff+" j", etat:"soon" };
+      return { j:lib, c:String(d.getFullYear()), etat:"" };
+    }
+    function favCard(f){
+      var info=simplifyPlatform(f.platform)||f.genre||"";
+      var est=f.itemType==="anime";
+      var dt=favDate(f);
+      var cls = dt.etat==="out" ? " out" : (dt.etat==="soon" ? " soon" : "");
+      return '<div class="f-c drawer-card'+cls+'" data-type="'+f.itemType+'" data-id="'+f.itemId+'" data-release-date="'+(f.releaseDate||"")+'">'
+        +'<span class="fav-ck"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></span>'
+        +'<span class="f-th"><span class="cov">'+(f.cover?'<img src="'+f.cover+'" alt="" loading="lazy" />':'\u65b0')+'</span></span>'
+        +'<span class="f-b"><span class="f-t">'+escapeHtml(f.title)+'</span>'
+        +'<span class="f-m"><span class="f-tag '+(est?"t-anime":"t-game")+'">'+(est?"Anime":"Jeu")+'</span>'
+        +(info?'<span class="f-sub">'+escapeHtml(info)+'</span>':'')+'</span></span>'
+        +'<span class="f-d"><span class="f-day">'+dt.j+'</span>'+(dt.c?'<span class="f-cd">'+dt.c+'</span>':'')+'</span>'
+        +'<button class="f-x drawer-card__remove" data-type="'+f.itemType+'" data-id="'+f.itemId+'" title="Retirer" type="button">\u2715</button>'
+        +'</div>';
+    }
+    var aVenir=items.filter(function(f){ return favDate(f).etat!=="out"; });
+    var sortis=items.filter(function(f){ return favDate(f).etat==="out"; });
+    var html="";
+    if(aVenir.length) html+='<div class="f-sec">\u00c0 venir</div>'+aVenir.map(favCard).join("");
+    if(sortis.length) html+='<div class="f-sec">D\u00e9j\u00e0 sortis</div>'+sortis.map(favCard).join("");
+    if(favDrawerContent)favDrawerContent.innerHTML=html;
+    majFavBar();
     }catch(e){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
   (window).__openFavDrawer=function(){openFavDrawerFn();};
@@ -134,6 +186,18 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
   if(favOverlay)favOverlay.addEventListener("click",closeFavDrawer);
   document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();});
   if(favDrawerContent)favDrawerContent.addEventListener("click",async function(e){
+    // Mode selection : le clic choisit la carte au lieu d'ouvrir le modal.
+    if(favSel){
+      var pc=e.target.closest(".f-c");
+      if(pc){
+        e.preventDefault(); e.stopPropagation();
+        var cle=pc.dataset.type+":"+pc.dataset.id;
+        favPicked[cle]=!favPicked[cle];
+        pc.classList.toggle("picked", !!favPicked[cle]);
+        majFavBar();
+      }
+      return;
+    }
     // Cas 1: click sur bouton "✕" remove
     var btn=e.target.closest(".drawer-card__remove");
     if(btn){
@@ -158,6 +222,71 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     }
   });
 
+  // ── Selection multiple des favoris ────────────────────────────────
+  // Deux temps volontaires : entrer dans le mode, puis choisir. La croix
+  // individuelle disparait pendant — deux façons de supprimer en meme
+  // temps preteraient a confusion.
+  var favSel = false;
+  var favPicked = {};
+  var favModeBtn = document.getElementById("favSelMode");
+  var favBarN = document.getElementById("favBarN");
+  var favAllBtn = document.getElementById("favAll");
+  var favDelBtn = document.getElementById("favDel");
+
+  function majFavBar(){
+    var n = Object.keys(favPicked).filter(function(k){ return favPicked[k]; }).length;
+    var tot = favDrawerContent ? favDrawerContent.querySelectorAll(".f-c").length : 0;
+    if(favBarN) favBarN.innerHTML = (n ? n + " s\u00e9lectionn\u00e9" + (n>1?"s":"") : "Aucun s\u00e9lectionn\u00e9")
+      + "<small>" + (n ? "Retirer les enl\u00e8ve de tes favoris" : "Tape une carte pour la choisir") + "</small>";
+    if(favDelBtn){ favDelBtn.disabled = n===0; favDelBtn.textContent = n ? "Retirer (" + n + ")" : "Retirer"; }
+    if(favAllBtn) favAllBtn.textContent = (n>0 && n===tot) ? "Aucun" : "Tout";
+  }
+
+  if(favModeBtn) favModeBtn.addEventListener("click", function(){
+    favSel = !favSel;
+    favPicked = {};
+    if(favDrawer) favDrawer.classList.toggle("fav-selecting", favSel);
+    favModeBtn.textContent = favSel ? "Annuler" : "S\u00e9lectionner";
+    favModeBtn.classList.toggle("on", favSel);
+    if(favDrawerContent) favDrawerContent.querySelectorAll(".f-c").forEach(function(c){ c.classList.remove("picked"); });
+    majFavBar();
+  });
+
+  if(favAllBtn) favAllBtn.addEventListener("click", function(){
+    if(!favDrawerContent) return;
+    var cards = favDrawerContent.querySelectorAll(".f-c");
+    var n = Object.keys(favPicked).filter(function(k){ return favPicked[k]; }).length;
+    favPicked = {};
+    if(n !== cards.length){
+      cards.forEach(function(c){
+        favPicked[c.dataset.type + ":" + c.dataset.id] = true;
+        c.classList.add("picked");
+      });
+    } else {
+      cards.forEach(function(c){ c.classList.remove("picked"); });
+    }
+    majFavBar();
+  });
+
+  if(favDelBtn) favDelBtn.addEventListener("click", async function(){
+    var cles = Object.keys(favPicked).filter(function(k){ return favPicked[k]; });
+    if(!cles.length) return;
+    favDelBtn.disabled = true;
+    favDelBtn.textContent = "Suppression\u2026";
+    for(var i=0;i<cles.length;i++){
+      var parts = cles[i].split(":");
+      try{
+        await fetch(authEndpoint("/favorites/" + parts[0] + "/" + parts[1]), { method:"DELETE", credentials:"include", headers:{ Accept:"application/json" } });
+        document.dispatchEvent(new CustomEvent("favChanged",{ detail:{ type:parts[0], id:parts[1], action:"remove" } }));
+      }catch(e){}
+    }
+    favPicked = {};
+    favSel = false;
+    if(favDrawer) favDrawer.classList.remove("fav-selecting");
+    if(favModeBtn){ favModeBtn.textContent = "S\u00e9lectionner"; favModeBtn.classList.remove("on"); }
+    openFavDrawer();
+  });
+
   // ── COMPTE ───────────────────────────────────────
   var accountDrawer=document.getElementById("accountDrawer"),accountOverlay=document.getElementById("accountOverlay"),accountDrawerClose=document.getElementById("accountDrawerClose"),accountDrawerContent=document.getElementById("accountDrawerContent");
   function closeAccountDrawer(){closeDrawerEl(accountDrawer,accountOverlay);}
@@ -167,25 +296,39 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var u=currentUser;var av=getAv(u.avatar||"avatar_01");
 
     accountDrawerContent.innerHTML=
-      '<div class="account-info"><div class="account-info__avatar" id="accAvDisp"><img src="'+av.img+'" alt="" class="avatar-img"/></div><div class="account-info__details"><div class="account-info__name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+(u.isPremium?' <span class="premium-text-badge">PREMIUM</span>':'')+'</div><div class="account-info__email">'+escapeHtml(u.email)+'</div>'+(u.emailVerified===false?'<button type="button" id="emailUnverifiedBtn" class="account-email-unverified">Email non vérifié — Renvoyer</button>':'')+'</div></div>'+
+      // En-tete : avatar cliquable (crayon en pastille), pseudo, email + etat
+      '<div class="acc-head"><button type="button" class="acc-av" id="accAvDisp" title="Changer d\'avatar"><img src="'+av.img+'" alt="" class="avatar-img"/></button>'+
+      '<div class="acc-hb"><div class="acc-name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+(u.isPremium?' <span class="premium-text-badge">PREMIUM</span>':'')+'</div>'+
+      '<div class="acc-mailrow"><span class="acc-mail">'+escapeHtml(u.email)+'</span>'+
+      (u.emailVerified===false
+        ? '<button type="button" id="emailUnverifiedBtn" class="acc-chip acc-chip--ko"><i></i>À confirmer</button>'
+        : '<span class="acc-chip acc-chip--ok"><i></i>Vérifié</span>')+
+      '</div>'+
+      // Bouton libelle plutot qu'un badge colle sur le cercle : la vignette
+      // reste propre et l'action est explicite, au clic comme au doigt.
+      '<button type="button" class="acc-pen" data-toggle="avatarForm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Changer d\'avatar</button>'+
+      '</div></div>'+
 
-      '<button class="account-option" data-toggle="avatarForm" type="button">🎭 Changer d\'avatar</button>'+
       '<div id="avatarForm" class="account-subform hidden"><div class="avatar-grid">'+AVATARS.map(function(a){var sel=(u.avatar||"avatar_01")===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'"><img src="'+a.img+'" alt="" class="avatar-img"/></button>';}).join("")+'</div></div>'+
 
-      '<button class="account-option" data-toggle="pseudoForm" type="button">✏️ Changer le pseudo</button>'+
+      '<div class="acc-sec">Profil</div>'+
+      '<button class="acc-row" data-toggle="pseudoForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="acc-rb"><span class="acc-rt">Pseudo</span><span class="acc-rs">'+escapeHtml(u.displayName||"Non défini")+'</span></span><span class="acc-chev">\u203a</span></button>'+
       '<div id="pseudoForm" class="account-subform hidden"><div class="account-field-row"><input type="text" id="accountPseudo" value="'+escapeHtml(u.displayName||"")+'" placeholder="Ton pseudo" class="account-input" /><button id="savePseudo" class="account-btn-sm" type="button">Sauver</button></div><div id="pseudoMsg" class="account-msg hidden"></div></div>'+
 
-      '<button class="account-option" data-toggle="pwForm" type="button">🔒 Changer le mot de passe</button>'+
-      '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div></div>'+
+      '<div class="acc-sec">Sécurité</div>'+
+      '<button class="acc-row" data-toggle="pwForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="acc-rb"><span class="acc-rt">Mot de passe</span><span class="acc-rs">Modifier ou réinitialiser</span></span><span class="acc-chev">\u203a</span></button>'+
+      '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div>'+
+      // Sortie de secours : sans l\'ancien mot de passe, le formulaire ci-dessus
+      // est inutilisable. Le lien reste donc a portee, mais dans son contexte.
+      '<button type="button" id="openResetFromAccount" class="acc-forgot">Mot de passe oublié ?</button></div>'+
 
-      '<button class="account-option" data-toggle="notifOptForm" type="button">🔔 Options notifications</button>'+
-      '<div id="notifOptForm" class="account-subform hidden"><label class="account-toggle"><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /> Notifications in-app</label><label class="account-toggle"><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /> Notifications email</label></div>'+
+      '<div class="acc-sec">Notifications</div>'+
+      '<label class="acc-tog"><span class="acc-tb">Sur le site<small>Cloche et badges</small></span><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /><span class="acc-sw"></span></label>'+
+      '<label class="acc-tog"><span class="acc-tb">Par email<small>Rappels de sortie</small></span><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /><span class="acc-sw"></span></label>'+
 
-      (u.isPremium?'<a href="/account" class="account-option account-option--premium">🤚 Gérer mon abonnement</a>':'')+'<button class="account-option" id="openResetFromAccount" type="button">🔑 Mot de passe oublié</button>'+
+      (u.isPremium?'<div class="acc-sec">Abonnement</div><a href="/account" class="acc-row acc-row--prem"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3 6.5 7 1-5 5 1.2 7L12 18l-6.2 3.5L7 14.5l-5-5 7-1Z"/></svg><span class="acc-rb"><span class="acc-rt">Gérer mon abonnement</span><span class="acc-rs">Premium actif</span></span><span class="acc-chev">\u203a</span></a>':'')+
 
-      
-      '<button class="auth-user-menu__item auth-user-menu__item--danger" id="accountLogout" type="button" style="margin-top:12px;">🚪 Se déconnecter</button>';
-
+      '<button class="acc-out" id="accountLogout" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Se déconnecter</button>';
     // Toggle sections
     accountDrawerContent.querySelectorAll("[data-toggle]").forEach(function(btn){
       btn.addEventListener("click",function(){var target=document.getElementById(btn.dataset.toggle);if(target)target.classList.toggle("hidden");});
@@ -315,7 +458,18 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
   // ── NOTIFICATIONS ────────────────────────────────
   var notifPDrawer=document.getElementById("notifPageDrawer"),notifPOverlay=document.getElementById("notifPageOverlay"),notifPClose=document.getElementById("notifPageClose"),notifPContent=document.getElementById("notifPContent"),notifPMeta=document.getElementById("notifPMeta"),notifPReadAll=document.getElementById("notifPReadAll");
   function closeNotifPageDrawer(){closeDrawerEl(notifPDrawer,notifPOverlay);}
-  function evIcon(t){if(t.includes("platform"))return"🖥️";if(t.includes("trailer"))return"▶️";if(t.includes("release_date"))return"📅";return"🔔";}
+  function evIcon(t){
+    // Pastille typee : chaque evenement a sa couleur, on identifie sa nature
+    // avant de lire. Rendu identique sur tous les appareils, contrairement
+    // aux emojis qui changent de dessin selon le systeme.
+    var s=String(t||"");
+    var d,c;
+    if(s.indexOf("platform")!==-1){c="plat";d='<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>';}
+    else if(s.indexOf("trailer")!==-1){c="trail";d='<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>';}
+    else if(s.indexOf("release_date")!==-1){c="date";d='<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>';}
+    else{c="def";d='<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>';}
+    return '<span class="ev-badge ev-'+c+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg></span>';
+  }
   async function openNotifPageDrawer(){
     closeDropdown();openDrawer(notifPDrawer,notifPOverlay);
     if(notifPContent)notifPContent.innerHTML='<div class="drawer-state">Chargement...</div>';
@@ -368,4 +522,16 @@ if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.pay
 <style>
 .avatar-img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}
 .avatar-pick .avatar-img{width:100%;height:100%;}
+.drawer-panel__header h2{display:flex;align-items:center;gap:10px}
+.dp-ic{flex:none;width:19px;height:19px;color:#ffb066;opacity:.9}
+.mnu{display:flex!important;align-items:center;gap:12px;text-align:left}
+.mnu-ic{flex:none;width:17px;height:17px;color:#ffb066;opacity:.82;transition:opacity 150ms ease}
+.mnu:hover .mnu-ic{opacity:1}
+.mnu-tx{flex:1;min-width:0}
+.mnu-sep{height:1px;margin:7px 10px;background:rgba(255,171,93,.22)}
+.mnu-prem{display:flex!important;align-items:center;gap:12px;text-align:left;background:linear-gradient(90deg,rgba(255,217,138,.15),rgba(255,255,255,.02))!important;border:1px solid rgba(255,217,138,.3)!important;color:#ffd98a!important;font-weight:700}
+.mnu-prem:hover{background:linear-gradient(90deg,rgba(255,217,138,.24),rgba(255,255,255,.03))!important}
+.mnu-prem .mnu-ic{color:#ffd98a;opacity:1}
+.mnu-prem small{display:block;font-size:.7rem;font-weight:500;color:rgba(255,217,138,.62);margin-top:1px}
+.mnu--dg .mnu-ic{color:#f08b7f;opacity:.8}
 </style>
