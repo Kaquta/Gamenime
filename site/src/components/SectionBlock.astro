@@ -530,7 +530,7 @@ function setupDetailModal() {
           }
           infos.push('<span class="info-tag">📡 ' + (statusLabels[st] || st) + '</span>');
         }
-        if (seaMatch) infos.push('<span class="info-tag">📅 ' + seaMatch[1] + '</span>');
+        if (seaMatch) infos.push('<span class="info-tag"><svg class="info-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg> ' + seaMatch[1] + '</span>');
         if (nextMatch) infos.push('<span class="info-tag countdown-info">⏳ Prochain : Épisode ' + nextMatch[1] + '</span>');
         animeInfoHtml = '<div class="detail-anime-info">' + infos.join('') + '</div>';
       }

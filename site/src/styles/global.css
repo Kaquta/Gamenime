@@ -4028,3 +4028,232 @@ body.is-authenticated .fav-heart {
     background:linear-gradient(90deg,transparent,rgba(45,17,10,.9));
   }
 }
+
+/* ══ Tiroir compte : regroupement et hierarchie (session 33) ══ */
+.acc-head{display:flex;gap:14px;align-items:center;padding:16px 14px;margin-bottom:6px;border-radius:16px;background:linear-gradient(180deg,rgba(255,140,58,.09),rgba(255,255,255,.02));border:1px solid rgba(255,171,93,.22)}
+.acc-av{position:relative;width:56px;height:56px;border-radius:999px;flex:none;padding:0;overflow:visible;background:linear-gradient(180deg,rgba(255,181,103,.28),rgba(255,118,41,.14));border:1px solid rgba(255,171,93,.24);cursor:pointer;display:grid;place-items:center}
+.acc-av img,.acc-av .avatar-img{width:100%;height:100%;border-radius:999px;object-fit:cover;display:block}
+.acc-av::after{content:"\270e";position:absolute;right:-2px;bottom:-2px;width:20px;height:20px;border-radius:50%;background:linear-gradient(180deg,#ffb066,#c9541a);color:#2a1105;font-size:.6rem;display:grid;place-items:center;border:2px solid #2a1409;line-height:1}
+.acc-hb{min-width:0;flex:1}
+.acc-name{font-size:1.08rem;font-weight:800;color:#fff4e8;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.acc-mailrow{display:flex;align-items:center;gap:7px;margin-top:5px;flex-wrap:wrap;min-width:0}
+.acc-mail{font-size:.82rem;color:rgba(255,226,205,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.acc-chip{flex:none;display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:99px;font-size:.66rem;font-weight:700;font-family:inherit}
+.acc-chip i{width:5px;height:5px;border-radius:50%;background:currentColor}
+.acc-chip--ok{background:rgba(48,209,108,.13);border:1px solid rgba(48,209,108,.32);color:#6fd99a}
+.acc-chip--ko{background:rgba(232,163,61,.15);border:1px solid rgba(232,163,61,.38);color:#f0c583;cursor:pointer}
+.acc-chip--ko:hover{background:rgba(232,163,61,.24)}
+.acc-sec{font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:800;margin:18px 0 8px;opacity:.85;padding-left:3px}
+.acc-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;margin-bottom:6px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,171,93,.1);color:#f2dcc6;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;text-decoration:none;transition:background 160ms ease,border-color 160ms ease}
+.acc-row:hover{background:rgba(255,255,255,.06);border-color:rgba(255,171,93,.22)}
+.acc-ic{flex:none;width:17px;height:17px;color:#ffb066;opacity:.85}
+.acc-rb{flex:1;min-width:0}
+.acc-rt{display:block}
+.acc-rs{display:block;font-size:.72rem;color:rgba(255,226,205,.6);font-weight:500;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acc-chev{flex:none;color:rgba(255,226,205,.6);font-size:.9rem}
+.acc-row--prem{background:linear-gradient(90deg,rgba(255,217,138,.14),rgba(255,255,255,.02));border-color:rgba(255,217,138,.28);color:#ffd98a}
+.acc-row--prem .acc-ic{color:#ffd98a;opacity:1}
+.acc-row--prem .acc-rs,.acc-row--prem .acc-chev{color:rgba(255,217,138,.6)}
+.acc-tog{display:flex;align-items:center;gap:12px;padding:11px 13px;margin-bottom:6px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,171,93,.1);cursor:pointer}
+.acc-tb{flex:1;min-width:0;font-size:.86rem;font-weight:600;color:#f2dcc6}
+.acc-tb small{display:block;font-size:.71rem;color:rgba(255,226,205,.6);font-weight:500;margin-top:2px}
+.acc-tog input{position:absolute;opacity:0;width:0;height:0}
+.acc-sw{flex:none;width:40px;height:23px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,171,93,.22);position:relative;transition:background 180ms ease,border-color 180ms ease}
+.acc-sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#c9b8a8;transition:transform 180ms ease,background 180ms ease}
+.acc-tog input:checked + .acc-sw{background:linear-gradient(180deg,rgba(255,132,41,.9),rgba(205,74,20,.85));border-color:transparent}
+.acc-tog input:checked + .acc-sw::after{transform:translateX(17px);background:#fff4e8}
+.acc-forgot{display:block;width:100%;margin-top:10px;padding:9px;background:transparent;border:none;color:#ffb066;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;text-underline-offset:3px}
+.acc-forgot:hover{color:#ffd0a8}
+.acc-out{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin-top:16px;padding:12px;border-radius:12px;background:transparent;border:1px solid rgba(224,90,63,.28);color:#f08b7f;font-size:.86rem;font-weight:700;cursor:pointer;font-family:inherit}
+.acc-out:hover{background:rgba(224,90,63,.1)}
+.acc-out svg{width:15px;height:15px}
+@media (prefers-reduced-motion:reduce){.acc-sw,.acc-sw::after,.acc-row{transition:none}}
+
+/* ── Avatar de l'en-tête : même rendu que les vignettes du sélecteur ──
+   scale(1.22) est la clé : les fichiers d'avatar ont une marge transparente,
+   sans ce zoom l'image flotte au centre au lieu de remplir le cercle.
+   Le halo reprend .avatar-pick--selected, puisque l'en-tête EST la selection. */
+.acc-av{
+  overflow:hidden;
+  border:2px solid #f2bc51;
+  background:transparent;
+  box-shadow:0 0 12px rgba(242,188,81,.4), 0 0 22px rgba(255,138,42,.3);
+  transition:box-shadow 180ms ease;
+}
+.acc-av img,
+.acc-av .avatar-img{
+  width:100%;height:100%;
+  object-fit:cover;border-radius:999px;display:block;
+  transform:scale(1.22);
+}
+.acc-av:hover{
+  box-shadow:0 0 16px rgba(255,138,42,.8), 0 0 26px rgba(255,138,42,.4);
+}
+/* Le crayon doit survivre a l'overflow:hidden du cercle */
+.acc-av::after{
+  z-index:2;
+  box-shadow:0 2px 7px -1px rgba(255,140,58,.6);
+}
+
+/* ── Pas de crayon : la grille des avatars s'ouvre juste dessous,
+      l'affordance se passe d'un badge qui salit le cercle. ── */
+.acc-av::after{content:none}
+
+/* ── Bouton « Changer d'avatar », sous la ligne email ── */
+.acc-pen{
+  display:inline-flex;align-items:center;gap:7px;margin-top:8px;
+  padding:7px 12px;border-radius:99px;
+  background:rgba(255,140,58,.12);border:1px solid rgba(255,171,93,.3);
+  color:#ffb066;font-size:.74rem;font-weight:700;cursor:pointer;
+  font-family:inherit;white-space:nowrap;
+  transition:background 160ms ease,border-color 160ms ease,color 160ms ease;
+}
+.acc-pen:hover{background:rgba(255,140,58,.24);border-color:rgba(255,171,93,.55);color:#ffd0a8}
+.acc-pen svg{width:14px;height:14px;flex:none}
+/* le cercle redevient purement decoratif */
+.acc-av{cursor:default}
+
+/* ── Icônes de titre de page, alignées sur le menu et les tiroirs ── */
+.favorites-title,.notif-page__title,.prefs-summary__label{display:flex;align-items:center;gap:10px}
+.pg-ic{flex:none;width:20px;height:20px;color:#ffb066;opacity:.9}
+
+/* ── Icônes de notification : pastille typée par événement ── */
+.ev-badge{display:grid;place-items:center;width:100%;height:100%;border-radius:9px;border:1px solid}
+.ev-badge svg{width:19px;height:19px}
+.ev-plat{background:rgba(122,160,255,.13);border-color:rgba(122,160,255,.3);color:#9fb7ff}
+.ev-trail{background:rgba(224,90,63,.13);border-color:rgba(224,90,63,.32);color:#f0937f}
+.ev-date{background:rgba(255,159,10,.13);border-color:rgba(255,159,10,.32);color:#ffc46b}
+.ev-def{background:rgba(255,140,58,.12);border-color:rgba(255,171,93,.28);color:#ffb066}
+.notif-bell__icon .pg-ic,.prefs-channel-icon .pg-ic{width:20px;height:20px;color:#ffb066}
+.prefs-card__title{display:flex;align-items:center;gap:10px}
+.info-ic{width:14px;height:14px;vertical-align:-2px;color:currentColor}
+.ev-ep{background:rgba(217,106,255,.13);border-color:rgba(217,106,255,.3);color:#d9a4ff}
+
+/* ══ Notifications : hiérarchie inversée + état lu (session 33) ══
+   Le titre passe devant le motif — sur six alertes du même lot, on lit
+   ce qui distingue avant ce qui se répète. L'état lu reprend l'opacité
+   des épisodes déjà diffusés du radar. */
+.nt-row{display:flex;gap:11px;align-items:center;width:100%;padding:10px;border-radius:12px;margin-bottom:7px;background:rgba(255,255,255,.03);border:1px solid rgba(255,171,93,.1);position:relative;cursor:pointer;text-align:left;font-family:inherit;transition:opacity 220ms ease,background 150ms ease,border-color 220ms ease}
+.nt-row:hover{background:rgba(255,255,255,.06)}
+.nt-row.is-unread{background:rgba(255,140,58,.07);border-color:rgba(255,140,58,.22)}
+.nt-row.is-unread::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:2px;background:linear-gradient(180deg,#ffb066,#c9541a)}
+.nt-row.is-read{opacity:.42}
+.nt-row.is-read:hover{opacity:.62}
+.nt-th{position:relative;flex:none;width:46px;height:46px;border-radius:9px}
+.nt-th .nt-cov{width:100%;height:100%;border-radius:9px;overflow:hidden;display:grid;place-items:center;background:#1a0d08;border:1px solid rgba(255,171,93,.14);font-size:1.1rem}
+.nt-th .nt-cov img{width:100%;height:100%;object-fit:cover;display:block}
+.nt-pin{position:absolute;right:-4px;bottom:-4px;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;border:2px solid #241109}
+.nt-pin svg{width:10px;height:10px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.nt-pin.t-new{background:#2f7a4f}.nt-pin.t-plat{background:#3a5a9f}.nt-pin.t-trail{background:#b8402f}
+.nt-pin.t-date{background:#c9821a}.nt-pin.t-ep{background:#8b4bb8}.nt-pin.t-def{background:#c9541a}
+.nt-b{flex:1;min-width:0}
+.nt-t{display:block;font-size:.88rem;font-weight:700;color:#fff4e8;line-height:1.28;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-m{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap;min-width:0}
+.nt-tag{flex:none;font-size:.63rem;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.nt-tag.t-new{background:rgba(47,122,79,.16);border:1px solid rgba(47,122,79,.34);color:#7ed49a}
+.nt-tag.t-plat{background:rgba(58,90,159,.18);border:1px solid rgba(58,90,159,.4);color:#9fb7ff}
+.nt-tag.t-trail{background:rgba(184,64,47,.18);border:1px solid rgba(184,64,47,.4);color:#f0937f}
+.nt-tag.t-date{background:rgba(201,130,26,.18);border:1px solid rgba(201,130,26,.4);color:#ffc46b}
+.nt-tag.t-ep{background:rgba(139,75,184,.18);border:1px solid rgba(139,75,184,.4);color:#d9a4ff}
+.nt-tag.t-def{background:rgba(255,140,58,.14);border:1px solid rgba(255,171,93,.3);color:#ffb066}
+.nt-sub{font-size:.71rem;color:rgba(255,226,205,.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.nt-w{flex:none;font-size:.68rem;color:rgba(255,226,205,.38);font-family:ui-monospace,monospace}
+.nt-x{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:6px;background:transparent;border:none;color:rgba(255,226,205,.3);cursor:pointer;font-size:.7rem;font-family:inherit;opacity:0;transition:opacity 150ms ease}
+.nt-row:hover .nt-x{opacity:1}
+.nt-x:hover{color:#f08b7f;background:rgba(224,90,63,.14)}
+/* les deux actions */
+.nt-acts{display:flex;gap:7px;margin-bottom:12px}
+.nt-act{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:9px 8px;border-radius:10px;font-size:.76rem;font-weight:600;cursor:pointer;font-family:inherit;background:rgba(255,255,255,.04);border:1px solid rgba(255,171,93,.1);color:#f2dcc6;transition:background 150ms ease,border-color 150ms ease,opacity 150ms ease}
+.nt-act:hover:not(:disabled){background:rgba(255,255,255,.08);border-color:rgba(255,171,93,.22)}
+.nt-act:disabled{opacity:.35;cursor:default}
+.nt-act svg{width:14px;height:14px;flex:none}
+.nt-act--del{color:#f0937f;border-color:rgba(224,90,63,.24)}
+.nt-act--del:hover:not(:disabled){background:rgba(224,90,63,.12);border-color:rgba(224,90,63,.42)}
+.nt-act .nt-n{font-size:.68rem;opacity:.7;font-family:ui-monospace,monospace}
+
+/* ── En-têtes de tiroir : même dégradé braise que les titres de section ── */
+.drawer-panel__header h2,
+.notif-drawer__header h2{
+  background:linear-gradient(100deg,#fff8f0 20%,#ffcb9a 62%,#ff9d4d 100%);
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;
+  text-shadow:0 0 26px rgba(255,140,58,.18);
+  letter-spacing:-.02em;
+}
+/* les icones heritent de la transparence du clip : on leur rend leur couleur */
+.drawer-panel__header h2 .dp-ic,
+.notif-drawer__header h2 .dp-ic,
+.drawer-panel__header h2 svg,
+.notif-drawer__header h2 svg{
+  -webkit-text-fill-color:#ffb066;
+  color:#ffb066;
+}
+
+/* ══ Tiroir favoris : titre devant, type en pastille, date à droite ══ */
+.f-sec{font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:800;margin:14px 0 8px;opacity:.85;padding-left:3px}
+.f-sec:first-child{margin-top:0}
+.f-c{display:flex;gap:11px;align-items:center;padding:10px;border-radius:12px;margin-bottom:7px;background:rgba(255,255,255,.03);border:1px solid rgba(255,171,93,.1);position:relative;cursor:pointer;transition:background 150ms ease,opacity 220ms ease}
+.f-c:hover{background:rgba(255,255,255,.06)}
+.f-c.soon{background:rgba(255,140,58,.07);border-color:rgba(255,140,58,.22)}
+.f-c.soon::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:2px;background:linear-gradient(180deg,#ffb066,#c9541a)}
+.f-c.out{opacity:.5}
+.f-c.out:hover{opacity:.72}
+.f-th{position:relative;flex:none;width:46px;height:46px;border-radius:9px}
+.f-th .cov{width:100%;height:100%;border-radius:9px;overflow:hidden;display:grid;place-items:center;background:#1a0d08;border:1px solid rgba(255,171,93,.14);font-size:1rem;color:rgba(255,255,255,.3)}
+.f-th .cov img{width:100%;height:100%;object-fit:cover;display:block}
+.f-b{flex:1;min-width:0}
+.f-t{display:block;font-size:.88rem;font-weight:700;color:#fff4e8;line-height:1.28;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.f-m{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:nowrap;min-width:0;overflow:hidden}
+.f-tag{flex:none;font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.f-tag.t-anime{background:rgba(217,106,255,.15);border:1px solid rgba(217,106,255,.34);color:#d9a4ff}
+.f-tag.t-game{background:rgba(58,90,159,.18);border:1px solid rgba(58,90,159,.4);color:#9fb7ff}
+.f-sub{font-size:.71rem;color:rgba(255,226,205,.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.f-d{flex:none;text-align:right}
+.f-day{display:block;font-size:.76rem;font-weight:700;color:#f2dcc6;font-family:ui-monospace,monospace}
+.f-cd{display:block;font-size:.64rem;margin-top:3px;font-family:ui-monospace,monospace;color:rgba(255,226,205,.38)}
+.f-c.soon .f-cd{color:#ffb066;font-weight:700}
+.f-x{position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:6px;background:transparent;border:none;color:rgba(255,226,205,.3);cursor:pointer;font-size:.7rem;font-family:inherit;opacity:0;transition:opacity 150ms ease}
+.f-c:hover .f-x{opacity:1}
+.f-x:hover{color:#f08b7f;background:rgba(224,90,63,.14)}
+
+/* ══ Favoris : mode sélection multiple ══ */
+.fav-topbar{display:flex;justify-content:flex-end;margin-bottom:10px}
+.fav-lnk{padding:5px 11px;border-radius:8px;background:rgba(255,255,255,.04);border:1px solid rgba(255,171,93,.1);color:#f2dcc6;font-size:.72rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.fav-lnk:hover{background:rgba(255,255,255,.08);border-color:rgba(255,171,93,.22)}
+.fav-lnk.on{background:rgba(255,140,58,.16);border-color:rgba(255,140,58,.4);color:#ffb066}
+/* la case, visible seulement en mode selection */
+.f-c .fav-ck{flex:none;width:0;height:20px;border-radius:6px;border:1.5px solid rgba(255,171,93,.4);background:rgba(0,0,0,.3);display:grid;place-items:center;opacity:0;overflow:hidden;margin-right:-11px;transition:width 200ms ease,opacity 200ms ease,margin 200ms ease}
+.fav-selecting .f-c .fav-ck{width:20px;opacity:1;margin-right:0}
+.f-c .fav-ck svg{width:12px;height:12px;stroke:#2a1105;stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity 140ms ease}
+.f-c.picked{background:rgba(255,140,58,.18);border-color:rgba(255,140,58,.55);opacity:1}
+.f-c.picked .fav-ck{background:linear-gradient(180deg,#ffb066,#c9541a);border-color:transparent}
+.f-c.picked .fav-ck svg{opacity:1}
+.fav-selecting .f-x{display:none}
+/* barre d'action collée en bas */
+.fav-bar{position:sticky;bottom:0;margin:10px -14px -14px;padding:11px 14px;display:flex;align-items:center;gap:9px;background:linear-gradient(180deg,rgba(30,14,9,.7),rgba(22,11,7,.98));border-top:1px solid rgba(255,171,93,.22);transform:translateY(140%);transition:transform 240ms cubic-bezier(.4,0,.2,1)}
+.fav-selecting .fav-bar{transform:translateY(0)}
+.fav-bar-n{flex:1;font-size:.78rem;font-weight:700;color:#f2dcc6;min-width:0}
+.fav-bar-n small{display:block;font-size:.68rem;font-weight:500;color:rgba(255,226,205,.55);margin-top:2px}
+.fav-bar-b{padding:9px 15px;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;background:rgba(255,255,255,.05);border:1px solid rgba(255,171,93,.1);color:#f2dcc6}
+.fav-bar-b:hover:not(:disabled){background:rgba(255,255,255,.09)}
+.fav-bar-b--del{background:rgba(224,90,63,.16);border-color:rgba(224,90,63,.44);color:#f0937f}
+.fav-bar-b--del:hover:not(:disabled){background:rgba(224,90,63,.28)}
+.fav-bar-b:disabled{opacity:.35;cursor:default}
+@media (prefers-reduced-motion:reduce){.fav-bar,.f-c .fav-ck{transition:none}}
+.notif-drawer__header h2{display:flex;align-items:center;gap:10px}
+.notif-drawer__header h2{display:flex;align-items:center;gap:10px}
+
+/* ── Icônes des titres de tiroir : .dp-ic n'avait jamais été dimensionnée,
+      et la règle .notif-drawer__header h2{color:...} du CSS d'origine
+      arrivait après le dégradé et l'annulait. ── */
+.dp-ic{
+  flex:none;width:19px;height:19px;
+  color:#ffb066;
+  -webkit-text-fill-color:#ffb066;
+}
+.notif-drawer__header h2,
+.drawer-panel__header h2{
+  color:transparent!important;
+  background:linear-gradient(100deg,#fff8f0 20%,#ffcb9a 62%,#ff9d4d 100%);
+  -webkit-background-clip:text;background-clip:text;
+}
