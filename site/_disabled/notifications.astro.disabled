@@ -9,8 +9,11 @@ import Footer from "../components/Footer.astro";
 
   <div class="notif-page container">
     <div class="notif-page__header">
-      <h2 class="notif-page__title">🔔 Notifications</h2>
-      <button id="notifPageReadAll" class="notif-page__readall" type="button">Tout marquer comme lu</button>
+      <h2 class="notif-page__title"><svg class="pg-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>Notifications</h2>
+      <div class="nt-acts" style="margin:0;max-width:380px">
+        <button id="notifPageReadAll" class="nt-act" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Tout marquer lu</button>
+        <button id="notifPageDelRead" class="nt-act nt-act--del" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Supprimer les lus <span class="nt-n" id="notifPageNRead"></span></button>
+      </div>
     </div>
     <p class="notif-page__count" id="notifPageCount"></p>
 
@@ -60,11 +63,15 @@ import Footer from "../components/Footer.astro";
   }
 
   function eventIcon(eventType) {
-    if (eventType.includes("platform")) return "🖥️";
-    if (eventType.includes("trailer")) return "▶️";
-    if (eventType.includes("release_date")) return "📅";
-    if (eventType.includes("episode")) return "🎬";
-    return "🔔";
+    // Pastille typee, alignee sur le tiroir et la cloche.
+    var s = String(eventType || "");
+    var d, c;
+    if (s.indexOf("platform") !== -1) { c = "plat"; d = '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>'; }
+    else if (s.indexOf("trailer") !== -1) { c = "trail"; d = '<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>'; }
+    else if (s.indexOf("release_date") !== -1) { c = "date"; d = '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>'; }
+    else if (s.indexOf("episode") !== -1) { c = "ep"; d = '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M7 4v5M17 4v5"/>'; }
+    else { c = "def"; d = '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>'; }
+    return '<span class="ev-badge ev-' + c + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg></span>';
   }
 
   function eventLabel(item) {
@@ -76,21 +83,34 @@ import Footer from "../components/Footer.astro";
   }
 
   function renderNotifCard(item) {
-    var info = eventLabel(item);
-    var icon = eventIcon(item.eventType);
-    var unreadClass = item.isRead ? "" : " notif-page-card--unread";
-    var dot = item.isRead ? "" : '<span class="notif-page-card__dot"></span>';
-    var time = timeAgo(item.eventAt || item.createdAt);
-
-    return '<button class="notif-page-card' + unreadClass + '" data-notif-id="' + item.id + '" type="button">' +
-      '<div class="notif-page-card__icon">' + icon + '</div>' +
-      '<div class="notif-page-card__body">' +
-        '<div class="notif-page-card__title">' + escapeHtml(info.label) + ' pour ' + escapeHtml(info.title) + '</div>' +
-        (info.detail ? '<div class="notif-page-card__detail">' + escapeHtml(info.detail) + '</div>' : '') +
-        '<div class="notif-page-card__time">' + time + '</div>' +
-      '</div>' +
-      dot +
-    '</button>';
+    // Hierarchie inversee : le titre de l'oeuvre passe devant le motif.
+    // Sur six alertes du meme lot, on lit ce qui distingue avant ce qui se repete.
+    var p = item.payload || {};
+    var titre = p.title || "Mise a jour";
+    var motif = p.label || item.eventType || "";
+    var detail = p.newValue || "";
+    var ty = typeOf(item.eventType);
+    var lu = item.isRead ? " is-read" : " is-unread";
+    var cov = p.cover
+      ? '<span class="nt-cov"><img src="' + escapeHtml(p.cover) + '" alt="" loading="lazy" /></span>'
+      : '<span class="nt-cov">\u65b0</span>';
+    return '<button class="nt-row' + lu + '" data-notif-id="' + item.id + '" type="button">'
+      + '<span class="nt-th">' + cov + '<span class="nt-pin t-' + ty.k + '"><svg viewBox="0 0 24 24">' + ty.d + '</svg></span></span>'
+      + '<span class="nt-b"><span class="nt-t">' + escapeHtml(titre) + '</span>'
+      + '<span class="nt-m"><span class="nt-tag t-' + ty.k + '">' + escapeHtml(ty.lib || motif) + '</span>'
+      + (detail ? '<span class="nt-sub">' + escapeHtml(detail) + '</span>' : '') + '</span></span>'
+      + '<span class="nt-w">' + timeAgo(item.eventAt || item.createdAt) + '</span>'
+      + '<span class="nt-x" data-notif-id="' + item.id + '" title="Supprimer">\u2715</span>'
+      + '</button>';
+  }
+  function typeOf(t) {
+    var s = String(t || "");
+    if (s.indexOf("platform") !== -1) return { k:"plat", lib:"Plateforme", d:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>' };
+    if (s.indexOf("trailer") !== -1) return { k:"trail", lib:"Trailer", d:'<circle cx="12" cy="12" r="9"/><path d="m10 8 6 4-6 4Z"/>' };
+    if (s.indexOf("release_date") !== -1) return { k:"date", lib:"Date", d:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>' };
+    if (s.indexOf("episode") !== -1) return { k:"ep", lib:"\u00c9pisode", d:'<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 9h20M7 4v5M17 4v5"/>' };
+    if (s.indexOf("new") !== -1) return { k:"new", lib:"Nouveaut\u00e9", d:'<path d="M12 5v14M5 12h14"/>' };
+    return { k:"def", lib:"", d:'<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>' };
   }
 
   var notifications = [];
@@ -165,8 +185,34 @@ import Footer from "../components/Footer.astro";
         unreadCount = 0;
         if (pageList) pageList.innerHTML = notifications.map(renderNotifCard).join("");
         if (pageCount) pageCount.textContent = notifications.length + " notification" + (notifications.length > 1 ? "s" : "") + " — tout lu";
+        majActions();
       }
     } catch(err) { console.error("Erreur read-all:", err); }
+  });
+
+  // Suppression en masse des lues — pendant de read-all.
+  var pageDelRead = document.getElementById("notifPageDelRead");
+  var pageNRead = document.getElementById("notifPageNRead");
+  function majActions() {
+    var lus = notifications.filter(function(n){ return n.isRead; }).length;
+    var nonLus = notifications.length - lus;
+    if (pageReadAll) pageReadAll.disabled = nonLus === 0;
+    if (pageDelRead) pageDelRead.disabled = lus === 0;
+    if (pageNRead) pageNRead.textContent = lus > 0 ? "(" + lus + ")" : "";
+  }
+  if (pageDelRead) pageDelRead.addEventListener("click", async function() {
+    try {
+      var res = await fetch(apiBase + "/notifications/read", { method: "DELETE", credentials: "include", headers: { Accept: "application/json" } });
+      if (res.ok) {
+        notifications = notifications.filter(function(n) { return !n.isRead; });
+        if (pageList) pageList.innerHTML = notifications.map(renderNotifCard).join("");
+        if (pageCount) pageCount.textContent = notifications.length
+          ? notifications.length + " notification" + (notifications.length > 1 ? "s" : "")
+          : "";
+        if (notifications.length === 0 && pageEmpty) pageEmpty.classList.remove("hidden");
+        majActions();
+      }
+    } catch(err) { console.error("Erreur delete-read:", err); }
   });
 
   loadNotifications();
