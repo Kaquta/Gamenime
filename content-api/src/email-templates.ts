@@ -163,21 +163,58 @@ export function reminderEmailTemplate(data: ReminderEmailData) {
     : data.daysLeft === 1
     ? "⏰"
     : "📅";
+  // Date exacte : "demain" seul devient faux si le mail est lu plus tard.
+  const dateLongue = data.releaseDate
+    ? new Date(data.releaseDate + "T12:00:00").toLocaleDateString("fr-FR", {
+        weekday: "long", day: "numeric", month: "long", year: "numeric",
+        timeZone: "Europe/Paris",
+      })
+    : null;
+  const quand = data.daysLeft === 0 ? "C'est aujourd'hui"
+    : data.daysLeft === 1 ? "C'est demain"
+    : `Dans ${data.daysLeft} jours`;
+
+  // Jaquette a 132px et posee a cote du texte : a 280px elle poussait
+  // le bouton hors de l'ecran sur mobile.
   const coverHtml = data.itemCover
-    ? `<img src="${escapeHtml(data.itemCover)}" alt="${safeTitle}" style="max-width:280px;width:100%;border-radius:12px;margin:16px 0;display:block;" />`
+    ? `<td width="132" valign="top" style="padding-right:18px;"><img src="${escapeHtml(data.itemCover)}" alt="${safeTitle}" width="132" style="width:132px;border-radius:10px;display:block;" /></td>`
     : "";
 
+  const plateforme = data.platform && data.platform.trim()
+    ? escapeHtml(data.platform)
+    : '<em style="color:#999;font-weight:400;">à confirmer</em>';
+
   const content = `
-    <h2 style="margin:0 0 16px;color:#222;font-size:20px;">${labelText}</h2>
-    <p style="margin:0 0 12px;">Bonjour ${safeName},</p>
-    <p style="margin:0 0 12px;">Le ${typeLabel} <strong>${safeTitle}</strong> que tu suis sort ${data.daysLeft === 0 ? "aujourd'hui" : data.daysLeft === 1 ? "demain" : "dans " + data.daysLeft + " jours"} !</p>
-    ${coverHtml}
-    <p style="margin:8px 0 16px;color:#444;font-size:14px;">📺 <strong>Plateforme :</strong> ${data.platform && data.platform.trim() ? escapeHtml(data.platform) : '<em style="color:#888;">à confirmer (annonce officielle pas encore publiée)</em>'}</p>
+    <p style="margin:0 0 4px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:${BRAND_COLOR};font-weight:700;">Rappel de sortie</p>
+    <h2 style="margin:0 0 18px;color:#1a1a1a;font-size:23px;line-height:1.25;font-weight:800;">${safeTitle}</h2>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff6f0;border:1px solid #ffd4bb;border-left:4px solid ${BRAND_COLOR};border-radius:10px;margin:0 0 18px;">
+      <tr><td style="padding:14px 16px;">
+        <p style="margin:0 0 3px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#c2551f;font-weight:700;">${quand}</p>
+        ${dateLongue ? `<p style="margin:0;font-size:19px;font-weight:800;color:#1a1a1a;">${dateLongue}</p>` : ""}
+        <p style="margin:3px 0 0;font-size:13px;color:#8a6a58;">Bonjour ${safeName} — tu suis ce ${typeLabel}</p>
+      </td></tr>
+    </table>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;">
+      <tr>
+        ${coverHtml}
+        <td valign="top">
+          <p style="margin:0 0 3px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#999;font-weight:700;">Où le regarder</p>
+          <p style="margin:0;font-size:14px;color:#333;font-weight:600;">${plateforme}</p>
+        </td>
+      </tr>
+    </table>
+
     ${button("Voir la fiche", data.itemUrl)}
-    <p style="margin:16px 0 0;color:#888;font-size:12px;">Tu reçois cet email parce que cet ${typeLabel} est dans tes favoris. Tu peux désactiver les notifications email dans ton compte.</p>
+
+    <p style="margin:20px 0 0;padding-top:16px;border-top:1px solid #eee;color:#999;font-size:12px;line-height:1.6;">
+      Tu reçois ce message parce que <strong>${safeTitle}</strong> est dans tes favoris.<br/>
+      <a href="${SITE_URL}" style="color:${BRAND_COLOR};">Gérer mes notifications</a>
+    </p>
   `;
   return {
-    subject: `${subjectPrefix} ${safeTitle} — ${labelText}`,
+    subject: `${safeTitle} — ${labelText}`,
     html: wrap(`Rappel ${SITE_NAME}`, content),
   };
 }

@@ -303,7 +303,9 @@ export async function sendReminderEmail(params: SendReminderEmailParams): Promis
   const cleanedTitle = cleanTitleForDisplay(params.itemTitle);
   try {
     const isUpcoming = params.releaseDate && new Date(params.releaseDate) > new Date();
-    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemId}`;
+    // Le type va dans l'ancre : /upcoming melange animes et jeux, sans lui
+    // le front ne sait pas quelle fiche charger.
+    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemType}-${params.itemId}`;
     const tpl = reminderEmailTemplate({
       displayName: params.displayName || "",
       itemTitle: cleanedTitle,
@@ -350,7 +352,9 @@ export async function sendAlertEmail(params: SendAlertEmailParams): Promise<Emai
 
   try {
     const isUpcoming = params.releaseDate && new Date(params.releaseDate) > new Date();
-    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemId}`;
+    // Le type va dans l'ancre : /upcoming melange animes et jeux, sans lui
+    // le front ne sait pas quelle fiche charger.
+    const itemUrl = `${SITE_URL}${isUpcoming ? "/upcoming" : "/" + params.itemType}#item-${params.itemType}-${params.itemId}`;
     const tpl = alertEmailTemplate({
       displayName: params.displayName || "",
       itemTitle: cleanedTitle,
