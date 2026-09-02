@@ -130,13 +130,14 @@ function renderSearchCard(item, domain) {
   var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : "";
   var hype = typeof getHypeLabel === "function" ? getHypeLabel(item) : null;
   var hypeBadge = "";
-  if (hype === "Populaire") hypeBadge = "<span class=\"item-badge popular\">🔥 Populaire</span>";
-  else if (hype === "Très attendu") hypeBadge = "<span class=\"item-badge anticipated\">⭐ Très attendu</span>";
+  if (hype === "Populaire") hypeBadge = "<span class=\"item-badge popular\">Populaire</span>";
+  else if (hype === "Très attendu") hypeBadge = "<span class=\"item-badge anticipated\">Très attendu</span>";
   return "<article class=\"item-card" + (hasTrailer ? " has-trailer" : "") + "\"" +
-    " data-id=\"" + item.id + "\" data-domain=\"" + domain + "\"" +
+    " data-id=\"" + item.id + "\" data-domain=\"" + domain + "\" data-type=\"" + (domain === "games" ? "game" : "anime") + "\" data-release-date=\"" + (item.releaseDate || "") + "\"" +
     (videoId ? " data-yt=\"" + videoId + "\"" : "") + screensAttr + ">" +
     "<div class=\"item-media\">" + media + "</div>" +
     "<div class=\"item-hover-video\"></div>" +
+    (hasTrailer ? "<div class=\"trailer-band top\" data-band-id=\"" + item.id + "\" data-band-domain=\"" + domain + "\"></div><div class=\"trailer-band bottom\" data-band-id=\"" + item.id + "\" data-band-domain=\"" + domain + "\"></div>" : "") +
     "<div class=\"item-hover-slides\"></div>" +
     "<div class=\"item-overlay\"></div>" +
     "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
@@ -161,12 +162,13 @@ async function doSearch() {
   resultsDiv.style.display = "block";
   row.innerHTML = '<p class="section-loading">Recherche…</p>';
   try {
-    var anime = await getAnimeItems('search=' + encodeURIComponent(q) + '&limit=20');
-    var games = await getGameItems('search=' + encodeURIComponent(q) + '&limit=20');
-    var all = [].concat(
-      anime.map(function(i) { return Object.assign({}, i, { _d: 'anime' }); }),
-      games.map(function(i) { return Object.assign({}, i, { _d: 'games' }); })
-    );
+    // /feed/search interroge les trois colonnes de titre et decoupe la
+    // requete en mots. getAnimeItems('search=') ne fait ni l'un ni l'autre.
+    var res = await fetch('/api/feed/search?q=' + encodeURIComponent(q) + '&type=all');
+    var data = await res.json();
+    var all = (data.items || []).map(function(i) {
+      return Object.assign({}, i, { _d: i.type === 'game' ? 'games' : 'anime' });
+    });
     row.innerHTML = all.length ? all.map(function(i) { return renderSearchCard(i, i._d); }).join('') : '<p class="section-empty">Aucun résultat.</p>';
   } catch(e) { row.innerHTML = '<p class="section-empty">Erreur.</p>'; }
 }
