@@ -784,6 +784,11 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
 
     const { q, type } = parsed.data;
     const escapedPattern = `%${escapeLikePattern(q)}%`;
+    // Recherche par mots : chaque terme doit apparaitre dans au moins un
+    // des titres. Sans ca, "one piece film" echouait des que le titre reel
+    // intercalait autre chose entre les mots.
+    const mots = q.split(/\s+/).filter((m) => m.length >= 2).slice(0, 6);
+    const motsPattern = mots.map((m) => `%${escapeLikePattern(m)}%`);
     const now = new Date();
 
     let anime: GameNimeItem[] = [];
@@ -799,9 +804,13 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
                 trailer_url AS trailerUrl,
                 'anime' AS type
          FROM anime_items
-         WHERE title LIKE ?
+         WHERE ${mots.length
+           ? mots.map(() => "(title LIKE ? OR title_english LIKE ? OR title_native LIKE ?)").join(" AND ")
+           : "(title LIKE ? OR title_english LIKE ? OR title_native LIKE ?)"}
          LIMIT ?`,
-        [escapedPattern, SEARCH_LIMIT_PER_TYPE]
+        [...(mots.length
+          ? motsPattern.flatMap((m) => [m, m, m])
+          : [escapedPattern, escapedPattern, escapedPattern]), SEARCH_LIMIT_PER_TYPE]
       );
     }
 
@@ -815,9 +824,13 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
                 trailer_url AS trailerUrl,
                 'game' AS type
          FROM game_items
-         WHERE title LIKE ?
+         WHERE ${mots.length
+           ? mots.map(() => "(title LIKE ? OR title_english LIKE ?)").join(" AND ")
+           : "(title LIKE ? OR title_english LIKE ?)"}
          LIMIT ?`,
-        [escapedPattern, SEARCH_LIMIT_PER_TYPE]
+        [...(mots.length
+          ? motsPattern.flatMap((m) => [m, m])
+          : [escapedPattern, escapedPattern]), SEARCH_LIMIT_PER_TYPE]
       );
     }
 
