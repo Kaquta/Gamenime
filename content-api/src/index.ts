@@ -1798,6 +1798,60 @@ app.post("/admin/match-anime-routes", async (req, reply) => {
   return reply.send({ ok: true, ...result });
 });
 
+// ─── Slugs des pages indexables ──────────────────────────────────────────
+// Le slug se termine par -{id} : unicite garantie par construction (et par
+// l'index UNIQUE en base), et un titre corrige plus tard ne casse pas une
+// URL deja indexee par Google — le slug ne se recalcule jamais.
+// Idempotent : chaque UPDATE recontrole que le slug est vide, donc un appel
+// concurrent ou une relance apres echec ne reecrit rien.
+function fabriquerSlug(titre: string | null, id: number): string {
+  const base = String(titre ?? "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/['\u2019]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+    .replace(/-+$/g, "");
+  return base ? `${base}-${id}` : `item-${id}`;
+}
+
+app.post("/admin/generate-slugs", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const bilan: Record<string, { generes: number; restants: number }> = {};
+  try {
+    for (const table of ["anime_items", "game_items"] as const) {
+      const rows: Array<{ id: number; title: string | null; title_english: string | null }> =
+        await pool.query(
+          `SELECT id, title, title_english FROM ${table} WHERE slug IS NULL OR slug = ''`
+        );
+      let generes = 0;
+      for (const r of rows) {
+        const slug = fabriquerSlug(r.title_english ?? r.title, Number(r.id));
+        // La condition est recontrolee dans l'UPDATE : en cas d'appel
+        // concurrent, le second passage ne touche rien.
+        const res: { affectedRows?: number } = await pool.query(
+          `UPDATE ${table} SET slug = ? WHERE id = ? AND (slug IS NULL OR slug = '')`,
+          [slug, r.id]
+        );
+        if (res.affectedRows) generes++;
+      }
+      const restRows: Array<{ n: number }> = await pool.query(
+        `SELECT COUNT(*) AS n FROM ${table} WHERE slug IS NULL OR slug = ''`
+      );
+      bilan[table] = { generes, restants: Number(restRows[0]?.n ?? 0) };
+    }
+    app.log.info(bilan, "generate-slugs termine");
+    return reply.send({ ok: true, ...bilan });
+  } catch (e) {
+    app.log.error({ err: (e as Error)?.message }, "generate-slugs echec");
+    return reply.code(500).send({ ok: false, msg: "generation interrompue", bilan });
+  }
+});
+
 app.post("/admin/match-orphan-games", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
