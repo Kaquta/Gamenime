@@ -121,6 +121,23 @@ function detailDateBlock(item) {
 // aux cartes qui raccourcissent en PS5 / Xbox X|S. Meme regle en revanche sur
 // le doublon : des qu'une version precise existe pour une famille, le generique
 // de cette famille disparait ("PlayStation, PlayStation 5" -> "PlayStation 5").
+// Titres alternatifs : le natif japonais, plus le romaji s'il differe du
+// titre affiche. displayTitle preferant l'anglais, montrer les deux sans
+// filtrer repeterait ce qui est deja en gros juste au-dessus.
+function altEsc(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function altTitles(item) {
+  var affiche = String(displayTitle(item) || "").trim();
+  var parts = [];
+  var nat = item.titleNative ? String(item.titleNative).trim() : "";
+  var rom = item.title ? String(item.title).trim() : "";
+  if (nat && nat !== affiche) parts.push('<span class="alt-nat">' + altEsc(nat) + '</span>');
+  if (rom && rom !== affiche && rom !== nat) parts.push(altEsc(rom));
+  if (!parts.length) return "";
+  return '<div class="alt-titles">' + parts.join('<span class="alt-sep">\u00b7</span>') + '</div>';
+}
+
 function dedupeGeneric(list) {
   var FAMILIES = [
     { generic: "playstation", precise: /^playstation \d/ },
@@ -563,6 +580,7 @@ function setupDetailModal() {
           '<div class="detail-cover">' + (item.cover ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" />' : '') + '</div>' +
           '<div class="detail-info">' +
             '<h2>' + displayTitle(item) + '</h2>' +
+            altTitles(item) +
             detailDateBlock(item) +
             '<div class="detail-section-label">' + (domain === 'games' ? 'Ou y jouer' : 'Ou le regarder') + '</div>' +
             detailPlatforms(item) +

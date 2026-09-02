@@ -4257,3 +4257,8 @@ body.is-authenticated .fav-heart {
   background:linear-gradient(100deg,#fff8f0 20%,#ffcb9a 62%,#ff9d4d 100%);
   -webkit-background-clip:text;background-clip:text;
 }
+
+/* ── Modal : titres alternatifs sous le titre principal ── */
+.alt-titles{margin:5px 0 12px;font-size:.78rem;line-height:1.5;color:rgba(255,226,205,.5)}
+.alt-nat{color:#d9bda3;font-weight:600}
+.alt-sep{opacity:.4;margin:0 6px}
