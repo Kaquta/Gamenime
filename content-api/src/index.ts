@@ -2319,7 +2319,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const where = conditions.length ? "WHERE " + conditions.join(" AND ") : "";
 
     const rows: any = await pool.query(
-      `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative" : ""}, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
               DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
               is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl,
@@ -2335,7 +2335,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const { id } = req.params as { id: string };
 
     const rows: any = await pool.query(
-      `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative" : ""}, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
               release_precision AS releasePrecision,
               DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,

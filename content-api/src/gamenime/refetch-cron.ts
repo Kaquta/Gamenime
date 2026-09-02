@@ -26,6 +26,7 @@ interface IncompleteItem {
 
 interface SourceData {
   cover?: string | null;
+  titleNative?: string | null;   // titre japonais : AniList, Jikan et AnimeSchedule l'ont tous les trois
   platform?: string | null;
   trailerUrl?: string | null;
   description: string | null;
@@ -37,7 +38,7 @@ interface SourceData {
 export async function fetchAniList(anilistId: number): Promise<SourceData | null> {
   if (!anilistId) return null;
 
-  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
+  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { title { native } format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
 
   try {
     const res = await fetch("https://graphql.anilist.co", {
@@ -52,6 +53,7 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
     if (!media) return null;
 
     const cover = media.coverImage?.extraLarge ?? media.coverImage?.large ?? null;
+    const titleNative: string | null = media.title?.native ?? null;
 
     const platforms = new Set<string>();
     if (Array.isArray(media.externalLinks)) {
@@ -100,7 +102,7 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
         releasePrecision = "year";
       }
     }
-    return { cover, platform, trailerUrl, description, format, releaseDate, releasePrecision };
+    return { cover, titleNative, platform, trailerUrl, description, format, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -125,6 +127,7 @@ export async function fetchJikan(malId: number): Promise<SourceData | null> {
     if (!data) return null;
 
     const cover = data.images?.jpg?.large_image_url ?? data.images?.jpg?.image_url ?? null;
+    const titleNative: string | null = data.title_japanese ?? null;
 
     const platforms: string[] = [];
     if (Array.isArray(data.streaming)) {
@@ -162,7 +165,7 @@ export async function fetchJikan(malId: number): Promise<SourceData | null> {
         releasePrecision = "year";
       }
     }
-    return { cover, platform, trailerUrl, description, releaseDate, releasePrecision };
+    return { cover, titleNative, platform, trailerUrl, description, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -318,6 +321,7 @@ export async function fetchAnimeSchedule(route: string, apiToken: string): Promi
     const cover = data.imageVersionRoute
       ? "https://img.animeschedule.net/production/assets/public/img/anime/" + data.imageVersionRoute
       : null;
+    const titleNative: string | null = data.names?.native ?? null;
 
     const platforms: string[] = [];
     if (data.websites?.streams && Array.isArray(data.websites.streams)) {
@@ -340,7 +344,7 @@ export async function fetchAnimeSchedule(route: string, apiToken: string): Promi
         releasePrecision = "day";  // premier donne toujours le jour
       }
     }
-    return { cover, platform, trailerUrl: null, description, releaseDate, releasePrecision };
+    return { cover, titleNative, platform, trailerUrl: null, description, releaseDate, releasePrecision };
   } catch (e) {
     return null;
   }
@@ -436,6 +440,9 @@ export function mergeSources(
   // Perimetre de cette source : la date de sortie, et elle seule.
   return {
     cover: primary.find(s => s.cover)?.cover ?? null,
+    // Premiere source qui repond : AniList couvre le plus (387), Jikan (308)
+    // et AnimeSchedule (323) prennent le relais.
+    titleNative: primary.find(s => s.titleNative)?.titleNative ?? null,
     platform: mergedPlatform,
     trailerUrl: primary.find(s => s.trailerUrl)?.trailerUrl ?? null,
     description: primary.find(s => s.description)?.description ?? null,
@@ -466,7 +473,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
   try {
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() - INTERVAL 365 DAY ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR title_native IS NULL OR title_native = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() - INTERVAL 365 DAY ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -531,6 +538,15 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           itemChanges.push({ field: "format", oldValue: item.format, newValue: merged.format });
         }
 
+        // TITRE NATIF (lossless append) : les trois sources l'ont — AniList dans
+        // title.native, Jikan dans title_japanese, AnimeSchedule dans names.native.
+        // merged applique deja l'ordre de repli, on remplit si la colonne est vide.
+        const nativeIsMissing = !(item as any).title_native || (item as any).title_native === "";
+        if (nativeIsMissing && merged.titleNative) {
+          updates.push("title_native = ?");
+          params.push(merged.titleNative);
+          itemChanges.push({ field: "title_native", oldValue: (item as any).title_native, newValue: merged.titleNative });
+        }
         // DATE : objectif = converger vers precision 'day'. Ne JAMAIS regresser.
         // Update si precision MEILLEURE (day>month>year) ou date differente a precision egale.
         // Etat Clean : la SOURCE fait autorite. Adopte sa date des qu'elle differe
@@ -612,7 +628,7 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
   const conn = await pool.getConnection();
   try {
     const rows: IncompleteItem[] = await conn.query(
-      "SELECT id, title, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE id = ? LIMIT 1",
+      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE id = ? LIMIT 1",
       [id]
     );
     if (!rows || rows.length === 0) {
