@@ -233,6 +233,13 @@ const SELECT_GAMES = `
 // Zod validation schemas
 // ============================================================
 
+const slugsQuerySchema = z.object({
+  type: z.enum(["anime", "game", "all"]).default("all"),
+  // Par defaut, seules les fiches avec un vrai synopsis deviennent des
+  // pages : une page sans texte serait du contenu mince pour Google.
+  withDescription: z.coerce.number().int().min(0).max(1).default(1),
+});
+
 const searchQuerySchema = z.object({
   q: z.string().trim().min(1).max(100),
   type: z.enum(["anime", "game", "all"]).default("all"),
@@ -774,6 +781,34 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
     weekCache = { at: Date.now(), data };
     req.log.info({ total, fetched: timetable.length }, "feed/week");
     return data;
+  });
+
+  // Liste id + slug + updatedAt pour le build des pages indexables et le
+  // sitemap. Volontairement minimal : /feed/anime renverrait des megaoctets
+  // de fiches completes la ou le build n'a besoin que de deux champs.
+  app.get("/feed/slugs", async (req: FastifyRequest, reply: FastifyReply) => {
+    const parsed = slugsQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return reply.code(400).send({ error: "invalid_query", details: parsed.error.flatten() });
+    }
+    const { type, withDescription } = parsed.data;
+    const descCond = withDescription
+      ? " AND description IS NOT NULL AND LENGTH(TRIM(description)) > 100"
+      : "";
+    const lister = async (table: "anime_items" | "game_items", t: "anime" | "game") => {
+      const rows: Array<{ id: number; slug: string; updatedAt: string }> = await pool.query(
+        `SELECT CAST(id AS UNSIGNED) AS id, slug, DATE_FORMAT(updated_at, '%Y-%m-%d') AS updatedAt
+         FROM ${table}
+         WHERE slug IS NOT NULL AND slug != ''${descCond}
+         ORDER BY id`
+      );
+      return rows.map((r) => ({ ...r, type: t }));
+    };
+    const items = [
+      ...(type === "anime" || type === "all" ? await lister("anime_items", "anime") : []),
+      ...(type === "game" || type === "all" ? await lister("game_items", "game") : []),
+    ];
+    return reply.send({ total: items.length, items });
   });
 
   app.get("/feed/search", async (req: FastifyRequest, reply: FastifyReply) => {
