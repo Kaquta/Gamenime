@@ -4262,3 +4262,39 @@ body.is-authenticated .fav-heart {
 .alt-titles{margin:5px 0 12px;font-size:.78rem;line-height:1.5;color:rgba(255,226,205,.5)}
 .alt-nat{color:#d9bda3;font-weight:600}
 .alt-sep{opacity:.4;margin:0 6px}
+
+/* ══ Modal mobile : alignement et allègement (session 33) ══
+   La cover reste au-dessus. Ce qui change : l'alignement passe a gauche
+   (le centrage faisait sauter la lecture d'un bloc a l'autre), le titre
+   descend de 1.8 a 1.42rem, et les pastilles perdent de la graisse —
+   4 par rangee au lieu de 2. */
+@media (max-width: 640px){
+  .detail-header{align-items:flex-start;text-align:left;gap:14px;margin-bottom:16px}
+  .detail-info h2{font-size:1.42rem;margin:0 0 6px}
+  .alt-titles{font-size:.76rem;margin:0 0 4px}
+  .detail-dateblock{padding:12px 13px;margin-bottom:14px}
+  .detail-section-label{text-align:left;font-size:.68rem;margin-bottom:7px}
+  .detail-platforms{justify-content:flex-start;gap:6px;margin-bottom:12px}
+  .plat-chip{padding:5px 11px;font-size:.78rem}
+  .detail-genres{justify-content:flex-start;gap:6px;margin-bottom:10px}
+  .genre-tag{padding:4px 11px;font-size:.75rem;font-weight:600}
+  .pegi-tag{padding:4px 11px;font-size:.73rem}
+  .popular-tag,.anticipated-tag{padding:4px 11px;font-size:.7rem}
+  .detail-anime-info{justify-content:flex-start;gap:6px}
+  .info-tag{padding:4px 11px;font-size:.75rem}
+}
+.info-tag{display:inline-flex;align-items:center;gap:6px}
+.info-ic{width:13px;height:13px;flex:none;opacity:.85}
+
+/* ── Pastilles du modal : icônes en trait, même vocabulaire que le menu ── */
+.genre-tag,.pegi-tag,.popular-tag,.anticipated-tag{display:inline-flex;align-items:center;gap:6px}
+.tag-ic{width:12px;height:12px;flex:none;opacity:.7}
+.popular-tag .tag-ic,.anticipated-tag .tag-ic{opacity:.9}
+/* Tres attendu se distingue de Populaire : deux etats differents
+   ne devraient pas porter la meme couleur. */
+.anticipated-tag{
+  background:rgba(90,70,140,.35)!important;
+  border-color:rgba(150,130,255,.4)!important;
+  color:#c9bcff!important;
+  box-shadow:none!important;
+}
