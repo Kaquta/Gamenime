@@ -801,24 +801,38 @@ autoOpenFromHash();
 // SESSION 12.7+: ouvre automatiquement le modal d'un item si l'URL contient #item-{id}
 // Utilisé pour les CTA "Voir la fiche" / "Découvrir" des emails Premium.
 function autoOpenFromHash() {
-  var match = window.location.hash.match(/^#item-(\d+)$/);
+  // Deux formes acceptees : #item-123 (ancienne, sans type) et
+  // #item-anime-123 / #item-game-123 (nouvelle). Les mails deja envoyes
+  // continuent de fonctionner.
+  var match = window.location.hash.match(/^#item-(?:(anime|game)-)?(\d+)$/);
   if (!match) return;
-  var itemId = match[1];
-  var attempts = 0;
-  var tryOpen = function() {
-    attempts++;
-    var card = document.querySelector('.item-card[data-id="' + itemId + '"]');
-    if (card) {
-      (card as HTMLElement).click();
-      // Scroller doucement vers le top après ouverture
+  var typeUrl = match[1];
+  var itemId = match[2];
+  // On appelle directement l'API plutot que de chercher une carte dans le DOM :
+  // la page n'affiche que 200 items, donc un titre plus bas dans le classement
+  // ou masque par un sous-onglet n'avait aucune carte a cliquer — et le lien
+  // "Voir la fiche" des emails tombait dans le vide.
+  var dom = typeUrl === "game" ? "games"
+    : typeUrl === "anime" ? "anime"
+    : (window.location.pathname.indexOf("/games") === 0 ? "games" : "anime");
+  var ouvrir = function() {
+    var fn = (window as any).__openItemModal;
+    if (typeof fn === "function") {
+      fn(dom, itemId);
       window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
+      return true;
     }
-    if (attempts < 20) {
-      setTimeout(tryOpen, 200);
-    }
+    return false;
   };
-  tryOpen();
+  if (ouvrir()) return;
+  // Le script du modal peut ne pas etre encore initialise au chargement.
+  var essais = 0;
+  var attendre = function() {
+    essais++;
+    if (ouvrir()) return;
+    if (essais < 25) setTimeout(attendre, 200);
+  };
+  setTimeout(attendre, 200);
 }
 window.addEventListener("hashchange", autoOpenFromHash);
 
