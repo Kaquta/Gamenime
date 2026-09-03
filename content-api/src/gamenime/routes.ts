@@ -818,11 +818,17 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
     }
 
     const { q, type } = parsed.data;
-    const escapedPattern = `%${escapeLikePattern(q)}%`;
+    // Surnoms : "gta" -> "grand theft auto", "jjk" -> "jujutsu kaisen".
+    // Le dictionnaire existait deja mais n'etait branche que sur le
+    // parametre search= des feeds, pas sur la recherche du site — d'ou
+    // "gta" qui ne renvoyait que "IGTAP", un titre contenant g-t-a.
+    const alias = expandSearchTerm(q);
+    const qEffectif = alias.length > 1 ? alias[1] : q;
+    const escapedPattern = `%${escapeLikePattern(qEffectif)}%`;
     // Recherche par mots : chaque terme doit apparaitre dans au moins un
     // des titres. Sans ca, "one piece film" echouait des que le titre reel
     // intercalait autre chose entre les mots.
-    const mots = q.split(/\s+/).filter((m) => m.length >= 2).slice(0, 6);
+    const mots = qEffectif.split(/\s+/).filter((m) => m.length >= 2).slice(0, 6);
     const motsPattern = mots.map((m) => `%${escapeLikePattern(m)}%`);
     const now = new Date();
 
