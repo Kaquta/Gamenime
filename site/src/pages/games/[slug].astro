@@ -1,0 +1,190 @@
+---
+/**
+ * Page indexable d'un jeu : /games/{slug}
+ *
+ * Les fiches ne vivaient que dans un modal, sans URL : Google n'avait rien a
+ * indexer — quatre pages pour un catalogue de plus de mille titres. Chaque
+ * fiche a desormais son adresse, avec son HTML complet des le premier octet.
+ *
+ * Le rendu reutilise fiche.ts, le meme module que le modal : pas de second
+ * gabarit a maintenir, donc pas de divergence possible.
+ */
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import HeroHeader from "../../components/HeroHeader.astro";
+import Footer from "../../components/Footer.astro";
+import { displayTitle } from "../../lib/api";
+import { detailDateBlock, detailPlatforms, dateLabel, formatPegi, getHypeLabel, ytId } from "../../lib/fiche";
+
+export async function getStaticPaths() {
+  // Declaree ici : Astro appelle getStaticPaths avant d'evaluer le reste
+  // du frontmatter, donc une constante de module ne serait pas encore definie.
+  const API = "https://gamenime.fr/api";
+  const res = await fetch(`${API}/feed/slugs?type=game`);
+  if (!res.ok) throw new Error(`/feed/slugs a repondu ${res.status}`);
+  const { items } = await res.json();
+  return await Promise.all(
+    items.map(async (it) => {
+      const r = await fetch(`${API}/games/items/${it.id}`);
+      if (!r.ok) throw new Error(`item ${it.id} : HTTP ${r.status}`);
+      return { params: { slug: it.slug }, props: { item: await r.json() } };
+    })
+  );
+}
+
+const { item } = Astro.props;
+const titre = displayTitle(item);
+const url = `https://gamenime.fr/games/${Astro.params.slug}`;
+const titreOnglet = `${titre} — date de sortie, plateformes | GameNime`;
+
+const synopsis = String(item.description || "").replace(/\[[A-Z]+:[^\]]*\]/g, "").replace(/<[^>]+>/g, "").trim();
+const meta = synopsis ? `${dateLabel(item)}. ${synopsis.slice(0, 150)}…` : `${titre} — date de sortie et plateformes.`;
+const alt = [item.titleNative, item.title].filter((t, i, a) => t && t !== titre && a.indexOf(t) === i);
+const genres = String(item.genre || "").split(",").map((g) => g.trim()).filter(Boolean);
+const pegi = formatPegi(item.rating);
+const hype = getHypeLabel(item);
+const videoId = item.trailerUrl ? ytId(item.trailerUrl) : null;
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "VideoGame",
+  name: titre,
+  alternateName: alt,
+  url,
+  ...(item.cover ? { image: item.cover } : {}),
+  ...(synopsis ? { description: synopsis.slice(0, 500) } : {}),
+  ...(item.releaseDate ? { startDate: item.releaseDate } : {}),
+  ...(genres.length ? { genre: genres } : {}),
+  
+};
+---
+
+<BaseLayout
+  title={titreOnglet}
+  description={meta}
+  canonical={url}
+  image={item.cover || "https://gamenime.fr/og-image.jpg?v=2"}
+  ogType="video.other"
+>
+  <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} is:inline />
+
+  <HeroHeader activeTab="games" />
+
+  <div class="container">
+    <nav class="fiche-fil" aria-label="Fil d'Ariane">
+      <a href="/">Accueil</a><span>›</span><a href="/games">Jeux</a><span>›</span>{titre}
+    </nav>
+
+    <article class="fiche-sheet">
+      <div class="detail-header">
+        <div class="detail-cover">
+          {item.cover && <img src={item.cover} alt={titre} width="160" height="213" />}
+        </div>
+        <div class="detail-info">
+          <h1>{titre}</h1>
+          {alt.length > 0 && (
+            <div class="alt-titles">
+              {alt.map((t, i) => (
+                <>
+                  {i > 0 && <span class="alt-sep">·</span>}
+                  <span class={i === 0 && item.titleNative ? "alt-nat" : ""}>{t}</span>
+                </>
+              ))}
+            </div>
+          )}
+          <Fragment set:html={detailDateBlock(item)} />
+          <div class="detail-section-label">Où y jouer</div>
+          <Fragment set:html={detailPlatforms(item)} />
+          <div class="detail-genres">
+            {genres.map((g) => <span class="genre-tag">{g}</span>)}
+            {pegi && <span class="pegi-tag">{pegi}</span>}
+            {hype === "Populaire" && <span class="popular-tag">Populaire</span>}
+            {hype === "Très attendu" && <span class="anticipated-tag">Très attendu</span>}
+          </div>
+        </div>
+      </div>
+
+      {videoId && (
+        <a class="fiche-trailer" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer">
+          <img src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`} alt={`Bande-annonce de ${titre}`} loading="lazy" width="480" height="270" />
+          <span class="fiche-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
+          <span class="fiche-trailer-lab">Voir la bande-annonce</span>
+        </a>
+      )}
+
+      {synopsis && (
+        <div class="detail-description">
+          <h2>Description</h2>
+          <p>{synopsis}</p>
+        </div>
+      )}
+
+      <p class="fiche-retour">
+        <a href="/games">← Tous les jeux</a> · <a href="/upcoming">Prochaines sorties</a>
+      </p>
+    </article>
+  </div>
+
+  <Footer />
+</BaseLayout>
+
+<style>
+  .fiche-fil {
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 0 14px; font-size: .76rem;
+    color: rgba(226,197,170,.5); flex-wrap: wrap;
+  }
+  .fiche-fil a { color: #ffb066; text-decoration: none; }
+  .fiche-fil a:hover { text-decoration: underline; }
+  .fiche-fil span { opacity: .5; }
+
+  .fiche-sheet {
+    padding: 20px; border-radius: 20px;
+    background: linear-gradient(180deg, rgba(52,22,14,.62), rgba(26,11,7,.58));
+    border: 1px solid rgba(255,165,98,.22);
+    margin-bottom: 28px;
+  }
+  .fiche-sheet .detail-info h1 {
+    margin: 0 0 8px; font-size: 1.8rem;
+    color: #F0F1F4; line-height: 1.2;
+  }
+  .fiche-sheet .detail-cover img {
+    width: 100%; height: auto; display: block; border-radius: 14px;
+  }
+
+  /* Vignette plutot qu'iframe : YouTube chargerait plusieurs centaines de
+     kilo-octets a l'ouverture, et Google mesure la vitesse des pages. */
+  .fiche-trailer {
+    position: relative; display: block; max-width: 480px;
+    margin: 20px 0; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(255,165,98,.11);
+  }
+  .fiche-trailer img { width: 100%; height: auto; display: block; }
+  .fiche-play {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 58px; height: 58px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: linear-gradient(180deg, rgba(255,132,41,.95), rgba(205,74,20,.92));
+    box-shadow: 0 6px 22px -4px rgba(255,140,58,.7);
+    transition: transform 180ms ease;
+  }
+  .fiche-trailer:hover .fiche-play { transform: translate(-50%,-50%) scale(1.08); }
+  .fiche-play svg { width: 24px; height: 24px; fill: #2a1105; margin-left: 3px; }
+  .fiche-trailer-lab {
+    position: absolute; bottom: 11px; left: 13px;
+    font-size: .72rem; font-weight: 700; color: #f2dcc6;
+    background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 7px;
+  }
+
+  .fiche-sheet .detail-description h2 {
+    font-size: 1.05rem; font-weight: 800;
+    color: #F0F1F4; margin: 20px 0 10px;
+  }
+  .fiche-retour {
+    margin: 24px 0 0; padding-top: 16px;
+    border-top: 1px solid rgba(255,165,98,.11);
+    font-size: .84rem;
+  }
+  .fiche-retour a { color: #ffb066; text-decoration: none; }
+  .fiche-retour a:hover { text-decoration: underline; }
+</style>
