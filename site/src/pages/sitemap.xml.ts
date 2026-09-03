@@ -23,7 +23,9 @@ export const GET: APIRoute = async () => {
   ];
 
   const fiches = items.map((it: { slug: string; type: string; updatedAt: string }) => ({
-    loc: `${SITE}/${it.type === "game" ? "games" : "anime"}/${it.slug}`,
+    // Barre oblique finale : nginx sert le dossier avec, et redirige sinon.
+    // Sans elle, Google suivrait une redirection sur chacune des 927 pages.
+    loc: `${SITE}/${it.type === "game" ? "games" : "anime"}/${it.slug}/`,
     freq: "weekly",
     prio: "0.7",
     lastmod: it.updatedAt,
