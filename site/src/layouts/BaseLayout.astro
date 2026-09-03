@@ -6,10 +6,20 @@ import "../styles/auth-user-menu.css";
 interface Props {
   title?: string;
   description?: string;
+  /** URL canonique de la page. Sans elle, toutes les pages declaraient
+   *  l'accueil comme canonique — Google aurait ignore les fiches. */
+  canonical?: string;
+  /** Image de partage : la jaquette sur une fiche, le visuel du site ailleurs. */
+  image?: string;
+  /** "video.tv_show" ou "video.other" sur une fiche, "website" ailleurs. */
+  ogType?: string;
 }
 const {
   title = "GameNime",
   description = "Nouveautés animés et jeux vidéo : trailers, plateformes, dates.",
+  canonical = "https://gamenime.fr",
+  image = "https://gamenime.fr/og-image.jpg?v=2",
+  ogType = "website",
 } = Astro.props;
 ---
 <!doctype html>
@@ -19,18 +29,18 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://gamenime.fr/og-image.jpg?v=2" />
-    <meta property="og:url" content="https://gamenime.fr" />
+    <meta property="og:image" content={image} />
+    <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content="GameNime" />
     <meta property="og:locale" content="fr_FR" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
-    <meta name="twitter:image" content="https://gamenime.fr/og-image.jpg?v=2" />
-    <link rel="canonical" href="https://gamenime.fr" />
+    <meta name="twitter:image" content={image} />
+    <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
