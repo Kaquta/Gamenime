@@ -245,6 +245,110 @@ async function notifierRoutes(scanned: number, matched: number, erreur: string |
   }
 }
 
+/**
+ * Planchers de popularite par franchise.
+ *
+ * IGDB compte les clics "je l'attends" sur son site : un public de passionnes
+ * ou personne ne declare attendre FIFA. EA Sports FC 27 y pesait 2, derriere
+ * 255 autres jeux a venir, quand c'est le premier vendeur europeen chaque
+ * annee. Ces planchers corrigent une cecite mesurable de la source, ils
+ * n'arbitrent pas les gouts.
+ *
+ * popularity_source garde toujours la valeur brute d'IGDB : le cycle compare
+ * cette colonne au plancher, jamais son propre resultat. Sans elle, un
+ * plancher applique une fois deviendrait indistinguable d'une vraie remontee
+ * IGDB, et on ecraserait la donnee reelle au passage suivant.
+ *
+ * Idempotent (n'ecrit que si la valeur change) et reversible : desactiver un
+ * plancher et relancer restaure la popularite d'origine.
+ */
+export async function applyFranchiseFloorsCycle(app: any): Promise<{
+  scanned: number;
+  raised: number;
+  restored: number;
+}> {
+  const pool = (app as any).pool;
+  if (!pool) {
+    app.log.warn("Franchise floors: pool absent");
+    return { scanned: 0, raised: 0, restored: 0 };
+  }
+  const debut = Date.now();
+  const conn = await pool.getConnection();
+  let scanned = 0, raised = 0, restored = 0;
+  try {
+    // Filet de securite : sans popularity_source, la valeur brute serait
+    // perdue des la premiere application.
+    await conn.query(
+      "UPDATE game_items SET popularity_source = popularity WHERE popularity_source IS NULL"
+    );
+
+    const floors: Array<{ pattern: string; floor_value: number }> = await conn.query(
+      "SELECT pattern, floor_value FROM franchise_floors WHERE active = 1"
+    );
+
+    // Tous les jeux, pas seulement ceux qui correspondent : un plancher
+    // desactive doit faire redescendre la popularite a sa valeur d'origine.
+    const jeux: Array<{ id: number; title: string; popularity: number; popularity_source: number }> =
+      await conn.query(
+        "SELECT id, title, popularity, popularity_source FROM game_items WHERE title IS NOT NULL"
+      );
+    scanned = jeux.length;
+
+    // LIKE de SQL traduit en JS : % en debut ou fin, insensible a la casse
+    // et aux accents (Pokemon doit correspondre a Pokémon, comme la collation).
+    const correspond = (titre: string, motif: string): boolean => {
+      const norm = (v: string) =>
+        v.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const t = norm(titre);
+      const m = norm(motif);
+      if (m.startsWith("%") && m.endsWith("%")) return t.includes(m.slice(1, -1));
+      if (m.endsWith("%")) return t.startsWith(m.slice(0, -1));
+      if (m.startsWith("%")) return t.endsWith(m.slice(1));
+      return t === m;
+    };
+
+    for (const j of jeux) {
+      const source = Number(j.popularity_source ?? 0);
+      let cible = source;
+      for (const f of floors) {
+        if (correspond(j.title, f.pattern) && Number(f.floor_value) > cible) {
+          cible = Number(f.floor_value);
+        }
+      }
+      const actuelle = Number(j.popularity ?? 0);
+      if (cible === actuelle) continue;   // idempotence
+
+      await conn.query("UPDATE game_items SET popularity = ? WHERE id = ?", [cible, j.id]);
+      if (cible > source) {
+        raised++;
+        app.log.info({ id: j.id, title: j.title, source, plancher: cible }, "plancher applique");
+      } else {
+        restored++;
+        app.log.info({ id: j.id, title: j.title, source }, "popularite restauree");
+      }
+    }
+
+    app.log.info({ scanned, raised, restored }, "Franchise floors: termine");
+    trackLastRun("franchise-floors", { scanned, raised, restored }, Date.now() - debut);
+    if (raised > 0 || restored > 0) {
+      pushActivity({
+        type: "popularity",
+        message: `${raised} plancher${raised > 1 ? "s" : ""} appliqué${raised > 1 ? "s" : ""}` +
+          (restored > 0 ? `, ${restored} restauré${restored > 1 ? "s" : ""}` : ""),
+        detail: `${scanned} jeu${scanned > 1 ? "x" : ""} scanné${scanned > 1 ? "s" : ""}`,
+        level: "info",
+      });
+    }
+    return { scanned, raised, restored };
+  } catch (e: any) {
+    app.log.error({ err: e?.message }, "Franchise floors: erreur");
+    trackLastRun("franchise-floors", { scanned, raised, restored, error: e?.message }, Date.now() - debut);
+    return { scanned, raised, restored };
+  } finally {
+    conn.release();
+  }
+}
+
 export async function matchAnimeRoutesCycle(app: FastifyInstance): Promise<{
   scanned: number;
   matched: number;
@@ -611,6 +715,16 @@ export function startRefetchCron(app: FastifyInstance): NodeJS.Timeout {
   }, 12 * 60 * 1000);
   setInterval(() => {
     matchAnimeRoutesCycle(app).catch(e => app.log.error({ err: e?.message }, "Match routes cycle error"));
+  }, ROUTES_INTERVAL_MS);
+
+  // Planchers de franchise : un nouveau Call of Duty entre avec la popularite
+  // qu'IGDB lui donne (20 pour le dernier) et resterait invisible jusqu'a un
+  // appel manuel. Decale de 18 min pour ne pas concourir avec les autres cycles.
+  setTimeout(() => {
+    applyFranchiseFloorsCycle(app).catch(e => app.log.error({ err: e?.message }, "Franchise floors error"));
+  }, 18 * 60 * 1000);
+  setInterval(() => {
+    applyFranchiseFloorsCycle(app).catch(e => app.log.error({ err: e?.message }, "Franchise floors error"));
   }, ROUTES_INTERVAL_MS);
 
   return setInterval(() => {

@@ -10,7 +10,7 @@ import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, se
 import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
 import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
-import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan , matchAnimeRoutesCycle } from "./gamenime/refetch-cron.js";
+import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan , matchAnimeRoutesCycle, applyFranchiseFloorsCycle } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug, matchOrphanGamesCycle } from "./gamenime/refetch-games-cron.js";
 import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
@@ -1850,6 +1850,15 @@ app.post("/admin/generate-slugs", async (req, reply) => {
     app.log.error({ err: (e as Error)?.message }, "generate-slugs echec");
     return reply.code(500).send({ ok: false, msg: "generation interrompue", bilan });
   }
+});
+
+app.post("/admin/apply-franchise-floors", async (req, reply) => {
+  const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
+  const provided = req.headers["x-api-key"];
+  const auth = requireApiKey(expected, provided);
+  if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
+  const result = await applyFranchiseFloorsCycle(app);
+  return reply.send({ ok: true, ...result });
 });
 
 app.post("/admin/match-orphan-games", async (req, reply) => {
