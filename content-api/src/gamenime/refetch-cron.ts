@@ -577,7 +577,7 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
   try {
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(description)) < 10 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR title_native IS NULL OR title_native = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() - INTERVAL 365 DAY ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) < 150 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR title_native IS NULL OR title_native = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() - INTERVAL 365 DAY ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -628,7 +628,15 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           itemChanges.push({ field: "trailer_url", oldValue: item.trailer_url, newValue: merged.trailerUrl });
         }
         // SESSION 12.7+: description (lossless append - on remplit si vide ou trop courte)
-        const descIsMissing = !item.description || item.description === "" || (typeof item.description === "string" && item.description.trim().length < 10);
+        // Longueur du VRAI texte : les balises [FORMAT:] [STATUS:] [SEASON:] posees
+    // par n8n gonflaient la mesure — Youjo Senki II affichait 92 caracteres pour
+    // 34 de synopsis reel. Seuil a 200 : au-dela ce sont de vrais synopsis (235
+    // animes en ont plus de 300), en deca des phrases generiques de suite ("The
+    // second season of Sousou no Frieren.", 39 car.) qu'AniList sait remplacer
+    // par 880 caracteres. L'ancien seuil de 10 ne les reprenait jamais, et elles
+    // restaient hors du sitemap.
+    const descTexte = String(item.description ?? "").replace(/\[[A-Z]+:[^\]]*\]/g, "").trim();
+    const descIsMissing = descTexte.length < 150;
         if (descIsMissing && merged.description) {
           updates.push("description = ?");
           params.push(merged.description);
@@ -776,7 +784,15 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
     if ((!item.trailer_url || item.trailer_url === "") && merged.trailerUrl) {
       updates.push("trailer_url = ?"); params.push(merged.trailerUrl); fields.push("trailer");
     }
-    const descIsMissing = !item.description || item.description === "" || (typeof item.description === "string" && item.description.trim().length < 10);
+    // Longueur du VRAI texte : les balises [FORMAT:] [STATUS:] [SEASON:] posees
+    // par n8n gonflaient la mesure — Youjo Senki II affichait 92 caracteres pour
+    // 34 de synopsis reel. Seuil a 200 : au-dela ce sont de vrais synopsis (235
+    // animes en ont plus de 300), en deca des phrases generiques de suite ("The
+    // second season of Sousou no Frieren.", 39 car.) qu'AniList sait remplacer
+    // par 880 caracteres. L'ancien seuil de 10 ne les reprenait jamais, et elles
+    // restaient hors du sitemap.
+    const descTexte = String(item.description ?? "").replace(/\[[A-Z]+:[^\]]*\]/g, "").trim();
+    const descIsMissing = descTexte.length < 150;
     if (descIsMissing && merged.description) {
       updates.push("description = ?"); params.push(merged.description); fields.push("description");
     }

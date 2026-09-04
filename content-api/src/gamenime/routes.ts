@@ -792,8 +792,12 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
       return reply.code(400).send({ error: "invalid_query", details: parsed.error.flatten() });
     }
     const { type, withDescription } = parsed.data;
+    // Longueur du VRAI texte : les balises [FORMAT:] [STATUS:] [SEASON:] posees
+    // par n8n gonflaient la mesure, si bien qu'une fiche generique de 43
+    // caracteres passait le seuil quand un vrai synopsis pouvait echouer.
     const descCond = withDescription
-      ? " AND description IS NOT NULL AND LENGTH(TRIM(description)) > 100"
+      ? " AND description IS NOT NULL" +
+        " AND LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) >= 150"
       : "";
     const lister = async (table: "anime_items" | "game_items", t: "anime" | "game") => {
       const rows: Array<{ id: number; slug: string; updatedAt: string }> = await pool.query(
