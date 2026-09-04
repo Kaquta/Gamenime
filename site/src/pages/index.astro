@@ -32,6 +32,10 @@ import Footer from "../components/Footer.astro";
 
 <script>
 import { getAnimeItems, getGameItems, displayTitle } from "../lib/api";
+// Meme rendu que le catalogue : renderSearchCard avait son propre corps de
+// carte, plus pauvre (deux paragraphes au lieu du bloc date, des pastilles
+// de plateformes et du badge). Un seul gabarit evite qu'ils redivergent.
+import { dateBox, platChips, hypePill } from "../lib/fiche";
 import type { ContentItem } from "../lib/api";
 
 function formatDate(v) {
@@ -143,12 +147,8 @@ function renderSearchCard(item, domain) {
     "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
     "<div class=\"item-body\">" +
     "<h3>" + displayTitle(item) + "</h3>" +
-    "<p>" + (item.releasePrecision === "year" && item.releaseDate ? "Prévu " + String(item.releaseDate).slice(0,4) : formatDate(item.releaseDate)) + "</p>" +
-    "<p>" + info + "</p>" +
-    "<div class=\"item-badges-row\">" +
-    "<span class=\"item-badge\">" + status + "</span>" +
-    hypeBadge +
-    "</div></div></article>";
+    dateBox(item) + platChips(item, domain) + hypePill(item, domain) +
+    "</div></article>";
 }
 
 var input = document.getElementById("homeSearch");
