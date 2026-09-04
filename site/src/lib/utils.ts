@@ -46,6 +46,8 @@ export function getStatusLabel(item: ContentItem): string {
 
   if (diffDays === 0) return "Aujourd'hui";
   if (diffDays > 0) return "À venir";
-  if (item.isRecentlyReleased) return "Récent";
+  // Calcule depuis la date : is_recently_released n'est ecrit qu'a
+  // l'ingestion et jamais recalcule.
+  if (diffDays >= -30) return "Récent";
   return "Sorti";
 }

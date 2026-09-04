@@ -145,7 +145,11 @@ export function getStatusLabel(item) {
   var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
   if (diff === 0) return "Aujourd'hui";
   if (diff > 0) return "À venir";
-  if (item.isRecentlyReleased) return "Récent";
+  // Calcule depuis la date plutot que lu en base : is_recently_released
+  // n'etait ecrit qu'a l'ingestion et jamais recalcule, donc un item entre
+  // comme "a venir" restait a 0 apres sa sortie (Sekiro, sorti le jour meme,
+  // affichait "Sorti" au lieu de "Recent").
+  if (diff >= -30) return "Récent";
   return "Sorti";
 }
 // Libelle de repli quand un ANIME n'a pas encore de plateforme renseignee.
