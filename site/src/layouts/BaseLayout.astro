@@ -104,5 +104,37 @@ const gn = accueil ? "fond encre verre bleu vitre cameleon" : catalogue ? "fond 
         setInterval(function () { track(true); }, 30000);
       })();
     </script>
+    <!-- REFLET-DEBUT : bloc ajoute par bandeau-reflet.sh (maquette « A · Reflet leger » validee le 8 octobre 2026) -->
+    <script is:inline>
+      /* Sur ordinateur, l'image du coin en haut a droite (Accueil, Anime, Jeux, A venir) se prolonge a gauche
+         en miroir : copie retournee de ses calques, juste a sa gauche. L'habillage est dans global.css (bloc
+         REFLET). Le coin est cree par le script de la page : tout de suite (Anime, Jeux, A venir) ou juste
+         apres la lecture de la page (accueil) ; sans coin, rien. */
+      (function () {
+        function reflet() {
+          var box = document.querySelector(".gc-box");
+          if (!box || box.parentNode.querySelector(".gc-reflet")) return;
+          var r = document.createElement("div");
+          r.className = "gc-reflet";
+          r.innerHTML = "<i></i><i></i>";
+          box.parentNode.insertBefore(r, box);
+          var de = box.querySelectorAll("i"), vers = r.querySelectorAll("i");
+          function copie() {
+            r.style.width = box.style.width; r.style.height = box.style.height; r.style.right = box.style.width;
+            for (var k = 0; k < de.length && k < vers.length; k++) {
+              vers[k].style.backgroundImage = de[k].style.backgroundImage;
+              vers[k].style.backgroundSize = de[k].style.backgroundSize;
+              vers[k].style.backgroundPosition = de[k].style.backgroundPosition;
+              vers[k].className = de[k].className;
+            }
+          }
+          new MutationObserver(copie).observe(box, { subtree: true, attributes: true, attributeFilter: ["style", "class"] });
+          copie();
+        }
+        if (document.querySelector(".gc-box")) reflet();
+        else document.addEventListener("DOMContentLoaded", reflet);
+      })();
+    </script>
+    <!-- REFLET-FIN -->
   </body>
 </html>

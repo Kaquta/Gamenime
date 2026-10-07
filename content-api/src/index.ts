@@ -20,6 +20,7 @@ import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setS
 
 import { registerAdminRuns } from "./gamenime/admin-runs.js";
 import { registerPublication } from "./gamenime/publication.js";
+import { startSynopsisCron } from "./gamenime/synopsis.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -2916,4 +2917,7 @@ startLookupCron(app);
 
 // Quality check J-7 : démarre cron quotidien 8h UTC
 startQualityCron(app);
+
+// Synopsis FR rédigés par Ollama (migration 014)
+startSynopsisCron({ pool, log: app.log });
 

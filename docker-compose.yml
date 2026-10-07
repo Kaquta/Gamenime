@@ -39,6 +39,9 @@ services:
       DISCORD_WEBHOOK_WORKFLOWS: ${DISCORD_WEBHOOK_WORKFLOWS}
       DISCORD_WEBHOOK_ERRORS: ${DISCORD_WEBHOOK_ERRORS}
       PORT: 3000
+      SYNOPSIS_ENABLED: "1"
+      SYNOPSIS_WINDOW: "0-24"
+      SYNOPSIS_MAX_PER_RUN: "10"
     volumes:
       # Le rapport et le journal du build, en lecture seule : l'API les affiche,
       # elle ne les ecrit jamais.
@@ -130,6 +133,23 @@ services:
     # nginx continue de servir l'ancien certificat en memoire.
     entrypoint: sh -c "trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew --deploy-hook 'touch /var/www/certbot/.renewed'; done"
     networks: [public]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_LOADED_MODELS: "1"
+    volumes:
+      - ./ollama:/root/.ollama
+    # pas de port publié : seul content-api l'appelle (http://ollama:11434)
+    cpus: 4
+    mem_limit: 8g
+    # si la RAM sature, le noyau arrête Ollama avant MariaDB
+    oom_score_adj: 1000
+    # public : pour télécharger le modèle ; internal : pour content-api
+    networks: [internal, public]
 networks:
   public:
   internal:

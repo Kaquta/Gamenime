@@ -6581,3 +6581,24 @@ html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-page { padding: 26px 12px 
 html[data-gn~="connexion"] :is(body,#_):not(#_) .hero-topbar { display: none; }
 }
 /* PAGES-FIN */
+/* REFLET-DEBUT — bloc ajoute par bandeau-reflet.sh (maquette « A · Reflet leger » validee le 8 octobre 2026) :
+   sur ordinateur, l'image du coin en haut a droite se prolonge a gauche en miroir, transparente (38 %),
+   sur l'accueil, Anime, Jeux et A venir ; le titre et les onglets prennent l'ombre deja en place au telephone
+   (pas sur Mes preferences, Connexion, Inscription : pages « braise », sans image).
+   Le reflet (.gc-reflet) est cree par le script REFLET de layouts/BaseLayout.astro. A remplacer en entier, pas a la main */
+.gc-reflet { display: none; }
+@media not all and (max-width: 1060px) {
+html[data-gn~="bleu"] .gc-reflet {
+  display: block; position: absolute; top: 0; transform: scaleX(-1); opacity: .38;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 38%, #000 72%, transparent 100%), linear-gradient(to bottom, #000 52%, transparent 100%); -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, #000 38%, #000 72%, transparent 100%), linear-gradient(to bottom, #000 52%, transparent 100%); mask-composite: intersect;
+}
+html[data-gn~="bleu"] .gc-reflet i { position: absolute; inset: 0; background-repeat: no-repeat; opacity: 0; transition: opacity 900ms ease; }
+html[data-gn~="bleu"] .gc-reflet i.on { opacity: 1; }
+html[data-gn~="cameleon"] .gc-reflet i { filter: var(--t-coin-filtre); }
+html[data-gn~="cameleon"] .gc-reflet::after { content: ""; position: absolute; inset: 0; background: rgba(var(--ep-rgb), .35); }
+html[data-gn~="cameleon"]:not([data-gn~="braise"]) :is(body,#_):not(#_) :is(.brand-subtitle, .tab:not(.active)) { text-shadow: 0 1px 3px rgba(var(--t-ombre-rgb), .9), 0 2px 16px rgba(var(--t-ombre-rgb), .8); }
+html[data-gn~="cameleon"]:not([data-gn~="braise"]) :is(body,#_):not(#_) .hero-header .brand-text { filter: drop-shadow(0 1px 2px rgba(var(--t-ombre-rgb), .9)) drop-shadow(0 2px 10px rgba(var(--t-ombre-rgb), .7)); }
+html[data-gn~="cameleon"]:not([data-gn~="braise"]) :is(body,#_):not(#_) .brand-mark::after { text-shadow: 0 1px 3px rgba(var(--t-ombre-rgb), .9), 0 2px 16px rgba(var(--t-ombre-rgb), .8); }
+}
+/* REFLET-FIN */
