@@ -1,0 +1,240 @@
+---
+/**
+ * IndexParMois — index crawlable des fiches, groupe par mois de sortie.
+ *
+ * Pourquoi ce composant existe : les cartes du catalogue sont injectees en
+ * JavaScript apres chargement, donc le HTML livre ne contenait AUCUN lien vers
+ * les 1044 fiches. Elles n'etaient connues de Google que par le sitemap, ce
+ * qui les laissait en « detectee, actuellement non indexee ».
+ *
+ * La frontmatter d'un composant Astro est evaluee au BUILD : les liens
+ * ci-dessous sont de vrais <a href> presents dans le HTML servi, que Googlebot
+ * suit sans executer une ligne de script.
+ */
+import { displayTitle } from "../lib/api";
+
+interface Props {
+  domain: "anime" | "games";
+}
+const { domain } = Astro.props;
+
+// Ecrit ici et non importe : piege rencontre sur [slug].astro, ou une constante
+// de module n'etait pas encore evaluee.
+const API = "https://gamenime.fr/api";
+const typeParam = domain === "anime" ? "anime" : "game";
+
+interface Fiche {
+  id: number;
+  slug: string;
+  title: string;
+  titleEnglish: string | null;
+  releaseDate: string | null;
+  releasePrecision: string | null;
+}
+
+let fiches: Fiche[] = [];
+try {
+  const r = await fetch(`${API}/feed/slugs?type=${typeParam}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const data = await r.json();
+  fiches = Array.isArray(data.items) ? data.items : [];
+} catch (e) {
+  // Echec volontaire du build : une page sans ces liens est le bug qu'on corrige.
+  throw new Error(`IndexParMois (${domain}) : /feed/slugs illisible — ${e}`);
+}
+if (fiches.length === 0) {
+  throw new Error(`IndexParMois (${domain}) : 0 fiche renvoyee, build interrompu`);
+}
+
+const MOIS = [
+  "janvier", "février", "mars", "avril", "mai", "juin",
+  "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+];
+
+interface Lien { slug: string; texte: string; jour: string; }
+interface Groupe { cle: string; annee: string; libelle: string; items: Lien[]; }
+
+const parGroupe = new Map<string, Groupe>();
+
+for (const f of fiches) {
+  const rd = f.releaseDate;
+  let cle: string, annee: string, libelle: string, jour: string;
+
+  if (!rd) {
+    // Aucune fiche dans ce cas aujourd'hui, mais un item peut arriver sans
+    // date : mieux vaut un groupe dedie qu'une fiche orpheline.
+    cle = "9999-99"; annee = "—"; libelle = "Date non annoncée"; jour = "—";
+  } else if (f.releasePrecision === "year") {
+    // 77 fiches n'ont qu'un millesime, stocke en 01-01. L'afficher au 1er
+    // janvier serait une date inventee.
+    annee = rd.slice(0, 4);
+    cle = `${annee}-99`;
+    libelle = `Courant ${annee}`;
+    jour = "—";
+  } else {
+    annee = rd.slice(0, 4);
+    const m = Number(rd.slice(5, 7));
+    cle = `${annee}-${rd.slice(5, 7)}`;
+    libelle = `${MOIS[m - 1][0].toUpperCase()}${MOIS[m - 1].slice(1)} ${annee}`;
+    jour = f.releasePrecision === "month" ? "—" : rd.slice(8, 10);
+  }
+
+  let g = parGroupe.get(cle);
+  if (!g) { g = { cle, annee, libelle, items: [] }; parGroupe.set(cle, g); }
+  g.items.push({ slug: f.slug, texte: displayTitle(f), jour });
+}
+
+const groupes = [...parGroupe.values()].sort((a, b) => a.cle.localeCompare(b.cle));
+// Tri du jour en numerique explicite : « — » vaut 0 et passe en tete. Un
+// localeCompare sur le tiret cadratin dependrait de la collation.
+const ordreJour = (j: string) => (j === "—" ? 0 : Number(j));
+for (const g of groupes) {
+  g.items.sort((a, b) => ordreJour(a.jour) - ordreJour(b.jour) || a.texte.localeCompare(b.texte, "fr"));
+}
+
+// Mois courant deplie par defaut, calcule au build : si la prod reste figee des
+// semaines, c'est un mois passe qui s'ouvre — purement cosmetique.
+const maintenant = new Date();
+const cleCourante = `${maintenant.getFullYear()}-${String(maintenant.getMonth() + 1).padStart(2, "0")}`;
+const ouvreParDefaut = groupes.some((g) => g.cle === cleCourante) ? cleCourante : groupes[0].cle;
+
+let anneePrec = "";
+const lignes = groupes.map((g) => {
+  const nouvelleAnnee = g.annee !== anneePrec;
+  anneePrec = g.annee;
+  return { ...g, nouvelleAnnee, ouvert: g.cle === ouvreParDefaut };
+});
+
+const motDomaine = domain === "anime" ? "anime" : "jeux";
+const autreDomaine = domain === "anime" ? "games" : "anime";
+const autreMot = domain === "anime" ? "jeux" : "anime";
+const premiere = groupes[0].libelle;
+const derniere = groupes[groupes.length - 1].libelle;
+---
+
+<section class="idx">
+  <header class="idx__head">
+    <span class="idx__kicker">Index complet</span>
+    <h2 class="idx__title">Toutes les sorties {motDomaine}, mois par mois</h2>
+    <p class="idx__sub">{fiches.length} fiches · {premiere} → {derniere}</p>
+  </header>
+
+  {lignes.map((g) => (
+    <>
+      {g.nouvelleAnnee && <div class="idx__year">{g.annee}</div>}
+      <details class="mo" open={g.ouvert}>
+        <summary class="mo__sum">
+          <span class="mo__name">{g.libelle}</span>
+          <span class="mo__count">{g.items.length}</span>
+          <svg class="mo__chev" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 15l6-6 6 6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </summary>
+        <ul class="mo__list">
+          {g.items.map((it) => (
+            <li>
+              <a href={`/${domain}/${it.slug}/`}>
+                <span class="mo__day">{it.jour}</span>
+                <span class="mo__t">{it.texte}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </>
+  ))}
+
+  <p class="idx__foot">
+    <a href={`/${domain}/`}>← Retour au catalogue {motDomaine}</a>
+    <span class="idx__sep">·</span>
+    <a href={`/${autreDomaine}/sorties/`}>Toutes les sorties {autreMot}</a>
+  </p>
+</section>
+
+<style>
+  .idx { max-width: 1180px; margin: 0 auto; padding: 30px 18px 70px; }
+
+  .idx__head { margin: 0 0 4px; }
+  .idx__kicker {
+    display: inline-block; font-size: 0.72rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 0 0 9px;
+  }
+  .idx__title { margin: 0 0 7px; font-size: 1.62rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+  .idx__sub { margin: 0; color: var(--muted); font-size: 0.9rem; }
+  .idx__head::after {
+    content: ""; display: block; height: 1px; margin-top: 20px;
+    background: linear-gradient(to right, var(--line), rgba(255, 170, 100, 0.06) 60%, transparent);
+  }
+
+  .idx__year {
+    display: flex; align-items: center; gap: 14px;
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted); margin: 28px 0 12px;
+  }
+  .idx__year::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .mo {
+    border: 1px solid var(--line); border-radius: 14px;
+    background: var(--panel); backdrop-filter: blur(8px);
+    margin-bottom: 10px; overflow: hidden;
+  }
+  .mo[open] {
+    background: var(--panel-strong); border-color: rgba(255, 170, 100, 0.42);
+    box-shadow: 0 0 0 1px rgba(255, 130, 40, 0.06), 0 10px 30px -18px var(--glow);
+  }
+  .mo__sum {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; cursor: pointer; list-style: none; user-select: none;
+  }
+  .mo__sum::-webkit-details-marker { display: none; }
+  .mo__sum:hover { background: rgba(255, 140, 58, 0.07); }
+  .mo__name { flex: 1; font-weight: 650; font-size: 1.02rem; }
+  .mo[open] .mo__name { color: var(--accent-2); }
+  .mo__count {
+    flex: none; font-size: 0.74rem; font-weight: 700; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .mo[open] .mo__count { color: var(--accent-2); border-color: rgba(255, 170, 100, 0.45); }
+  .mo__chev {
+    flex: none; width: 15px; height: 15px; stroke: var(--muted); fill: none;
+    stroke-width: 2.2; transition: transform 0.18s ease;
+  }
+  .mo[open] .mo__chev { transform: rotate(180deg); stroke: var(--accent-2); }
+
+  .mo__list {
+    margin: 0; padding: 6px 8px 14px; list-style: none;
+    border-top: 1px solid var(--line);
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); gap: 1px 10px;
+  }
+  .mo__list a {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 8px 11px; border-radius: 9px; border-left: 2px solid transparent;
+    color: var(--text); text-decoration: none; font-size: 0.92rem; line-height: 1.32;
+  }
+  .mo__list a:hover {
+    background: rgba(255, 140, 58, 0.1); color: var(--accent-2); border-left-color: var(--accent);
+  }
+  .mo__day {
+    flex: none; min-width: 19px; font-size: 0.74rem; font-weight: 700;
+    color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .mo__list a:hover .mo__day { color: var(--accent); }
+  .mo__t { flex: 1; }
+
+  .idx__foot {
+    margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line);
+    font-size: 0.84rem; color: var(--muted);
+  }
+  .idx__sep { margin: 0 10px; opacity: 0.5; }
+  .idx__foot a { color: var(--accent-2); text-decoration: none; }
+  .idx__foot a:hover { text-decoration: underline; }
+
+  @media (max-width: 640px) {
+    .idx { padding: 22px 14px 54px; }
+    .idx__title { font-size: 1.34rem; }
+    .mo__list { grid-template-columns: 1fr; padding: 4px 6px 12px; }
+    .mo__sum { padding: 13px 14px; }
+    .mo__name { font-size: 0.96rem; }
+  }
+</style>

@@ -46,6 +46,19 @@ export function igdbLog(level: "info" | "warn", event: string, extra?: Record<st
 }
 
 // ── Token Twitch : cache unique partage par tous les appelants ──
+// -- Effacement du warn : l'appariement IGDB refonctionne --
+// Le warn etait pose et jamais retire. La colonne restait marquee des mois
+// apres la panne, et le dashboard, pour eviter une alerte perpetuelle, ne
+// l'affichait que pendant 6 heures -- donc masquait justement les pannes qui
+// durent. On efface ici, sur la preuve qu'un appel IGDB authentifie a abouti.
+export function igdbLookupOk(): void {
+  if (!igdbWarnPool) return;
+  igdbWarnPool.query(
+    "UPDATE source_health SET last_lookup_warn = NULL, last_lookup_warn_msg = NULL " +
+    "WHERE source = 'igdb' AND last_lookup_warn IS NOT NULL"
+  ).catch(() => { /* jamais bloquant */ });
+}
+
 let TWITCH_TOKEN: { token: string; expiresAt: number } | null = null;
 export async function getTwitchToken(): Promise<string | null> {
   const clientId = process.env.TWITCH_CLIENT_ID || "";
@@ -98,5 +111,10 @@ export async function igdbFetch(path: string, init: RequestInit): Promise<Respon
     invalidateTwitchToken();
     res = await doFetch(); // un seul retry avec token frais
   }
+  // Toute reponse 2xx prouve que le chemin IGDB authentifie fonctionne :
+  // c'est le seul endroit qui le sait pour TOUS les appelants (health
+  // check, enrichissement, appariement), donc le seul ou l'effacement
+  // du warn a sa place.
+  if (res.ok) igdbLookupOk();
   return res;
 }

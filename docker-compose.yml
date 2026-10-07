@@ -39,6 +39,13 @@ services:
       DISCORD_WEBHOOK_WORKFLOWS: ${DISCORD_WEBHOOK_WORKFLOWS}
       DISCORD_WEBHOOK_ERRORS: ${DISCORD_WEBHOOK_ERRORS}
       PORT: 3000
+    volumes:
+      # Le rapport et le journal du build, en lecture seule : l'API les affiche,
+      # elle ne les ecrit jamais.
+      - /opt/stack/site/.build-report:/data/build:ro
+      # Les drapeaux de demande, en ecriture : c'est le seul moyen pour un
+      # conteneur de demander quelque chose a l'hote sans privilege.
+      - /opt/stack/site/.publish:/data/publish
     depends_on: [mariadb]
     networks: [internal, public]
 

@@ -12,11 +12,101 @@ interface Props {
                   de plateforme EU ne veut rien dire, elle n'est pas
                   encore annoncee) */
   kinds?: boolean | "anime" | "upcoming";
+  /* Mise en page de l'accueil (session 34). Les cartes ne changent pas :
+     "slider" = fenetre glissante, une carte a la fois, la suivante qui depasse
+     "rang"   = liste de classement compacte, les 25 visibles
+     Sans variant, le bloc garde la grille de cartes d'origine. */
+  variant?: "slider" | "rang";
+  taille?: "haute" | "basse";
+  duree?: number;
+  /* retard au demarrage du defilement : deux fenetres cote a cote qui
+     tournent en meme temps donnent le tournis. */
+  decal?: number;
 }
-const { title, source, limit, href, kinds } = Astro.props;
+import { renderCard, renderCardDerniers, renderRangTop } from "../lib/fiche";
+
+const { title, source, limit, href, kinds, variant, taille, duree, decal } = Astro.props;
+
+// Les cartes sont rendues ICI, au build, et plus seulement en JavaScript.
+// Sans ca le HTML livre ne contient aucun lien vers les fiches : c'est la
+// cause pour laquelle 935 pages restaient en « detectee, non indexee ».
+// Le script plus bas recharge ensuite les memes zones, donc le catalogue
+// reste vivant.
+const API = "https://gamenime.fr/api";
+
+async function feed(dom: "anime" | "games", params: Record<string, string>) {
+  const r = await fetch(`${API}/feed/${dom}?${new URLSearchParams(params)}`);
+  if (!r.ok) throw new Error(`/feed/${dom} a repondu ${r.status}`);
+  const d = await r.json();
+  return Array.isArray(d.items) ? d.items : [];
+}
+
+// Les pages de fiches ne sont generees que pour les items dont le synopsis
+// atteint 150 caracteres (filtre de /feed/slugs). Un item sans page ne doit
+// donc PAS recevoir de lien : l'URL n'existerait pas, et nginx y repond par
+// la page d'accueil en 200 — Google indexerait un doublon de l'accueil.
+const rSlugs = await fetch(`${API}/feed/slugs?type=all`);
+if (!rSlugs.ok) throw new Error(`/feed/slugs a repondu ${rSlugs.status}`);
+const avecPage = new Set<string>(
+  ((await rSlugs.json()).items || []).map((i: any) => i.slug).filter(Boolean)
+);
+// renderCard ne pose un lien que si item.slug existe : on le neutralise pour
+// les items sans page, et la carte redevient du texte simple.
+const lisible = (i: any) => (i.slug && avecPage.has(i.slug) ? i : { ...i, slug: null });
+
+// L'accueil a ses propres corps de carte (maquette du 3 octobre). La
+// coquille .item-card ne change pas : les ecouteurs delegues (survol
+// bande-annonce, clic modale, favoris) et le lien interne vers la fiche
+// restent exactement les memes. Le Top 25, lui, devient une ligne de
+// classement : un <a> entier, pas une carte.
+// carteDe() dans le <script> plus bas doit rester son jumeau exact, sinon
+// l'accueil changerait d'allure au premier rechargement client.
+const carte = (i: any, dom: string, rang?: number) =>
+  variant === "rang" ? renderRangTop(lisible(i), dom, rang)
+  : variant === "slider" ? renderCardDerniers(lisible(i), dom)
+  : renderCard(lisible(i), dom, rang);
+
+// Correspondance STRICTEMENT identique a loadSection() dans le <script>.
+// Toute divergence se verrait a l'oeil : les cartes changeraient au
+// chargement de la page.
+let cartes = "";
+try {
+  if (source === "anime" || source === "games") {
+    const it = await feed(source, { status: "released", limit: "150", orderBy: "date" });
+    cartes = (limit ? it.slice(0, limit) : it).map((i: any) => carte(i, source)).join("");
+  } else if (source === "anime-upcoming" || source === "games-upcoming") {
+    const dom = source === "anime-upcoming" ? "anime" : "games";
+    const it = await feed(dom, { status: "upcoming", limit: "300", orderBy: "date" });
+    cartes = (limit ? it.slice(0, limit) : it).map((i: any) => carte(i, dom)).join("");
+  } else if (source === "top-anime" || source === "top-games") {
+    const dom = source === "top-anime" ? "anime" : "games";
+    const it = await feed(dom, { status: "released", limit: "25" });
+    cartes = (limit ? it.slice(0, limit) : it).map((i: any, k: number) => carte(i, dom, k + 1)).join("");
+  } else {
+    const [a, g] = await Promise.all([
+      feed("anime", { status: "upcoming", limit: "50", orderBy: "date" }),
+      feed("games", { status: "upcoming", limit: "50", orderBy: "date" }),
+    ]);
+    const tout = [
+      ...a.map((i: any) => ({ ...i, _d: "anime" })),
+      ...g.map((i: any) => ({ ...i, _d: "games" })),
+    ].sort((x: any, y: any) =>
+      (x.releaseDate ? new Date(x.releaseDate).getTime() : 0) -
+      (y.releaseDate ? new Date(y.releaseDate).getTime() : 0));
+    cartes = (limit ? tout.slice(0, limit) : tout).map((i: any) => carte(i, i._d)).join("");
+  }
+} catch (e) {
+  // Echec volontaire : construire la page sans ces liens reproduirait
+  // silencieusement le bug qu'on corrige.
+  throw new Error(`SectionBlock (${source}) : rendu au build impossible — ${e}`);
+}
 ---
 
-<section class="section-block container" data-source={source} data-limit={limit}>
+<section class="section-block container" data-source={source} data-limit={limit}
+         data-variant={variant}
+         data-taille={variant === "slider" ? (taille || "basse") : undefined}
+         data-duree={variant === "slider" ? String(duree || 6000) : undefined}
+         data-decal={variant === "slider" ? String(decal || 0) : undefined}>
   <div class="section-head">
     <h2>{title}</h2>
     {kinds ? (
@@ -36,9 +126,17 @@ const { title, source, limit, href, kinds } = Astro.props;
       </div>
     ) : (href && <a class="see-more" href={href}>Voir plus</a>)}
   </div>
-  <div class="items-row">
-    <p class="section-loading">Chargement…</p>
-  </div>
+  {variant === "slider" ? (
+    <div class="sl">
+      <div class="items-row sl-track" set:html={cartes || '<p class="section-loading">Chargement…</p>'}
+           tabindex="0"></div>
+      <button type="button" class="sl-fl g" aria-label="Précédent">‹</button>
+      <button type="button" class="sl-fl d" aria-label="Suivant">›</button>
+      <div class="sl-pied"><span class="sl-cpt"></span></div>
+    </div>
+  ) : (
+    <div class="items-row" set:html={cartes || '<p class="section-loading">Chargement…</p>'}></div>
+  )}
 </section>
 
 <div class="detail-modal" id="detailModal">
@@ -51,7 +149,22 @@ const { title, source, limit, href, kinds } = Astro.props;
 
 <script>
 import { getAnimeItems, getGameItems, getFeedAnime, getFeedGames, getItemDetail, postVote, displayTitle } from "../lib/api";
+import { monterFenetre } from "../lib/slider";
 import type { ContentItem } from "../lib/api";
+// Les corps de carte de l'accueil sont dans lib/fiche : ce <script> en
+// redefinit beaucoup (renderCard, dateBox, platChips…), mais les
+// dupliquer une fois de plus garantissait qu'ils finiraient par diverger.
+import { renderCardDerniers, renderRangTop } from "../lib/fiche";
+
+// Jumeau exact de carte() dans le frontmatter. Sans lui, loadSection()
+// redessinerait des cartes de catalogue par-dessus la mise en page de
+// l'accueil des le premier rechargement.
+function carteDe(section, item, domain, rang) {
+  var v = section && section.dataset ? section.dataset.variant : "";
+  if (v === "rang") return renderRangTop(item, domain, rang);
+  if (v === "slider") return renderCardDerniers(item, domain);
+  return renderCard(item, domain, rang);
+}
 
 function formatDate(v) {
   if (!v) return "Date inconnue";
@@ -410,8 +523,14 @@ function renderCard(item, domain, rank) {
   if (hype === "Populaire") hypeBadge = '<span class="item-badge popular">🔥 Populaire</span>';
   else if (hype === "Très attendu") hypeBadge = '<span class="item-badge anticipated">⭐ Très attendu</span>';
 
-  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
+  // --cover permet a l'accueil d'afficher l'affiche floutee en fond de carte
+  // sans dupliquer la balise <img>. encodeURI suffit : ces URL n'ont ni
+  // parenthese ni espace, et la propriete est ignoree partout ailleurs.
+  var coverVar = item.cover ? ' style="--cover:url(' + encodeURI(item.cover) + ')"' : '';
+
+  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' + coverVar +
     ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    ' data-slug="' + (item.slug || '') + '"' +
     ' data-format="' + (item.format || '') + '"' +
     ' data-platform="' + String(item.platform || '').replace(/"/g, '') + '"' +
     (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
@@ -424,7 +543,13 @@ function renderCard(item, domain, rank) {
     rankBadge +
     '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +
-    '<h3>' + displayTitle(item) + '</h3>' +
+    // Le titre porte le lien vers la fiche : HTML valide, invisible a l'oeil,
+    // sans effet sur la grille, et le texte d'ancrage est le titre de l'oeuvre.
+    // Le coeur et les bandes du trailer restent hors du <a>, donc aucun clic
+    // sur eux ne peut declencher de navigation.
+    '<h3>' + (item.slug
+      ? '<a class="item-link" href="/' + (String(domain).indexOf("anime") !== -1 ? 'anime' : 'games') + '/' + item.slug + '/">' + displayTitle(item) + '</a>'
+      : displayTitle(item)) + '</h3>' +
     dateBox(item) + platChips(item, domain) + hypePill(item, domain) +
     '</div></article>';
 }
@@ -493,7 +618,14 @@ function setupDetailModal() {
   var backdrop = modal ? modal.querySelector(".detail-backdrop") : null;
   var closeBtn = modal ? modal.querySelector(".detail-close") : null;
 
-  function close() {
+  // URL de la fiche a pousser dans l'historique, posee par le clic sur un titre.
+  // Les autres points d'entree (tiroirs favoris/notifs, liens #item- des emails)
+  // la laissent nulle : pour eux l'URL ne bouge pas.
+  var urlFiche: string | null = null;
+  (window as any).__gnUrlFiche = function(u: string | null) { urlFiche = u; };
+
+  // Fermeture reelle du modal, sans toucher a l'historique.
+  function fermerModal() {
     if (!modal || !inner) return;
     inner.innerHTML = "";
     modal.classList.remove("active");
@@ -512,6 +644,20 @@ function setupDetailModal() {
     }
   }
 
+  // Action utilisateur (fond, croix, Echap). Si une URL de fiche a ete poussee,
+  // on revient en arriere et c'est popstate qui fermera — sinon on fermerait
+  // deux fois et l'URL resterait bloquee sur la fiche.
+  function close() {
+    if (!modal || !modal.classList.contains("active")) return;
+    if (history.state && (history.state as any).gnModal) history.back();
+    else fermerModal();
+  }
+
+  // Bouton Retour du navigateur : ferme sans retoucher l'historique.
+  window.addEventListener("popstate", function() {
+    if (modal && modal.classList.contains("active")) fermerModal();
+  });
+
   if (backdrop) backdrop.addEventListener("click", close);
   if (closeBtn) closeBtn.addEventListener("click", close);
   document.addEventListener("keydown", function(e) { if (e.key === "Escape") close(); });
@@ -520,6 +666,15 @@ function setupDetailModal() {
   (window as any).__openItemModal = async function(domain: string, id: string) {
     if (!modal || !inner) return;
     if (activeCard) killHover(activeCard);
+    // L'URL suit l'item tant que le modal est ouvert. replaceState si un modal
+    // etait deja ouvert : passer de fiche en fiche ne doit pas empiler dix
+    // entrees d'historique et rendre le bouton Retour inutilisable.
+    if (urlFiche && location.pathname !== urlFiche) {
+      var dejaOuvert = modal.classList.contains("active") && history.state && (history.state as any).gnModal;
+      if (dejaOuvert) history.replaceState({ gnModal: true }, "", urlFiche);
+      else history.pushState({ gnModal: true }, "", urlFiche);
+    }
+    urlFiche = null;
     modal.classList.add("active");
     document.body.style.overflow = "hidden";
     inner.innerHTML = '<p class="detail-loading">Chargement…</p>';
@@ -654,6 +809,20 @@ function setupDetailModal() {
   var GN_isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
   // Handler click : desktop ouvre la modale, mobile lance le trailer
   document.addEventListener("click", function(e) {
+    // Le titre est un vrai lien : on annule la navigation AVANT les sorties
+    // ci-dessous, pour que le modal s'ouvre au lieu de changer de page.
+    if ((e.target as HTMLElement).closest("a.item-link")) e.preventDefault();
+    // L'URL doit suivre l'item quel que soit l'endroit clique sur la carte : le
+    // titre est le seul <a> (pour Google), mais le modal s'ouvre aussi depuis la
+    // jaquette. Le slug est donc lu sur la carte, pas sur le lien.
+    var carteUrl = (e.target as HTMLElement).closest(".item-card") as HTMLElement | null;
+    if (carteUrl && typeof (window as any).__gnUrlFiche === "function") {
+      var sl = carteUrl.getAttribute("data-slug");
+      var dm = carteUrl.getAttribute("data-domain") || "anime";
+      (window as any).__gnUrlFiche(
+        sl ? "/" + (dm.indexOf("anime") !== -1 ? "anime" : "games") + "/" + sl + "/" : null
+      );
+    }
     if ((e.target as HTMLElement).closest(".trailer-band")) return; // bande geree separement
     if ((e.target as HTMLElement).closest(".fav-heart")) return;
     var card = (e.target as HTMLElement).closest(".item-card");
@@ -665,7 +834,15 @@ function setupDetailModal() {
     var id = (card as HTMLElement).dataset.id;
     var domain = (card as HTMLElement).dataset.domain;
     if (!id || !domain) return;
-    if (GN_isTouch) {
+    // Au doigt, un appui sur une carte lance la bande-annonce, et c'est ensuite
+    // une bande du trailer qui ouvre la fiche. Sur l'accueil ces bandes
+    // n'existent plus : sans cette exception, une carte avec bande-annonce y
+    // devient inatteignable au doigt — le premier appui lance la video, les
+    // suivants ne font plus rien. Sur l'accueil, l'appui ouvre donc la fiche,
+    // ce qui est aussi la regle demandee : « si je clique, j'ouvre le modal ».
+    // Le Top 25 (.acc-bas) aussi, depuis le 6 octobre 2026 : ses lignes n'ont pas
+    // de bandes et la video y est masquee au telephone, l'appui ne faisait rien.
+    if (GN_isTouch && !(card as HTMLElement).closest(".acc-haut, .acc-bas")) {
       // MOBILE : clic carte = lance le trailer (le glow des bandes sert d'indice pour la modale)
       if (activeCard !== card) {
         var videoId = (card as HTMLElement).dataset.yt;
@@ -749,16 +926,21 @@ async function loadSection(section) {
           return at - bt;
         });
       if (limit) all.splice(limit);
-      row.innerHTML = all.length ? all.map(function(i) { return renderCard(i, i._d); }).join("") : '<p class="section-empty">Aucun contenu.</p>';
+      row.innerHTML = all.length ? all.map(function(i) { return carteDe(section, i, i._d); }).join("") : '<p class="section-empty">Aucun contenu.</p>';
       return;
     }
     if (limit) items = items.slice(0, limit);
     row.innerHTML = items.length
-      ? items.map(function(i, idx) { return renderCard(i, domain, isTop ? idx + 1 : undefined); }).join("")
+      ? items.map(function(i, idx) { return carteDe(section, i, domain, isTop ? idx + 1 : undefined); }).join("")
       : '<p class="section-empty">Aucun contenu pour le moment.</p>';
   } catch (err) {
     console.error("Erreur " + source + ":", err);
-    row.innerHTML = '<p class="section-empty">Impossible de charger les données.</p>';
+    // Les cartes rendues au build sont deja la : on n'efface que s'il n'y a
+    // rien a perdre. Sans ce garde, une API momentanement muette effacerait
+    // du contenu parfaitement valide.
+    if (!row.querySelector(".item-card")) {
+      row.innerHTML = '<p class="section-empty">Impossible de charger les données.</p>';
+    }
   }
 }
 
@@ -790,13 +972,33 @@ document.addEventListener("applyFilters", async function(e) {
       else if (source === "games-upcoming") { items = await getFeedGames(Object.assign({ status: "upcoming", limit: 300, orderBy: "date" }, fo)); domain = "games"; }
       else { continue; }
       row.innerHTML = items.length
-        ? items.map(function(it) { return renderCard(it, domain); }).join("")
+        ? items.map(function(it) { return carteDe(section, it, domain); }).join("")
         : '<p class="section-empty">Aucun résultat pour ces filtres.</p>';
     } catch (err) { row.innerHTML = '<p class="section-empty">Erreur.</p>'; }
   }
 });
 
-document.querySelectorAll(".section-block[data-source]").forEach(function(s) { loadSection(s); });
+// Fenetres glissantes de l'accueil. On ne monte que les blocs rendus par ce
+// composant : « Cette semaine » monte la sienne, ses cartes arrivant plus tard.
+var gnFenetres = new Map();
+document.querySelectorAll('.section-block[data-variant="slider"][data-source]').forEach(function(b) {
+  var sl = (b as HTMLElement).querySelector(".sl") as HTMLElement | null;
+  if (!sl) return;
+  var api = monterFenetre(sl, {
+    duree: Number((b as HTMLElement).dataset.duree || 6000),
+    decal: Number((b as HTMLElement).dataset.decal || 0),
+  });
+  if (api) gnFenetres.set(b, api);
+});
+
+document.querySelectorAll(".section-block[data-source]").forEach(function(s) {
+  // loadSection reecrit .items-row : la fenetre doit recompter ses cartes,
+  // sinon elle continue de pointer sur celles du build.
+  loadSection(s).then(function() {
+    var f = gnFenetres.get(s);
+    if (f) f.recompter(false);
+  });
+});
 setInterval(updateCountdowns, 1000);
 setupHoverTrailer();
 setupDetailModal();

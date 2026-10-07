@@ -17,9 +17,9 @@ export const GET: APIRoute = async () => {
 
   const statiques = [
     { loc: `${SITE}/`, freq: "daily", prio: "1.0" },
-    { loc: `${SITE}/anime`, freq: "daily", prio: "0.9" },
-    { loc: `${SITE}/games`, freq: "daily", prio: "0.9" },
-    { loc: `${SITE}/upcoming`, freq: "daily", prio: "0.9" },
+    { loc: `${SITE}/anime/`, freq: "daily", prio: "0.9" },
+    { loc: `${SITE}/games/`, freq: "daily", prio: "0.9" },
+    { loc: `${SITE}/upcoming/`, freq: "daily", prio: "0.9" },
   ];
 
   const fiches = items.map((it: { slug: string; type: string; updatedAt: string }) => ({

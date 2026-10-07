@@ -13,6 +13,7 @@ export interface ContentItem {
   rating?: string | null;
   popularity?: number;
   screenshots?: string | null;
+  slug?: string | null;
 }
 
 export interface VoteData {

@@ -1,8 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
 ---
 
-<BaseLayout title="Inscription — GameNime">
+<BaseLayout title="Inscription — GameNime" jetons="braise connexion">
+  <HeroHeader activeTab="none" lienAccueil />
   <div class="auth-page">
     <div class="auth-card">
       <h1 class="auth-card__title">Créer un compte</h1>

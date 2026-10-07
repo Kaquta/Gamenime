@@ -530,6 +530,168 @@
   .tool-desc { font-size: 0.68rem; color: #8c8c92; margin-bottom: 10px; }
   .tool-btn { width: 100%; padding: 7px; border-radius: 7px; background: #1a1a1f; border: 1px solid #232328; color: #d9a978; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s ease; }
   .tool-btn:hover { border-color: #d9a978; }
+
+/* === PISTE B : coquille de navigation === */
+.gn-bh{position:sticky;top:0;z-index:400;height:50px;display:flex;align-items:center;gap:13px;
+       padding:0 22px;background:rgba(6,6,8,.88);backdrop-filter:blur(12px);border-bottom:1px solid #1a1a1f}
+.gn-bh .gn-mq{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;font-size:1.12rem;
+       background:linear-gradient(135deg,#ffeedb 10%,#d9a978 90%);-webkit-background-clip:text;
+       background-clip:text;-webkit-text-fill-color:transparent}
+.gn-bh .gn-sp{flex:1}
+.gn-bh .gn-hh{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#47474f}
+.gn-pv{display:inline-flex;align-items:center;gap:7px;font-size:.74rem;font-weight:600;color:#30d16c}
+.gn-pv i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:gnbat 2.4s ease-in-out infinite}
+.gn-crit{display:inline-flex;align-items:center;gap:8px;padding:4px 11px;border-radius:999px;cursor:pointer;
+       background:rgba(255,69,58,.12);border:1px solid rgba(255,69,58,.28);color:#ff7a70;
+       font-size:.73rem;font-weight:650;text-decoration:none}
+.gn-crit:hover{background:rgba(255,69,58,.2)}
+.gn-crit i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:gnbat 1.6s ease-in-out infinite}
+@keyframes gnbat{0%,100%{opacity:1}50%{opacity:.25}}
+
+.gn-page{max-width:1160px;margin:0 auto;padding:24px 22px 90px;
+       display:grid;grid-template-columns:196px 1fr;gap:30px;align-items:start}
+
+.gn-idx{position:sticky;top:72px;display:flex;flex-direction:column;gap:1px}
+.gn-idx-t{font-size:.64rem;letter-spacing:.11em;text-transform:uppercase;color:#47474f;
+       padding:2px 10px 10px;font-weight:700}
+.gn-ix{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:9px;cursor:pointer;
+       border:0;background:transparent;color:#6b6b74;font-size:.8rem;font-weight:600;font-family:inherit;
+       text-align:left;transition:color .15s,background .15s;position:relative;text-decoration:none}
+.gn-ix:hover{color:#f4f2f0}
+.gn-ix.ici{color:#ffe8c0;background:rgba(217,169,120,.13)}
+.gn-ix .jauge{position:absolute;left:-1px;top:50%;width:2px;height:0;border-radius:2px;
+       background:#d9a978;transform:translateY(-50%);transition:height .28s cubic-bezier(.4,0,.2,1)}
+.gn-ix.ici .jauge{height:58%}
+.gn-ix .n{flex:1}
+.gn-idx-pied{margin-top:12px;padding:11px 11px 0;border-top:1px solid #121216;
+       font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.67rem;color:#47474f;line-height:1.7}
+
+.gn-anc{scroll-margin-top:64px;padding-bottom:34px}
+.gn-st{position:sticky;top:50px;z-index:200;display:flex;align-items:center;gap:13px;
+       margin:0 0 14px;padding:11px 2px 10px;background:rgba(3,3,4,.92);backdrop-filter:blur(10px);
+       border-bottom:1px solid #1a1a1f}
+.gn-st h2{margin:0;font-size:.76rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;color:#9b9ba3}
+.gn-st em{font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#47474f}
+.gn-st .gn-sp{flex:1}
+
+.gn-bg{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.67rem;font-weight:700;
+       padding:2px 8px;border-radius:999px;background:#2b2b32;color:#9b9ba3;line-height:1.4;flex:none}
+.gn-bg.ko{background:rgba(255,69,58,.17);color:#ff7a70;box-shadow:0 0 0 1px rgba(255,69,58,.28) inset}
+.gn-bg.amb{background:rgba(255,159,10,.15);color:#ffba4d;box-shadow:0 0 0 1px rgba(255,159,10,.26) inset}
+.gn-bg.ok{background:rgba(48,209,108,.14);color:#5fe08f;box-shadow:0 0 0 1px rgba(48,209,108,.24) inset}
+.gn-bg.run{background:rgba(217,169,120,.13);color:#ffe8c0}
+.gn-bg.run::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;
+       background:currentColor;margin-right:5px;vertical-align:1px;animation:gnbat 1.1s ease-in-out infinite}
+
+@media (max-width:900px){
+  .gn-page{grid-template-columns:1fr;gap:0;padding:0 16px 70px}
+  .gn-idx{position:sticky;top:50px;z-index:300;flex-direction:row;gap:4px;overflow-x:auto;
+       scrollbar-width:none;margin:0 -16px;padding:9px 16px;
+       background:rgba(6,6,8,.92);backdrop-filter:blur(10px);border-bottom:1px solid #1a1a1f}
+  .gn-idx::-webkit-scrollbar{display:none}
+  .gn-idx-t,.gn-idx-pied{display:none}
+  .gn-ix{flex:none;padding:6px 12px;border-radius:999px;border:1px solid #242429;background:#0c0c0e}
+  .gn-ix .jauge{display:none}
+  .gn-ix.ici{border-color:rgba(217,169,120,.4)}
+  .gn-st{top:97px}
+  .gn-anc{scroll-margin-top:110px}
+}
+
+/* === PISTE B : ajustements au gabarit existant === */
+html{scroll-behavior:smooth}
+.top{position:sticky;top:0;z-index:400;background:rgba(6,6,8,.9);backdrop-filter:blur(12px);
+     border-bottom:1px solid #1a1a1f}
+#admin-btn,#toggle-btn{display:none!important}
+.page{display:block!important}
+.gn-flux{min-width:0}
+.gn-page{max-width:none;padding:22px 0 90px}
+.gn-idx{top:calc(var(--gn-top,60px) + 18px)}
+.gn-ix.sous{padding-left:26px;font-size:.755rem}
+.gn-ix.sous .n{color:inherit}
+.gn-st{top:var(--gn-top,60px)}
+.gn-anc{scroll-margin-top:calc(var(--gn-top,60px) + 14px)}
+@media (max-width:900px){
+  .gn-idx{top:var(--gn-top,60px)}
+  .gn-st{top:calc(var(--gn-top,60px) + 47px)}
+  .gn-anc{scroll-margin-top:calc(var(--gn-top,60px) + 60px)}
+}
+
+/* === PISTE B : console toujours accessible === */
+.console-fab{display:inline-flex!important}
+
+/* === PISTE B : historique toujours accessible === */
+#histFab{display:flex!important}
+
+/* === PISTE B : frontiere alertes / nominaux === */
+.gn-sep-sys{grid-column:1/-1;display:flex;align-items:center;gap:10px;padding:6px 2px 0;
+            font-size:.74rem;color:#6b6b74;cursor:pointer;user-select:none}
+.gn-sep-sys:hover{color:#9b9ba3}
+.gn-sep-sys .chev{display:inline-block;font-size:.62rem;color:#47474f;transition:transform .2s}
+.gn-sep-sys .filet{flex:1;height:1px;background:#1a1a1f}
+.health-grid.replie .gn-sep-sys .chev{transform:rotate(-90deg)}
+.health-grid.replie .hcard-nominal{display:none}
+
+/* === Journal des executions sous les boutons de process === */
+.gn-der{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;line-height:1.5;
+        margin-top:6px;color:#6b6b74}
+.gn-der-ok{color:#8a8a92}
+.gn-der-ok::before{content:"\25cf  ";color:#30d16c}
+.gn-der-ko{color:#ff7a70}
+.gn-der-ko::before{content:"\25cf  ";color:#ff453a}
+.gn-der-run{color:#ffe8c0}
+.gn-der-run::before{content:"\25cf  ";color:#d9a978}
+.gn-der-rien{color:#47474f}
+.gn-der-rien::before{content:"\25cb  ";color:#47474f}
+.gn-verrou{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:11px 14px;border-radius:12px;
+           margin:0 0 13px;background:rgba(217,169,120,.1);border:1px solid rgba(217,169,120,.26);
+           font-size:.8rem;line-height:1.5}
+.gn-verrou b{color:#ffe8c0;font-weight:650}
+.gn-verrou span{color:#9b9ba3}
+
+/* === Section Publication === */
+.pub{border:1px solid #242429;border-radius:18px;background:linear-gradient(180deg,rgba(20,20,24,.92),rgba(11,11,14,.88));overflow:hidden}
+.pub-tete{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:15px 20px;border-bottom:1px solid #1a1a1f}
+.pub-etat{flex:1;min-width:220px;font-size:.82rem;line-height:1.5;color:#f4f2f0}
+.pub-etat b{color:#ffe8c0}
+.pub-etat .q{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#6b6b74;display:block;margin-top:3px}
+.pub-boutons{display:flex;gap:8px;flex-wrap:wrap}
+.pub-bt{padding:8px 16px;border-radius:9px;cursor:pointer;font:700 .77rem Inter,system-ui,sans-serif;
+        border:1px solid transparent;transition:.16s;font-family:inherit}
+.pub-bt-b{background:#30d16c;color:#04120a;border-color:#30d16c}
+.pub-bt-p{background:linear-gradient(135deg,#ffe8c0,#d9a978);color:#160d04;border-color:#ffe8c0}
+.pub-bt:hover:not(:disabled){filter:brightness(1.08)}
+.pub-bt:disabled{background:transparent;border-color:#242429;color:#6b6b74;cursor:not-allowed;filter:none}
+.pub-msg{padding:0 20px;font-size:.78rem;line-height:1.5;color:#9b9ba3}
+.pub-msg:not(:empty){padding:11px 20px;border-bottom:1px solid #1a1a1f}
+.pub-msg.ko{color:#ff7a70} .pub-msg.ok{color:#5fe08f}
+.pub-duo{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#121216}
+@media(max-width:760px){.pub-duo{grid-template-columns:1fr}}
+.pub-pan{background:#0c0c0e;padding:15px 20px 17px}
+.pub-pan-t{font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:#6b6b74;margin-bottom:11px}
+.pub-mes{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-bottom:1px solid #121216;font-size:.8rem}
+.pub-mes:last-child{border-bottom:none}
+.pub-mes span{flex:1;color:#9b9ba3}
+.pub-mes .av{font-family:ui-monospace,Menlo,monospace;color:#47474f}
+.pub-mes .fl{color:#2b2b32;font-size:.7rem}
+.pub-mes .ap{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#f4f2f0}
+.pub-mes .dt{font-family:ui-monospace,Menlo,monospace;font-size:.73rem;width:40px;text-align:right;color:#47474f}
+.pub-mes .dt.p{color:#30d16c} .pub-mes .dt.m{color:#ff9f0a}
+.pub-ctl{display:flex;align-items:center;gap:9px;padding:6px 0;font-size:.8rem}
+.pub-ctl i{width:14px;flex:none;font-style:normal;font-family:ui-monospace,Menlo,monospace;font-weight:700}
+.pub-ctl.ok i{color:#30d16c} .pub-ctl.ko i{color:#ff453a} .pub-ctl.na i{color:#47474f}
+.pub-ctl span{flex:1;color:#9b9ba3}
+.pub-ctl.ko span{color:#ff7a70}
+.pub-ctl b{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#6b6b74}
+.pub-log-bar{display:flex;align-items:center;gap:9px;padding:9px 20px;background:#08080a;
+             border-top:1px solid #1a1a1f;border-bottom:1px solid #121216;
+             font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:#6b6b74}
+.pub-log-bar span{font-family:ui-monospace,Menlo,monospace;text-transform:none;letter-spacing:0;color:#47474f}
+.pub-log{margin:0;padding:11px 20px;max-height:260px;overflow-y:auto;background:#040405;
+         font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.735rem;line-height:1.65;
+         color:#9b9ba3;white-space:pre-wrap;word-break:break-word}
+.pub-log::-webkit-scrollbar{width:8px}
+.pub-log::-webkit-scrollbar-thumb{background:#242429;border-radius:4px}
+.pub-log:empty::before{content:"aucun journal";color:#47474f}
 </style>
 <body>
 <div class="wrap">
@@ -549,7 +711,22 @@
     </div>
   </div>
 
-  <!-- ═══ PAGE SURVEILLANCE ═══ -->
+  
+<!-- === PISTE B : flux et index === -->
+<div class="gn-page">
+  <nav class="gn-idx" id="gn-idx">
+    <div class="gn-idx-t">Dashboard</div>
+    <a class="gn-ix ici" href="#page-surveillance"><span class="jauge"></span><span class="n">Surveillance</span></a>
+    <a class="gn-ix" href="#page-traffic"><span class="jauge"></span><span class="n">Audience</span></a>
+    <a class="gn-ix" href="#page-admin"><span class="jauge"></span><span class="n">Administration</span></a>
+    <a class="gn-ix" href="#page-publication"><span class="jauge"></span><span class="n">Publication</span><span class="gn-bg" id="pub-bg-idx">—</span></a>
+    <a class="gn-ix sous" href="#sec-process"><span class="n">Process</span></a>
+    <a class="gn-ix sous" href="#sec-incomplete"><span class="n">Items incomplets</span></a>
+    <a class="gn-ix sous" href="#sec-tools"><span class="n">Outils</span></a>
+    <div class="gn-idx-pied" id="gn-idx-pied">&nbsp;</div>
+  </nav>
+  <main class="gn-flux">
+<!-- ═══ PAGE SURVEILLANCE ═══ -->
   <div class="page active" id="page-surveillance">
     <div class="status-banner ok" id="status-banner">
       <div class="status-icon" id="status-icon">✓</div>
@@ -789,7 +966,42 @@
   </div>
 
   <!-- ═══ CONSOLE FLOTTANTE (admin) ═══ -->
-  <button class="console-fab" id="console-fab" onclick="toggleConsole()">
+  
+    <!-- ═══ PUBLICATION ═══ -->
+    <section class="gn-anc" id="page-publication">
+      <div class="gn-st"><h2>Publication</h2><em>staging &rarr; production</em>
+        <span class="gn-sp"></span><span class="gn-bg" id="pub-bg">&mdash;</span></div>
+
+      <div class="pub">
+        <div class="pub-tete">
+          <div class="pub-etat" id="pub-etat">Lecture du rapport&hellip;</div>
+          <div class="pub-boutons">
+            <button class="pub-bt pub-bt-b" id="pub-build">Lancer un build</button>
+            <button class="pub-bt pub-bt-p" id="pub-promo" disabled>Publier en production</button>
+          </div>
+        </div>
+        <div class="pub-msg" id="pub-msg"></div>
+
+        <div class="pub-duo">
+          <div class="pub-pan">
+            <div class="pub-pan-t">Compteurs, avant et apr&egrave;s</div>
+            <div id="pub-mes"></div>
+          </div>
+          <div class="pub-pan">
+            <div class="pub-pan-t">Contr&ocirc;les avant publication</div>
+            <div id="pub-ctl"></div>
+          </div>
+        </div>
+
+        <div class="pub-log-bar">journal du build <span id="pub-log-t"></span></div>
+        <pre class="pub-log" id="pub-log"></pre>
+      </div>
+    </section>
+
+  </main>
+</div>
+<!-- === fin PISTE B === -->
+<button class="console-fab" id="console-fab" onclick="toggleConsole()">
     <span class="fab-ic">&gt;_</span><span>Console</span>
   </button>
   <div class="console-float" id="console-float">
@@ -1249,6 +1461,90 @@
   }
 
   // ═══ Diagnostic santé ═══
+  // Duree lisible. L'anciennete d'une alerte est ce qui dit sa gravite :
+  // une panne de trois heures et une panne de deux mois ne se traitent pas
+  // de la meme facon, et jusqu'ici le dashboard ne faisait pas la difference.
+  // Résumé d'état, branché sur les mêmes checks que les cartes : la pastille de
+  // la barre haute, les badges du titre collant et le pied de l'index disent
+  // donc forcément la même chose qu'elles. C'est ce qui permet de descendre
+  // dans la page sans perdre de vue qu'une alerte existe.
+  function gnEntete(m, checks) {
+    var crit = 0, warn = 0;
+    (checks || []).forEach(function (c) {
+      if (c.level === "crit") crit++; else if (c.level === "warn") warn++;
+    });
+
+    var zone = document.querySelector(".top .top-right") || document.querySelector(".top");
+    if (zone) {
+      var ch = document.getElementById("gn-chip");
+      if (!ch) {
+        ch = document.createElement("a");
+        ch.id = "gn-chip"; ch.className = "gn-crit"; ch.href = "#page-surveillance";
+        zone.insertBefore(ch, zone.firstChild);
+      }
+      if (crit > 0) {
+        ch.style.display = "";
+        ch.innerHTML = "<i></i>" + crit + (crit > 1 ? " alertes critiques" : " alerte critique");
+        ch.style.background = "rgba(255,69,58,.12)";
+        ch.style.borderColor = "rgba(255,69,58,.28)";
+        ch.style.color = "#ff7a70";
+      } else if (warn > 0) {
+        ch.style.display = "";
+        ch.innerHTML = "<i></i>" + warn + " à surveiller";
+        ch.style.background = "rgba(255,159,10,.12)";
+        ch.style.borderColor = "rgba(255,159,10,.3)";
+        ch.style.color = "#ffba4d";
+      } else {
+        ch.style.display = "none";
+      }
+    }
+
+    var st = document.querySelector("#page-surveillance .gn-st");
+    if (st) {
+      st.querySelectorAll(".gn-bg").forEach(function (b) { b.remove(); });
+      var badge = function (cl, txt) {
+        var b = document.createElement("span");
+        b.className = "gn-bg " + cl; b.textContent = txt; st.appendChild(b);
+      };
+      if (crit > 0) badge("ko", crit + " critique" + (crit > 1 ? "s" : ""));
+      if (warn > 0) badge("amb", warn + " à surveiller");
+      if (crit === 0 && warn === 0) badge("ok", "tout est vert");
+    }
+
+    var pied = document.getElementById("gn-idx-pied");
+    if (pied && m) {
+      var sys = m.system || {}, cat = m.catalog || {};
+      var dms = m.ts ? (Date.now() - m.ts) : null;
+      // Un capteur muet ne doit pas passer pour un système en bonne santé :
+      // si les mesures datent, on le dit avant tout le reste.
+      var retard = dms !== null && dms > 300000;
+      var ageTxt = dms === null ? ""
+        : retard ? "mesures en retard de " + gnDuree(dms)
+        : dms < 45000 ? "mesures à l'instant"
+        : dms < 3600000 ? "mesures il y a " + Math.round(dms / 60000) + " min"
+        : "mesures il y a " + gnDuree(dms);
+      var tot = ((cat.anime && cat.anime.total) || 0) + ((cat.games && cat.games.total) || 0);
+      pied.style.color = retard ? "#ff7a70" : "";
+      pied.innerHTML = [
+        ageTxt,
+        sys.disk ? "disque " + sys.disk.percent + " %" : "",
+        sys.mem ? "RAM " + sys.mem.percent + " %" : "",
+        tot ? tot.toLocaleString("fr-FR") + " items" : ""
+      ].filter(Boolean).join("<br>");
+    }
+  }
+
+  function gnDuree(ms) {
+    var h = ms / 3600000;
+    if (h < 1) return "moins d'une heure";
+    if (h < 24) return Math.round(h) + " h";
+    var j = Math.round(h / 24);
+    if (j < 14) return j + (j > 1 ? " jours" : " jour");
+    var sem = Math.round(j / 7);
+    if (sem < 9) return sem + " semaines";
+    return Math.round(j / 30) + " mois";
+  }
+
   function buildHealthChecks(m) {
     var checks = [];
     var sys = m.system || {};
@@ -1325,15 +1621,21 @@
       var ageStr = checkAge === null ? "jamais vérifié" : (checkAge < 1 ? "vérifié il y a <1h" : "vérifié il y a " + checkAge.toFixed(0) + "h");
       if (s.status === "DOWN") {
         checks.push({ srcKey: s.source, name: "Source " + label, level: "crit",
-          detail: label + " : DOWN (HTTP " + (s.httpCode || "?") + ") · " + ageStr,
+          detail: label + " : DOWN (HTTP " + (s.httpCode || "?") + ")"
+            + (s.lastOk ? " · en panne depuis " + gnDuree(Date.now() - s.lastOk) : " · jamais vue répondre")
+            + " · " + ageStr,
           cause: "L'API " + label + " ne répond plus (" + (s.errorMsg || "erreur") + "). " + (s.httpCode === 401 ? "401 = quota épuisé ou clé invalide." : (s.httpCode === 429 ? "429 = rate limit atteint." : "Vérifier la source.")),
           fix: label === "RAWG" ? "Vérifier le quota RAWG sur rawg.io (reset le 10 du mois) ou régénérer la clé." : "Vérifier la clé/token de " + label + " et son quota." });
-      } else if (s.lookupWarn && (Date.now() - s.lookupWarn) < 6 * 3600000) {
-        var wAge = ((Date.now() - s.lookupWarn) / 3600000);
-        var wAgeStr = wAge < 1 ? "il y a <1h" : "il y a " + wAge.toFixed(0) + "h";
-        checks.push({ srcKey: s.source, name: "Source " + label, level: "warn",
-          detail: label + " : appariement en echec (" + wAgeStr + ")",
-          cause: "Un lookup " + label + " a echoue recemment : " + (s.lookupWarnMsg || "erreur") + ". La source repond peut-etre au health check, mais l'appariement d'un item a rate — souvent un token expire.",
+      } else if (s.lookupWarn) {
+        // Pas de fenetre de temps : une alerte non resolue se voit tant qu'elle
+        // dure. Elle s'efface d'elle-meme cote serveur des qu'un appel IGDB
+        // authentifie aboutit (igdbFetch -> igdbLookupOk).
+        var wMs = Date.now() - s.lookupWarn;
+        var wAgeStr = "depuis " + gnDuree(wMs);
+        var wNiveau = wMs > 48 * 3600000 ? "crit" : "warn";
+        checks.push({ srcKey: s.source, name: "Source " + label, level: wNiveau,
+          detail: label + " : appariement en echec " + wAgeStr,
+          cause: "Le chemin authentifie " + label + " a echoue : " + (s.lookupWarnMsg || "erreur") + ". Le health check peut rester vert, il ne teste pas le meme appel. Cette alerte dure " + gnDuree(wMs) + " — elle s'effacerait seule au premier appel authentifie reussi, donc l'appariement est toujours casse.",
           fix: "Verifier le token Twitch (TWITCH_CLIENT_ID / SECRET) et son quota. Details : docker logs content-api | grep igdb-lookup" });
       } else if (s.status === "UP" && s.responseMs && s.responseMs > 3000) {
         checks.push({ srcKey: s.source, name: "Source " + label, level: "warn",
@@ -1417,10 +1719,20 @@
       return order[a.level] - order[b.level];
     });
     var html = "";
+    var sepPose = false;
     sorted.forEach(function(c) {
       var isAlert = c.level !== "ok";
+      // Frontière entre ce qui demande une action et ce qui n'en demande pas.
+      // Posée une seule fois, au premier contrôle vert de la liste triée.
+      if (!isAlert && !sepPose) {
+        sepPose = true;
+        html += '<div class="gn-sep-sys" onclick="gnPlierNominaux(this)">'
+              + '<span class="chev">\u25be</span>'
+              + '<span>' + nOk + ' syst\u00e8me' + (nOk > 1 ? 's' : '') + ' nominal' + (nOk > 1 ? 'aux' : '') + '</span>'
+              + '<span class="filet"></span></div>';
+      }
       var badge = c.level === "ok" ? "OK" : (c.level === "warn" ? "ATTENTION" : "CRITIQUE");
-      html += '<div class="hcard ' + c.level + (isAlert ? ' alert' : '') + '">';
+      html += '<div class="hcard ' + c.level + (isAlert ? ' alert' : ' hcard-nominal') + '">';
       html += '<div class="hcard-stripe"></div>';
       html += '<div class="hcard-main"><div class="hcard-dot"></div><div class="hcard-info"><div class="hcard-name">' + c.name + '</div><div class="hcard-detail">' + c.detail + '</div></div>' + (c.srcKey ? '<button class="src-refresh" data-src="' + c.srcKey + '" onclick="refreshSource(this)" title="Reverifier">&#8635;</button>' : '') + '<div class="hcard-badge">' + badge + '</div></div>';
       if (isAlert && c.cause) {
@@ -1431,6 +1743,7 @@
       html += '</div>';
     });
     document.getElementById("health-grid").innerHTML = html;
+    gnEntete(m, checks);
 
     // Mini trafic
     var tf = m.traffic || {};
@@ -1580,10 +1893,117 @@
   }
 
   // Lance un process simple (refetch, refetch-games, lookup, quality)
+  // ═══ Journal des exécutions ═══
+  // Un bouton ne disait ni quand il avait tourné, ni ce qu'il avait changé : on
+  // cliquait à l'aveugle. La source est /admin/runs, donc exactement ce que la
+  // base sait — pas un état reconstitué dans l'onglet, qui serait faux dès
+  // qu'un autre onglet agit.
+  var gnRunsTimer = null;
+  var GN_PROC_FN = { lancerMerge: "merge-duplicates", lancerCleanup: "cleanup-niches" };
+
+  function gnProcessDuBouton(b) {
+    var oc = b.getAttribute("onclick") || "";
+    var m = /lancerProcess\(this,\s*'([a-z0-9-]+)'/.exec(oc);
+    if (m) return m[1];
+    var fn = /^\s*([a-zA-Z]+)\(/.exec(oc);
+    return fn && GN_PROC_FN[fn[1]] ? GN_PROC_FN[fn[1]] : null;
+  }
+
+  function gnLigneDerniere(d) {
+    if (!d) return '<span class="gn-der-rien">jamais lancé</span>';
+    var quand = d.debut ? gnDuree(Date.now() - d.debut) : "?";
+    if (d.etat === "en_cours") {
+      return '<span class="gn-der-run">en cours depuis ' + quand + '</span>';
+    }
+    if (d.etat === "interrompu") {
+      return '<span class="gn-der-ko">il y a ' + quand + " · interrompu par un redémarrage</span>";
+    }
+    var duree = d.duree_ms == null ? ""
+      : (d.duree_ms < 1000 ? d.duree_ms + " ms"
+        : (d.duree_ms / 1000).toFixed(d.duree_ms < 10000 ? 1 : 0) + " s");
+    var cl = d.etat === "reussi" ? "gn-der-ok" : "gn-der-ko";
+    return '<span class="' + cl + '">il y a ' + quand
+      + (duree ? " · " + duree : "")
+      + (d.resume ? " · " + d.resume : "") + "</span>";
+  }
+
+  async function gnMajRuns() {
+    try {
+      var r = await fetch("/dashboard/admin/runs");
+      if (!r.ok) {
+        // Replanifier malgre tout : sans ca, une seule reponse en erreur
+        // tuerait la boucle de rafraichissement pour de bon.
+        if (window.console) console.warn("gnMajRuns : /admin/runs a repondu " + r.status);
+        clearTimeout(gnRunsTimer);
+        gnRunsTimer = setTimeout(gnMajRuns, 60000);
+        return;
+      }
+      var j = await r.json();
+      var verrou = j.verrou || null;
+      var lourds = j.process || [];
+
+      document.querySelectorAll("button.proc-launch").forEach(function (b) {
+        var p = gnProcessDuBouton(b);
+        if (p === null && window.console) {
+          console.warn("gnMajRuns : process inconnu pour un bouton", b.getAttribute("onclick"));
+        }
+        var l = b.nextElementSibling;
+        if (!l || !l.classList || !l.classList.contains("gn-der")) {
+          l = document.createElement("div");
+          l.className = "gn-der";
+          b.insertAdjacentElement("afterend", l);
+        }
+        l.innerHTML = p ? gnLigneDerniere(j.derniers && j.derniers[p]) : "";
+        // Le bouton reflete le verrou, il ne le decide pas : c'est la
+        // difference avec le disabled d'avant, qui ne tenait que dans l'onglet.
+        if (verrou && p && lourds.indexOf(p) !== -1) {
+          b.disabled = true;
+          b.title = "Verrou pris par " + verrou.process;
+        } else if (b.getAttribute("data-gn-en-cours") !== "1") {
+          b.disabled = false;
+          b.title = "";
+        }
+      });
+
+      var sec = document.getElementById("sec-process");
+      if (sec) {
+        var ban = document.getElementById("gn-verrou");
+        if (verrou) {
+          if (!ban) {
+            ban = document.createElement("div");
+            ban.id = "gn-verrou"; ban.className = "gn-verrou";
+            sec.insertBefore(ban, sec.firstChild);
+          }
+          ban.innerHTML = "<b>\u2298 Verrou pris par \u00ab " + verrou.process + " \u00bb depuis "
+            + (verrou.depuis_s == null ? "?" : verrou.depuis_s + " s")
+            + ".</b> <span>Les autres process attendent la fin \u2014 le verrou est c\u00f4t\u00e9 serveur, "
+            + "un second onglet ne peut pas passer outre.</span>";
+        } else if (ban) {
+          ban.remove();
+        }
+      }
+
+      // Tant qu'un process tourne on suit de pres ; sinon on laisse la machine
+      // tranquille. Une requete toutes les 30 s ne coute rien.
+      clearTimeout(gnRunsTimer);
+      gnRunsTimer = setTimeout(gnMajRuns, verrou ? 3000 : 30000);
+    } catch (e) {
+      // Le dashboard ne doit pas casser parce que son journal est muet.
+      if (window.console) console.warn("gnMajRuns :", e);
+      clearTimeout(gnRunsTimer);
+      gnRunsTimer = setTimeout(gnMajRuns, 60000);
+    }
+  }
+
+  // Expose : si le script du dashboard est encapsule, la fonction n'est pas
+  // visible depuis le listener de fin de page. JavaScript, pas TypeScript.
+  window.gnMajRuns = gnMajRuns;
+
   async function lancerProcess(btn, endpoint, label) {
     ensureConsoleOpen();
     var original = btn.textContent;
     btn.disabled = true;
+    btn.setAttribute("data-gn-en-cours", "1");
     btn.textContent = "⏳ En cours...";
     consoleLine("$ " + label + " — lancement...", "cmd");
     var t0 = Date.now();
@@ -1591,6 +2011,14 @@
       var res = await fetch("/dashboard/admin/" + endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       var data = await res.json();
       var secs = ((Date.now() - t0) / 1000).toFixed(1);
+      // Un 409 de verrou n'est pas un echec du process : c'est un refus de la
+      // machine, qui est occupee. L'afficher en rouge comme une panne
+      // apprendrait a ignorer les vraies pannes.
+      if (res.status === 409 && data.verrou) {
+        consoleLine("  \u2298 Refus\u00e9 \u2014 " + (data.msg || "un autre process occupe la machine"), "info");
+        gnMajRuns();
+        return;
+      }
       if (!res.ok || data.ok === false) {
         consoleLine("  ✗ Échec : " + (data.msg || data.error || ("HTTP " + res.status)), "err");
       } else {
@@ -1629,8 +2057,10 @@
     } catch (err) {
       consoleLine("  ✗ Erreur réseau : " + err.message, "err");
     } finally {
+      btn.removeAttribute("data-gn-en-cours");
       btn.disabled = false;
       btn.textContent = original;
+      gnMajRuns();
     }
   }
 
@@ -1921,5 +2351,242 @@
   </div>
   <div id="hist-src"></div>
 </div>
+
+<script>
+/* === PISTE B : navigation par defilement === */
+(function () {
+  var SECTIONS = [
+    ["page-surveillance", "Surveillance",   "syst\u00e8mes et alertes"],
+    ["page-traffic",      "Audience",       "trafic, pages, comptes"],
+    ["page-admin",        "Administration", "process, items, outils"]
+  ];
+
+  /* hauteur reelle de l'en-tete : les offsets collants en dependent */
+  function mesurer() {
+    var t = document.querySelector(".top");
+    if (t) document.documentElement.style.setProperty("--gn-top", t.offsetHeight + "px");
+  }
+  mesurer();
+  window.addEventListener("resize", mesurer);
+
+  /* titre collant en tete de chaque section */
+  SECTIONS.forEach(function (s) {
+    var el = document.getElementById(s[0]);
+    if (!el || el.querySelector(".gn-st")) return;
+    el.classList.add("gn-anc");
+    var t = document.createElement("div");
+    t.className = "gn-st";
+    t.innerHTML = '<h2>' + s[1] + '</h2><em>' + s[2] + '</em><span class="gn-sp"></span>';
+    el.insertBefore(t, el.firstChild);
+  });
+
+  /* l'index suit la lecture — seules les trois sections principales s'allument */
+  var vus = new IntersectionObserver(function (es) {
+    es.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      document.querySelectorAll("#gn-idx .gn-ix").forEach(function (b) { b.classList.remove("ici"); });
+      var b = document.querySelector('#gn-idx .gn-ix[href="#' + e.target.id + '"]');
+      if (b) b.classList.add("ici");
+    });
+  }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 });
+  SECTIONS.forEach(function (s) {
+    var el = document.getElementById(s[0]);
+    if (el) vus.observe(el);
+  });
+
+  /* les deux anciens commutateurs ne masquent plus rien : ils amenent a la section */
+  function versSection(id) {
+    var el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  window.switchView  = function () { versSection("page-traffic"); };
+  window.toggleAdmin = function () { versSection("page-admin"); };
+})();
+</script>
+<script>
+/* === PISTE B : repli des systemes nominaux ===
+   L'etat vit sur la grille, pas sur le separateur : la grille n'est pas
+   remplacee a chaque snapshot, seulement son contenu. Le repli survit donc
+   au rafraichissement, et le chevron suit en CSS. */
+function gnPlierNominaux(el) {
+  var g = document.getElementById("health-grid");
+  if (g) g.classList.toggle("replie");
+}
+</script>
+<script>
+/* Premier releve du journal des executions, une fois la page en place. */
+window.addEventListener("load", function () {
+  if (typeof window.gnMajRuns === "function") setTimeout(window.gnMajRuns, 800);
+  else if (window.console) console.warn("gnMajRuns indisponible depuis le load listener");
+});
+</script>
+<script>
+/* ═══ Section Publication ═══
+   Deux sources, deux rythmes : le rapport dit l'etat et les compteurs, le
+   journal se lit par morceaux avec un decalage pour ne jamais relire ce qui
+   est deja affiche. Tant qu'un build tourne on suit de pres ; sinon on se
+   contente d'un coup d'oeil de temps en temps. */
+(function () {
+  var E = function (id) { return document.getElementById(id); };
+  var decalage = 0, minuteur = null, dernierEtat = null;
+
+  function duree(ms) {
+    var s = Math.round(ms / 1000);
+    if (s < 60) return s + " s";
+    var m = Math.round(s / 60);
+    if (m < 60) return m + " min";
+    var h = m / 60;
+    return (h < 48 ? Math.round(h) + " h" : Math.round(h / 24) + " jours");
+  }
+
+  function badges(cl, txt) {
+    ["pub-bg", "pub-bg-idx"].forEach(function (id) {
+      var b = E(id); if (!b) return;
+      b.className = "gn-bg " + cl; b.textContent = txt;
+    });
+  }
+
+  function mesure(nom, av, ap) {
+    if (av == null || ap == null) return "";
+    var d = ap - av;
+    var cl = d > 0 ? "dt p" : (d < 0 ? "dt m" : "dt");
+    var txt = d === 0 ? "\u2014" : (d > 0 ? "+" + d : String(d));
+    return '<div class="pub-mes"><span>' + nom + '</span>'
+      + '<em class="av">' + av + '</em><em class="fl">\u2192</em>'
+      + '<em class="ap">' + ap + '</em><em class="' + cl + '">' + txt + '</em></div>';
+  }
+
+  function controle(cl, nom, val) {
+    var ic = cl === "ok" ? "\u2713" : (cl === "ko" ? "\u2717" : "\u00b7");
+    return '<div class="pub-ctl ' + cl + '"><i>' + ic + '</i><span>' + nom + '</span>'
+      + '<b>' + (val == null ? "" : val) + '</b></div>';
+  }
+
+  function rendreRapport(j) {
+    var r = j.rapport, e = j.etat;
+    dernierEtat = e;
+
+    if (e === "en_cours") {
+      badges("run", "build");
+      E("pub-etat").innerHTML = "<b>Build en cours.</b>"
+        + '<span class="q">le journal ci-dessous avance en direct</span>';
+    } else if (e === "interrompu") {
+      badges("ko", "interrompu");
+      E("pub-etat").innerHTML = "<b>Le build s'est arr\u00eat\u00e9 en route.</b>"
+        + '<span class="q">journal muet depuis ' + duree((j.silence_s || 0) * 1000)
+        + ", et aucun rapport \u00e9crit</span>";
+    } else if (!r) {
+      badges("", "jamais");
+      E("pub-etat").innerHTML = "<b>Aucun build depuis la mise en place.</b>"
+        + '<span class="q">rien \u00e0 publier pour l\'instant</span>';
+    } else if (r.promouvable === true) {
+      badges("ok", "pr\u00eat");
+      E("pub-etat").innerHTML = "<b>Pr\u00eat \u00e0 publier.</b>"
+        + '<span class="q">build de ' + (r.fini || "?").replace("T", " \u00e0 ").slice(0, 19)
+        + " \u00b7 " + (r.duree_s == null ? "?" : r.duree_s + " s") + "</span>";
+    } else {
+      badges("ko", "refus\u00e9");
+      E("pub-etat").innerHTML = "<b>Publication bloqu\u00e9e.</b>"
+        + '<span class="q">' + ((r.alertes || []).join(" \u00b7 ") || "un contr\u00f4le a \u00e9chou\u00e9")
+        + "</span>";
+    }
+
+    var s = (r && r.staging) || {}, p = (r && r.prod) || {};
+    E("pub-mes").innerHTML = r
+      ? mesure("Fiches anime", p.anime, s.anime)
+        + mesure("Fiches jeux", p.jeux, s.jeux)
+        + mesure("URLs au sitemap", p.sitemap, s.sitemap)
+        + mesure("Liens vers les fiches", p.liens, s.liens)
+      : '<div class="pub-ctl na"><i>\u00b7</i><span>aucun rapport</span><b></b></div>';
+
+    // Les quatre controles sont exactement ceux que build-staging.sh evalue :
+    // on les deduit de ses alertes, on n'en invente pas.
+    if (!r) {
+      E("pub-ctl").innerHTML = '<div class="pub-ctl na"><i>\u00b7</i><span>aucun rapport</span><b></b></div>';
+    } else {
+      var al = (r.alertes || []).join(" | ");
+      var ko = function (mot) { return al.indexOf(mot) !== -1 ? "ko" : "ok"; };
+      E("pub-ctl").innerHTML =
+          controle(ko("aucun lien"), "Des liens m\u00e8nent aux fiches", s.liens)
+        + controle(ko("anime en forte baisse"), "Volume anime coh\u00e9rent", s.anime)
+        + controle(ko("jeux en forte baisse"), "Volume jeux coh\u00e9rent", s.jeux)
+        + controle(ko("sitemap en forte baisse"), "Sitemap coh\u00e9rent", s.sitemap)
+        + controle("na", "Fiches sans lien, arbitrage en attente", s.orphelines);
+    }
+
+    E("pub-promo").disabled = !(e === "termine" && r && r.promouvable === true);
+    E("pub-build").disabled = (e === "en_cours");
+    E("pub-build").textContent = e === "en_cours" ? "Build en cours\u2026" : "Lancer un build";
+  }
+
+  async function maj() {
+    try {
+      var rr = await fetch("/dashboard/admin/build/rapport");
+      if (rr.ok) rendreRapport(await rr.json());
+
+      var rj = await fetch("/dashboard/admin/build/journal?depuis=" + decalage);
+      if (rj.ok) {
+        var j = await rj.json();
+        if (j.depuis === 0 && decalage !== 0) E("pub-log").textContent = "";
+        if (j.texte) {
+          var log = E("pub-log");
+          var enBas = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
+          log.textContent += j.texte;
+          if (enBas) log.scrollTop = log.scrollHeight;
+        }
+        decalage = j.taille;
+        E("pub-log-t").textContent = j.taille + " octets";
+      }
+    } catch (e) {
+      if (window.console) console.warn("publication :", e);
+    }
+    clearTimeout(minuteur);
+    minuteur = setTimeout(maj, dernierEtat === "en_cours" ? 1500 : 20000);
+  }
+
+  async function demander(url, bouton) {
+    var m = E("pub-msg");
+    bouton.disabled = true;
+    m.className = "pub-msg"; m.textContent = "Demande en cours\u2026";
+    try {
+      var r = await fetch(url, { method: "POST" });
+      var d = await r.json();
+      m.className = "pub-msg " + (r.ok ? "ok" : "ko");
+      m.textContent = d.msg || (r.ok ? "Demande accept\u00e9e." : "Refus\u00e9 (HTTP " + r.status + ")");
+      if (r.ok && url.indexOf("demande") !== -1) {
+        // Nouveau build : le journal est remis a zero cote serveur, donc le
+        // decalage doit repartir de zero ici aussi.
+        decalage = 0; E("pub-log").textContent = ""; dernierEtat = "en_cours";
+      }
+    } catch (e) {
+      m.className = "pub-msg ko"; m.textContent = "Erreur r\u00e9seau : " + e.message;
+    }
+    clearTimeout(minuteur);
+    minuteur = setTimeout(maj, 1200);
+  }
+
+  window.addEventListener("load", function () {
+    var b = E("pub-build"), p = E("pub-promo");
+    if (!b || !p) return;
+    b.onclick = function () { demander("/dashboard/admin/build/demande", b); };
+    p.onclick = function () { demander("/dashboard/admin/build/promouvoir", p); };
+
+    // La section est ecrite en dur, donc le script de la piste B ne l'observe
+    // pas : il lui faut son propre observateur pour allumer l'index.
+    var sec = E("page-publication");
+    if (sec && window.IntersectionObserver) {
+      new IntersectionObserver(function (es) {
+        es.forEach(function (ev) {
+          if (!ev.isIntersecting) return;
+          document.querySelectorAll("#gn-idx .gn-ix").forEach(function (x) { x.classList.remove("ici"); });
+          var a = document.querySelector('#gn-idx .gn-ix[href="#page-publication"]');
+          if (a) a.classList.add("ici");
+        });
+      }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 }).observe(sec);
+    }
+    setTimeout(maj, 1000);
+  });
+})();
+</script>
 </body>
 </html>

@@ -1,0 +1,28 @@
+GameNime — images HD de « Cette semaine » et du coin du personnage (tache gn-hd)
+Pose par le patch images-hd du 5 octobre 2026.
+
+A quoi ca sert
+  Les jaquettes d'AniList ne font que 460 px de large : la case « Cette semaine »
+  et le coin du personnage les agrandissaient jusqu'a 3 fois, d'ou le flou.
+  Toutes les heures, cette tache agrandit 4 fois par IA (Real-ESRGAN, modele
+  anime) chaque NOUVELLE jaquette de la semaine, trouve le visage du personnage
+  (cadrage) et la teinte (couleur Caméléon), et publie les images et le
+  manifeste sur /hd/. La page prend l'image HD quand elle existe, la jaquette
+  d'AniList sinon : si la tache s'arrete, rien ne casse.
+
+Ce qu'il y a ici
+  gn-hd.sh         le lanceur (crontab de rey, minute 23 de chaque heure)
+  app/hd.py        la tache (lit le flux, agrandit, visage, teinte, WebP, manifeste)
+  app/esr.py       l'agrandissement par IA, sans PyTorch (onnxruntime)
+  image/Dockerfile l'image gn-hd:1 (Python 3.12 et paquets a versions figees)
+  modeles/         poids Real-ESRGAN x4plus_anime_6B et detecteur de visages anime
+  journal.txt      ce que fait chaque passage
+  Images et manifeste : /opt/stack/nginx/static/hd (servis sur /hd/ par nginx)
+
+Commandes utiles
+  tail -n 30 /opt/stack/hd/journal.txt         ce qui s'est passe
+  /opt/stack/hd/gn-hd.sh                        un passage tout de suite
+  ls /opt/stack/nginx/static/hd | wc -l         nombre de fichiers publies
+
+Arreter la tache (la page revient aux jaquettes d'AniList pour les nouvelles)
+  crontab -l | grep -v -e '/opt/stack/hd/gn-hd.sh' -e '^# gn-hd' | crontab -

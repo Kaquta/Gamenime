@@ -371,8 +371,14 @@ export function renderCard(item, domain, rank) {
   if (hype === "Populaire") hypeBadge = '<span class="item-badge popular">🔥 Populaire</span>';
   else if (hype === "Très attendu") hypeBadge = '<span class="item-badge anticipated">⭐ Très attendu</span>';
 
-  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' +
+  // --cover permet a l'accueil d'afficher l'affiche floutee en fond de carte
+  // sans dupliquer la balise <img>. encodeURI suffit : ces URL n'ont ni
+  // parenthese ni espace, et la propriete est ignoree partout ailleurs.
+  var coverVar = item.cover ? ' style="--cover:url(' + encodeURI(item.cover) + ')"' : '';
+
+  return '<article class="item-card' + (hasTrailer ? ' has-trailer' : '') + '"' + coverVar +
     ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    ' data-slug="' + (item.slug || '') + '"' +
     ' data-format="' + (item.format || '') + '"' +
     ' data-platform="' + String(item.platform || '').replace(/"/g, '') + '"' +
     (videoId ? ' data-yt="' + videoId + '"' : '') + screensAttr + '>' +
@@ -385,7 +391,183 @@ export function renderCard(item, domain, rank) {
     rankBadge +
     '<button class="fav-heart" data-fav-id="' + item.id + '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>' +
     '<div class="item-body">' +
-    '<h3>' + displayTitle(item) + '</h3>' +
+    // Le titre porte le lien vers la fiche : HTML valide, invisible a l'oeil,
+    // sans effet sur la grille, et le texte d'ancrage est le titre de l'oeuvre.
+    // Le coeur et les bandes du trailer restent hors du <a>, donc aucun clic
+    // sur eux ne peut declencher de navigation.
+    '<h3>' + (item.slug
+      ? '<a class="item-link" href="/' + (String(domain).indexOf("anime") !== -1 ? 'anime' : 'games') + '/' + item.slug + '/">' + displayTitle(item) + '</a>'
+      : displayTitle(item)) + '</h3>' +
     dateBox(item) + platChips(item, domain) + hypePill(item, domain) +
     '</div></article>';
+}
+ 
+ 
+ 
+ 
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCUEIL — maquette validee le 3 octobre (session 35)
+   ═══════════════════════════════════════════════════════════════════════════
+   Trois blocs de l'accueil ont un corps de carte a eux : « Cette semaine »,
+   les deux « Derniers sortis » et les deux « Top 25 ». Le reste du site ne
+   change pas et garde renderCard.
+ 
+   Ce qui NE change pas, et pourquoi :
+   - la coquille reste <article class="item-card"> avec ses data-id/data-domain,
+     son .item-hover-video, ses .trailer-band, son .fav-heart et son <a
+     class="item-link"> dans le h3. Ce sont les crochets des ecouteurs delegues
+     de SectionBlock : survol -> bande-annonce YouTube, clic -> modale, coeur ->
+     favoris. Changer la coquille, c'est tout perdre d'un coup.
+   - le lien interne reste dans le h3 : c'est lui qui peuple le HTML livre et
+     qui a sorti les fiches de « detectee, non indexee ».
+ 
+   Ce qui change : le CORPS. .ds-l / .ds-t / .bds pour les derniers sortis,
+   .se-tags / .se-t / .se-m pour la semaine, tels que valides.
+ 
+   Le Top 25 fait exception : dans la maquette c'est une ligne de classement,
+   pas une carte. C'est donc un <a> entier, sans survol ni modale — conforme a
+   la demande (« si je laisse la souris sur item le trailer se lance » ne visait
+   que Cette semaine et Derniers sortis).
+   ═══════════════════════════════════════════════════════════════════════════ */
+ 
+// Les informations de la carte viennent des MEMES fonctions que le catalogue :
+// dateBox (la ligne « 3 octobre » + la pastille d'etat), platChips (les
+// plateformes) et hypePill. L'accueil avait ses propres etiquettes — « SORTI
+// LE 2 OCT. », des badges Jeu/Anime — c'est ce qu'on retire : une seule source
+// pour toute l'information du site, et elle se corrige a un seul endroit.
+ 
+// Le coeur des favoris. Son balisage ne doit exister qu'a un seul endroit :
+// c'est lui que l'ecouteur delegue reconnait (data-fav-id / data-fav-type) et
+// que updateAllHearts() bascule entre ♡ et ♥.
+function coeurFavori(item, domain) {
+  return '<button class="fav-heart" data-fav-id="' + item.id +
+    '" data-fav-type="' + domain + '" aria-label="Favori">♡</button>';
+}
+ 
+// Coquille commune. Tout ce que les ecouteurs delegues vont chercher est ici,
+// dans le meme ordre que renderCard : si une de ces lignes disparait, c'est une
+// fonctionnalite du site qui disparait avec elle.
+function coquilleAccueil(item, domain, classes, corps, coeurAilleurs?) {
+  const hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
+  const videoId = hasTrailer ? ytId(item.trailerUrl) : null;
+  const screens = parseScreenshots(item);
+  const screensAttr = !hasTrailer && screens.length
+    ? " data-screens='" + JSON.stringify(screens) + "'" : "";
+  const media = item.cover
+    ? '<img src="' + item.cover + '" alt="' + displayTitle(item) + '" loading="lazy" />'
+    : '<div class="item-placeholder">Aucune image</div>';
+  // --cover sert au fond floute (::before) sans dupliquer la balise <img>.
+  const coverVar = item.cover ? ' style="--cover:url(' + encodeURI(item.cover) + ')"' : "";
+ 
+  return '<article class="item-card ' + classes + (hasTrailer ? " has-trailer" : "") + '"' + coverVar +
+    ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    ' data-slug="' + (item.slug || "") + '"' +
+    ' data-format="' + (item.format || "") + '"' +
+    ' data-platform="' + String(item.platform || "").replace(/"/g, "") + '"' +
+    (videoId ? ' data-yt="' + videoId + '"' : "") + screensAttr + ">" +
+    '<div class="item-media">' + media + "</div>" +
+    '<div class="item-hover-video"></div>' +
+    // Ni bandes ni pastille ici. Les .trailer-band du catalogue servaient a
+    // rattraper le clic que l'iframe YouTube avalait ; sur l'accueil la video
+    // est transparente au clic, donc toute la carte ouvre la fiche et les
+    // bandes n'ont plus de role. La pastille « Bande-annonce », elle, se
+    // posait sur le titre de la carte large.
+    '<div class="item-hover-slides"></div>' +
+    '<div class="item-overlay"></div>' +
+    (coeurAilleurs ? "" : coeurFavori(item, domain)) +
+    corps +
+    "</article>";
+}
+ 
+// Le titre, avec son lien vers la fiche quand elle existe. Identique a
+// renderCard : meme classe, meme forme d'URL, meme texte d'ancrage.
+function titreAccueil(item, domain, classe) {
+  const txt = displayTitle(item);
+  const lien = item.slug
+    ? '<a class="item-link" href="/' +
+      (String(domain).indexOf("anime") !== -1 ? "anime" : "games") + "/" + item.slug + '/">' + txt + "</a>"
+    : txt;
+  return '<h3 class="' + classe + '">' + lien + "</h3>";
+}
+ 
+/**
+ * Carte large des deux « Derniers sortis ».
+ * Jaquette a gauche, texte a droite, fond floute tire de la jaquette.
+ */
+export function renderCardDerniers(item, domain) {
+  const corps = '<div class="item-body ds-info">' +
+    titreAccueil(item, domain, "ds-t") +
+    dateBox(item) +
+    platChips(item, domain) +
+    hypePill(item, domain) +
+    "</div>";
+  return coquilleAccueil(item, domain, "ds-sl", corps);
+}
+ 
+/**
+ * Grande diapositive de « Cette semaine ».
+ * WeekRadar pose lui-meme accLibelle (« Aujourd'hui · 11:30 ») et accEpisode :
+ * ces deux valeurs dependent de l'heure de la VISITE, pas de celle du build,
+ * et le compte a rebours .cd est rafraichi toutes les 30 secondes.
+ */
+export function renderCardSemaine(item, domain) {
+  const ep = item.accEpisode
+    ? '<div class="se-m">Épisode <b>' + item.accEpisode + "</b>" +
+      (item.accPlateforme ? " · sur <b>" + item.accPlateforme + "</b>" : "") + "</div>"
+    : "";
+  // La ligne de date est celle du site (.dbox / .dval / .dcd), mais son contenu
+  // nous appartient : dateBox ne connait que le jour, alors qu'un episode a une
+  // heure de diffusion et un compte a rebours que WeekRadar rafraichit.
+  const quand = '<div class="dbox"><div class="dline">' +
+    '<span class="dval">' + (item.accLibelle || "") + "</span>" +
+    '<span class="dcd"></span></div></div>';
+  const corps = '<div class="item-body se-txt">' +
+    titreAccueil(item, domain, "se-t") +
+    ep +
+    quand +
+    platChips(item, domain) +
+    hypePill(item, domain) +
+    "</div>";
+  // Le coeur reprend sa place habituelle, dans le coin de la carte, comme sur
+  // toutes les autres du site : « Me rappeler » disparait, les favoris restent.
+  return coquilleAccueil(item, domain, "se-sl", corps);
+}
+ 
+/**
+ * Ligne du Top 25.
+ *
+ * C'est une .item-card comme les autres : c'est cette classe que les ecouteurs
+ * delegues de SectionBlock reconnaissent. Elle herite donc, sans une ligne de
+ * JavaScript en plus, du clic vers LA MEME modale que le catalogue et du survol
+ * qui lance la bande-annonce dans .item-hover-video.
+ * Le titre reste un <a class="item-link"> : c'est lui qui peuple le HTML livre,
+ * et le gestionnaire annule sa navigation pour ouvrir la modale a la place.
+ *
+ * Sans page de fiche (synopsis trop court), pas de lien : une URL qui n'existe
+ * pas renverrait l'accueil en 200 et Google indexerait un doublon.
+ */
+export function renderRangTop(item, domain, rank) {
+  const estAnime = String(domain).indexOf("anime") !== -1;
+  const sousTitre = estAnime
+    ? (item.genre || platformFallback(item))
+    : (simplifyPlatform(item.platform) || item.genre || "Information à venir");
+  const hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
+  const videoId = hasTrailer ? ytId(item.trailerUrl) : null;
+  const titre = displayTitle(item);
+  const vignette = item.cover
+    ? '<img src="' + item.cover + '" alt="' + titre + '" loading="lazy" />'
+    : "";
+  const lien = item.slug
+    ? '<a class="item-link" href="/' + (estAnime ? "anime" : "games") + "/" + item.slug + '/">' + titre + "</a>"
+    : titre;
+  return '<article class="item-card tl' + (rank <= 3 ? " p3" : "") + (hasTrailer ? " has-trailer" : "") + '"' +
+    ' data-id="' + item.id + '" data-domain="' + domain + '"' +
+    ' data-slug="' + (item.slug || "") + '"' +
+    (videoId ? ' data-yt="' + videoId + '"' : "") + ">" +
+    '<span class="r">' + rank + "</span>" +
+    '<span class="mv">' + vignette + "</span>" +
+    '<span class="tx"><span class="n">' + lien + "</span>" +
+    '<span class="gn">' + sousTitre + "</span></span>" +
+    '<div class="item-hover-video"></div>' +
+    "</article>";
 }

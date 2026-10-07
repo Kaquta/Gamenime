@@ -193,7 +193,7 @@ export function clearFeedCache(): void {
 // ============================================================
 
 const SELECT_ANIME = `
-  SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
          CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          screenshots,
@@ -211,7 +211,7 @@ const SELECT_ANIME = `
 `;
 
 const SELECT_GAMES = `
-  SELECT CAST(id AS UNSIGNED) AS id, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
          CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          screenshots,
@@ -708,7 +708,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
     if (routes.length > 0) {
       const ph = routes.map(() => "?").join(",");
       const rows: any[] = await pool.query(
-        `SELECT id, title, title_english AS titleEnglish, cover, platform,
+        `SELECT id, slug, title, title_english AS titleEnglish, cover, platform, trailer_url AS trailerUrl,
                 anime_schedule_route AS route, popularity
          FROM anime_items WHERE anime_schedule_route IN (${ph})`,
         routes
@@ -744,6 +744,12 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
       if (idx < 0) continue;
       days[idx].episodes.push({
         id: item.id,
+        // Le slug permet un vrai lien vers la fiche depuis l'accueil, au lieu
+        // d'ouvrir seulement la modale : autant de liens internes que d'episodes.
+        slug: item.slug ?? null,
+        // La bande-annonce au survol sur l'accueil : sans elle, les cartes de
+        // la semaine sont les seules du site a ne pas en avoir.
+        trailerUrl: item.trailerUrl ?? null,
         title: item.title,
         titleEnglish: item.titleEnglish,
         cover: item.cover,
@@ -800,8 +806,10 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
         " AND LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) >= 150"
       : "";
     const lister = async (table: "anime_items" | "game_items", t: "anime" | "game") => {
-      const rows: Array<{ id: number; slug: string; updatedAt: string }> = await pool.query(
-        `SELECT CAST(id AS UNSIGNED) AS id, slug, DATE_FORMAT(updated_at, '%Y-%m-%d') AS updatedAt
+      const rows: Array<{ id: number; slug: string; updatedAt: string; title: string; titleEnglish: string | null; releaseDate: string | null; releasePrecision: string | null }> = await pool.query(
+        `SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish,
+                DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate, release_precision AS releasePrecision,
+                DATE_FORMAT(updated_at, '%Y-%m-%d') AS updatedAt
          FROM ${table}
          WHERE slug IS NOT NULL AND slug != ''${descCond}
          ORDER BY id`
@@ -841,7 +849,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
 
     if (type === "anime" || type === "all") {
       anime = await pool.query(
-        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
                 DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
                 release_precision AS releasePrecision,
@@ -861,7 +869,7 @@ function applyDisplayStripToItems<T extends { description?: string | null }>(ite
 
     if (type === "game" || type === "all") {
       games = await pool.query(
-        `SELECT id, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
                 DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
                 release_precision AS releasePrecision,

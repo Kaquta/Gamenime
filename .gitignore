@@ -39,3 +39,12 @@ backup-*.sql
 site/public/backup/
 nginx/conf.d/site.conf
 discord-bot/data/active-polls.json
+# images HD de « Cette semaine » (patch images-hd) : modeles, journal, images produites
+hd/modeles/
+hd/journal.txt
+hd/.verrou
+nginx/static/hd/
+
+sauvegardes/
+site/.build-report/
+anime_workflow_n8n.json

@@ -6,9 +6,317 @@ import SectionBlock from "../components/SectionBlock.astro";
 import Footer from "../components/Footer.astro";
 ---
 
-<BaseLayout title="GameNime — Anime">
+<BaseLayout title="GameNime — Anime" catalogue>
   <HeroHeader activeTab="anime" />
   <FilterBar domain="anime" />
   <SectionBlock title="Derniers animés" source="anime" kinds />
   <Footer />
+<!-- COIN-TOP-DEBUT : le Top qui defile en haut a droite et sa couleur (pages-finales.sh, 6 octobre 2026) -->
+<script is:inline>
+/* ═══ PAGES ANIME, JEUX, A VENIR : LE TOP QUI DEFILE EN HAUT A DROITE, ET SA COULEUR (Caméléon) ═══
+   Anime  : le Top 5 du Top 25 Anime ; Jeux : le Top 5 du Top 25 Jeux ; A venir : le Top 3 des sorties
+   les plus attendues dans les 30 jours, celui de l'onglet affiche (Animes ou Jeux, au score du site) :
+   changer d'onglet change le defilement. Une image toutes les
+   6 secondes (pas de defilement si l'utilisateur a demande moins d'animations, ni onglet cache) ; chaque
+   image donne sa couleur a toute la page, comme « Cette semaine » a l'accueil. L'image HD, son cadrage
+   et sa teinte viennent de /hd/manifeste.json quand elle y est ; sinon la jaquette (IGDB : en 1080p).
+   L'image seule : ni pastille, ni texte.
+     > 1060 px : boite de 50 % de large (900 px au plus), du haut de page
+                 jusqu'a 120 px sous le haut du panneau de la page
+     <= 1060 px : 68 % de large, du haut de page jusqu'au haut du panneau
+   La couleur, le cadrage, le fondu et la bichromie sont ceux du script de l'accueil, mot pour mot.
+   Tout l'habillage (bichromie, fondus, cadre) est dans le CSS. */
+(function () {
+  // l'ancre : le haut du panneau de la page, le premier VISIBLE (sur A venir, l'onglet Jeux masque
+  // la section des animes) ; relue a chaque placement
+  var ANCRES = ".page-shell > .section-block";
+  function ancre() {
+    var l = document.querySelectorAll(ANCRES);
+    for (var k = 0; k < l.length; k++) if (l[k].offsetParent !== null) return l[k];
+    return l[0] || null;
+  }
+  var shell = document.querySelector(".page-shell");
+  var acc = ancre();
+  if (!shell || !acc || !window.fetch) return;
+
+  var gc = document.createElement("div");
+  gc.className = "gc";
+  gc.setAttribute("aria-hidden", "true");
+  gc.innerHTML = '<div class="gc-box"><i></i><i></i><b class="gc-ep"></b></div>';
+  shell.parentNode.insertBefore(gc, shell);
+  var box = gc.querySelector(".gc-box"), calques = box.querySelectorAll("i"), ep = box.querySelector(".gc-ep");
+  var TEL = window.matchMedia("(max-width: 1060px)");
+  // ── la page : Anime, Jeux ou A venir (d'apres la source du premier panneau)
+  var src0 = acc.getAttribute("data-source") || "";
+  var MODE = src0 === "games" ? "games" : /-upcoming$/.test(src0) ? "avenir" : "anime";
+  var DUREE = 6000, CALME = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var url = "";
+
+  // ── couleur de l'episode (design Caméléon) ─────────────────────────────────
+  // La teinte dominante de l'image de l'episode affiche (0 a 360) : lue sur
+  // data-couleur si le serveur la fournit, sinon calculee ici sur l'image (une
+  // vignette de 48 px, une fois par image, gardee en memoire et dans le
+  // navigateur). Le script en tire les couleurs --ep-* posees sur <html>.
+  // La DENSITE est reglee par le CSS du design (--ep-k-fond, --ep-k-lueur,
+  // --ep-k-verre, --ep-k-voile : 0 a 1) : la couleur de l'episode dans la
+  // nuit, la lumiere, le verre des panneaux et les voiles. Les accents gardent
+  // toujours leur pleine couleur. Sans teinte (image illisible) : tout est neutre.
+  var racine = document.documentElement, cle = null;
+  function nb(x) { return Math.round(x * 10) / 10; }
+  function hsl(h, s, l, a) { return (a === undefined ? "hsl(" : "hsla(") + h + ", " + nb(s) + "%, " + nb(l) + "%" + (a === undefined ? ")" : ", " + nb(a * 100) / 100 + ")"); }
+  function rgb(h, s, l) {
+    s /= 100; l /= 100;
+    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2, r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; } else if (h < 120) { r = x; g = c; } else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; } else if (h < 300) { r = x; b = c; } else { r = c; b = x; }
+    return [r, g, b].map(function (v) { return Math.round((v + m) * 255); }).join(", ");
+  }
+  function reglage(n) { var v = parseFloat(getComputedStyle(racine).getPropertyValue(n)); return isNaN(v) ? 1 : Math.max(0, Math.min(1, v)); }
+  function teinter(v) {
+    var h = v === null || v === "" || isNaN(Number(v)) ? null : ((Math.round(Number(v)) % 360) + 360) % 360;
+    var kf = reglage("--ep-k-fond"), kl = reglage("--ep-k-lueur"), kv = reglage("--ep-k-verre"), kw = reglage("--ep-k-voile");
+    var c = [h, kf, kl, kv, kw].join(" ");
+    if (c === cle) return;
+    cle = c;
+    var t = h === null ? 0 : h, s = h === null ? 0 : 1, st = racine.style;
+    st.setProperty("--ep-a", hsl(t, 85 * s, 72));             // accent clair (pastilles, onglet actif)
+    st.setProperty("--ep-b", hsl(t, 70 * s, 56));             // accent profond (bas du degrade)
+    st.setProperty("--ep-c", hsl(t, 80 * s, 58, .3 * kl));    // lumiere
+    st.setProperty("--ep-c2", hsl(t, 80 * s, 58, .16 * kl));  // lumiere douce
+    st.setProperty("--ep-d", hsl(t, 16 * s * kf, 9));         // nuit teintee (haut)
+    st.setProperty("--ep-e", hsl(t, 12 * s * kf, 4));         // nuit teintee (bas)
+    st.setProperty("--ep-f", hsl(t, 70 * s, 72, .34));        // filets et bords teintes
+    st.setProperty("--ep-g", hsl(t, 75 * s, 87));             // texte pale teinte
+    st.setProperty("--ep-h", hsl(t, 80 * s, 76, .55));        // reflet teinte (aretes)
+    st.setProperty("--ep-p1", hsl(t, 20 * s * kv, 16, .5));   // verre teinte (haut)
+    st.setProperty("--ep-p2", hsl(t, 16 * s * kv, 7, .8));    // verre teinte (bas)
+    st.setProperty("--ep-rgb", rgb(t, 16 * s * kw, 6));       // voile sur les images, en r, g, b
+  }
+
+  // teinte dominante : histogramme des teintes (24 cases) pondere par la
+  // vivacite, puis la fenetre de 45 degres la plus lourde et sa moyenne
+  // circulaire. Les gris et les noirs ne comptent pas.
+  function teinteDominante(d) {
+    var poids = [], sx = [], sy = [], k;
+    for (k = 0; k < 24; k++) { poids[k] = 0; sx[k] = 0; sy[k] = 0; }
+    for (var i = 0; i < d.length; i += 4) {
+      var r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      var v = mx, s = mx ? (mx - mn) / mx : 0;
+      if (v < 0.2 || s < 0.18) continue;
+      var c = mx - mn, h = mx === r ? ((g - b) / c) % 6 : mx === g ? (b - r) / c + 2 : (r - g) / c + 4;
+      h /= 6; if (h < 0) h += 1;
+      var w = s * v * v;
+      k = Math.floor(h * 24) % 24;
+      poids[k] += w; sx[k] += w * Math.cos(2 * Math.PI * h); sy[k] += w * Math.sin(2 * Math.PI * h);
+    }
+    var best = -1, lourd = 0;
+    for (k = 0; k < 24; k++) {
+      var t = poids[(k + 23) % 24] + poids[k] + poids[(k + 1) % 24];
+      if (t > lourd) { lourd = t; best = k; }
+    }
+    if (best < 0) return null;
+    var x = 0, y = 0;
+    [(best + 23) % 24, best, (best + 1) % 24].forEach(function (j) { x += sx[j]; y += sy[j]; });
+    return Math.round((Math.atan2(y, x) * 180 / Math.PI + 360) % 360);
+  }
+  var MEMO = {}, GARDE = "gn-teintes", garde = {};
+  try { garde = JSON.parse(localStorage.getItem(GARDE) || "{}") || {}; } catch (e) { garde = {}; }
+  function teinteImage(src, fin) {
+    if (Object.prototype.hasOwnProperty.call(MEMO, src)) { fin(MEMO[src]); return; }
+    if (typeof garde[src] === "number") { MEMO[src] = garde[src]; fin(garde[src]); return; }
+    var im = new Image();
+    im.crossOrigin = "anonymous";          // l'image doit autoriser la lecture (CORS) ; sinon : neutre
+    im.onload = function () {
+      var h = null;
+      try {
+        var w = 48, hh = Math.max(1, Math.round(48 * im.naturalHeight / im.naturalWidth));
+        var cv = document.createElement("canvas"); cv.width = w; cv.height = hh;
+        var cx = cv.getContext("2d");
+        cx.imageSmoothingEnabled = true; cx.imageSmoothingQuality = "high";
+        cx.drawImage(im, 0, 0, w, hh);
+        h = teinteDominante(cx.getImageData(0, 0, w, hh).data);
+      } catch (e) { h = null; }
+      MEMO[src] = h;
+      if (h !== null && src.length < 400) {   // adresses courtes seulement (pas d'image en data:)
+        try {
+          if (Object.keys(garde).length > 300) garde = {};
+          garde[src] = h; localStorage.setItem(GARDE, JSON.stringify(garde));
+        } catch (e) { /* stockage plein ou interdit : tant pis */ }
+      }
+      fin(h);
+    };
+    im.onerror = function () { MEMO[src] = null; fin(null); };
+    // image d'un autre site : adresse a part, pour ne pas reprendre la copie deja
+    // en cache sans autorisation de lecture (celle de la diapositive)
+    var u = src;
+    try {
+      if (/^https?:/i.test(src) && new URL(src, location.href).origin !== location.origin) u = src + (src.indexOf("?") < 0 ? "?" : "&") + "gn-teinte=1";
+    } catch (e) { u = src; }
+    im.src = u;
+  }
+
+  function cadrer(i) {
+    var W = Number(i.dataset.w), H = Number(i.dataset.h);
+    if (!W || !H) return;
+    var f = (i.dataset.foyer || "").split(" ").map(Number), cs = getComputedStyle(box);
+    var bw = box.clientWidth, bh = box.clientHeight;
+    var tx = parseFloat(cs.getPropertyValue("--gc-fx")) || 0.62, ty = parseFloat(cs.getPropertyValue("--gc-fy")) || 0.4;
+    var tw = parseFloat(cs.getPropertyValue("--gc-fw")) || 0.16;
+    var vu = f.length === 3 && f[2] > 0, fx = vu ? f[0] / 100 : 0.5, fy = vu ? f[1] / 100 : 0.3;
+    var s = Math.max(bw / W, bh / H, vu ? tw * bw / (f[2] / 100 * W) : 0), iw = W * s, ih = H * s;
+    var x = Math.min(0, Math.max(bw - iw, tx * bw - fx * iw)), y = Math.min(0, Math.max(bh - ih, ty * bh - fy * ih));
+    i.style.backgroundSize = iw + "px " + ih + "px";
+    i.style.backgroundPosition = x + "px " + y + "px";
+  }
+
+  function placer() {
+    var a = (ancre() || acc).getBoundingClientRect(), y = a.top + scrollY, l, h;
+    if (TEL.matches) { l = Math.round(innerWidth * 0.68); h = Math.max(220, y); }
+    else { l = Math.min(900, Math.round(innerWidth * 0.5)); h = y + 120; }
+    box.style.cssText = "width:" + l + "px;height:" + h + "px";
+    gc.style.height = h + "px";
+    for (var k = 0; k < calques.length; k++) cadrer(calques[k]);
+  }
+
+  function fondu(src, n, w, h, foyer) {
+    var on = box.querySelector("i.on");
+    var suiv = on === calques[0] ? calques[1] : calques[0];
+    suiv.dataset.w = w; suiv.dataset.h = h; suiv.dataset.foyer = foyer || "";
+    suiv.style.backgroundImage = 'url("' + src.replace(/"/g, "%22") + '")';
+    cadrer(suiv);
+    suiv.classList.add("on");
+    if (on) on.classList.remove("on");
+    ep.innerHTML = n ? "第<span>" + n + "</span>話" : "";
+  }
+
+  // ── l'episode du jour : flux de « Cette semaine » + images HD (memes regles que l'accueil) ──
+  function largeurHD(liste) {
+    var besoin = (TEL.matches ? innerWidth : Math.min(900, innerWidth / 2)) * (window.devicePixelRatio || 1);
+    var l = liste.filter(function (x) { return x === Math.round(x) && x > 0; }).sort(function (a, b) { return a - b; });
+    for (var k = 0; k < l.length; k++) if (l[k] >= besoin * 0.9) return l[k];
+    return l[l.length - 1];
+  }
+  function lire(u) {
+    return fetch(u).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+  }
+  function liste() {
+    var bon = function (r) { return r && Array.isArray(r.items) ? r.items : []; };
+    if (MODE === "avenir") {
+      var j = function (d) { return d.toISOString().slice(0, 10); }, a = new Date(), b = new Date(a.getTime() + 30 * 864e5);
+      var q = "status=upcoming&orderBy=score&limit=12&releasedAfter=" + j(a) + "&releasedBefore=" + j(b);
+      // un Top 3 par onglet (Animes, Jeux) ; une date vague (« prevu novembre », « prevu 2026 ») n'est pas
+      // une sortie du mois
+      var trois = function (r, d) {
+        return bon(r).filter(function (i) { var p = i.releasePrecision; return i.releaseDate && p !== "month" && p !== "year"; })
+          .sort(function (x, y) { return (Number(y.gameNimeScore) || 0) - (Number(x.gameNimeScore) || 0); })
+          .slice(0, 3).map(function (i) { return { i: i, d: d }; });
+      };
+      return Promise.all([lire("/api/feed/anime?" + q), lire("/api/feed/games?" + q)]).then(function (r) {
+        return { "anime-upcoming": trois(r[0], "anime"), "games-upcoming": trois(r[1], "games") };
+      });
+    }
+    return lire("/api/feed/" + MODE + "?status=released&limit=5").then(function (r) {
+      return bon(r).slice(0, 5).map(function (i) { return { i: i, d: MODE }; });
+    });
+  }
+  function diapos(l, hd) {
+    return l.map(function (x) {
+      var i = x.i || {}, cover = typeof i.cover === "string" ? i.cover : "";
+      var im = hd && hd.images && cover && Object.prototype.hasOwnProperty.call(hd.images, cover) ? hd.images[cover] : null;
+      if (im && !(typeof im.n === "string" && /^[\w-]+$/.test(im.n))) im = null;
+      var src = cover;
+      if (im) {
+        var ls = Array.isArray(im.l) && im.l.length ? im.l : (hd.largeurs || [960, 1600]);
+        src = "/hd/" + im.n + "-" + largeurHD(ls) + ".webp";
+      } else if (/^https:\/\/images\.igdb\.com\//.test(src)) {
+        src = src.replace(/\/t_[a-z0-9_]+\//, "/t_1080p/");   // la jaquette IGDB en grand
+      }
+      return { src: src,
+               f: im && Array.isArray(im.f) && im.f.length === 3 && im.f[2] > 0 ? im.f.join(" ") : "",
+               h: im && typeof im.h === "number" && isFinite(im.h) ? im.h : null };
+    }).filter(function (x) { return x.src; });
+  }
+
+  // ── le defilement ──────────────────────────────────────────────────────────
+  var diap = [], cur = -1, minuterie = null;
+  function montrer(k) {
+    if (!diap.length) return;
+    cur = (k + diap.length) % diap.length;
+    var x = diap[cur], src = x.src;
+    url = src;
+    if (x.h !== null) teinter(x.h);
+    else teinteImage(src, function (h) { if (url === src) teinter(h); });
+    var pre = new Image();
+    pre.onload = function () { if (url === src) fondu(src, "", pre.naturalWidth, pre.naturalHeight, x.f); };
+    pre.src = src;
+  }
+  function arreter() { if (minuterie) { clearInterval(minuterie); minuterie = null; } }
+  function lancer() {
+    arreter();
+    if (diap.length > 1 && !document.hidden && !CALME.matches) minuterie = setInterval(function () { montrer(cur + 1); }, DUREE);
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) arreter(); else lancer(); });
+  function vider() {
+    url = "";
+    [].forEach.call(box.querySelectorAll("i.on"), function (i) { i.classList.remove("on"); });
+    teinter(null);
+  }
+  // A venir : le Top 3 de l'onglet affiche ; changer d'onglet relance le defilement sur l'autre Top 3
+  var listes = null;
+  function onglet() {
+    var t = document.querySelector(".up-tab.active");
+    return (t && t.getAttribute("data-target")) || "anime-upcoming";
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".up-tab") : null;
+    if (!t || !listes) return;
+    var l = listes[t.getAttribute("data-target")];
+    if (!l || l === diap) return;
+    arreter(); diap = l; cur = -1;
+    if (diap.length) { placer(); montrer(0); lancer(); } else vider();
+  });
+
+  var largeur = innerWidth;
+  function redimensionner() {
+    if (TEL.matches && innerWidth === largeur) return;
+    largeur = innerWidth;
+    placer();
+  }
+  addEventListener("resize", redimensionner);
+  if (TEL.addEventListener) TEL.addEventListener("change", placer);
+  if (window.ResizeObserver) { var ro = new ResizeObserver(placer); [].forEach.call(document.querySelectorAll(ANCRES), function (e) { ro.observe(e); }); }
+
+  // bichromie bleue (variante 1, 3, 4) : un filtre SVG, partage par la page
+  var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", "0"); svg.setAttribute("height", "0"); svg.setAttribute("aria-hidden", "true");
+  svg.style.position = "absolute";
+  svg.innerHTML =
+    '<filter id="gn-duo" color-interpolation-filters="sRGB">' +
+    '<feColorMatrix type="matrix" values="0.30 0.59 0.11 0 0  0.30 0.59 0.11 0 0  0.30 0.59 0.11 0 0  0 0 0 1 0"/>' +
+    '<feComponentTransfer><feFuncR type="table" tableValues="0.008 0.05 0.36 0.86"/>' +
+    '<feFuncG type="table" tableValues="0.04 0.16 0.6 0.95"/>' +
+    '<feFuncB type="table" tableValues="0.13 0.42 0.95 1"/></feComponentTransfer></filter>' +
+    '<filter id="gn-onde" x="0" y="0" width="100%" height="100%">' +
+    '<feTurbulence type="fractalNoise" baseFrequency="0.006 0.09" numOctaves="2" seed="7" result="t"/>' +
+    '<feDisplacementMap in="SourceGraphic" in2="t" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter>';
+  document.body.appendChild(svg);
+
+  Promise.all([liste().catch(function () { return []; }), lire("/hd/manifeste.json")]).then(function (r) {
+    var l = r[0] || [];
+    if (MODE === "avenir" && !Array.isArray(l)) {
+      listes = { "anime-upcoming": diapos(l["anime-upcoming"] || [], r[1]), "games-upcoming": diapos(l["games-upcoming"] || [], r[1]) };
+      diap = listes[onglet()] || [];
+    } else {
+      diap = diapos(Array.isArray(l) ? l : [], r[1]);
+    }
+    if (!diap.length) { teinter(null); return; }
+    placer();
+    montrer(0);
+    lancer();
+  });
+  // apres le premier affichage, les couleurs glissent d'un episode a l'autre (CSS : .ep-pret)
+  requestAnimationFrame(function () { requestAnimationFrame(function () { racine.classList.add("ep-pret"); }); });
+})();
+</script>
+<!-- COIN-TOP-FIN -->
 </BaseLayout>

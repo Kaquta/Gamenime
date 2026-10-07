@@ -1,9 +1,11 @@
 ---
 import AuthUserMenu from "./AuthUserMenu.astro";
 interface Props {
-  activeTab?: "home" | "anime" | "games" | "upcoming";
+  activeTab?: "home" | "anime" | "games" | "upcoming" | "none";
+  /** Connexion, Inscription : la marque mene a l'accueil (les onglets y sont masques). */
+  lienAccueil?: boolean;
 }
-const { activeTab = "home" } = Astro.props;
+const { activeTab = "home", lienAccueil = false } = Astro.props;
 ---
 <header class="hero-header container">
   <div class="hero-topbar">
@@ -20,6 +22,7 @@ const { activeTab = "home" } = Astro.props;
   <h1 class="brand-mark">
     <span class="brand-text">GameNime</span>
     <span class="brand-kanji">新</span>
+    {lienAccueil && <a class="brand-home" href="/" aria-label="GameNime : accueil"></a>}
   </h1>
   <div class="brand-line"></div>
   <p class="brand-subtitle">Animés et jeux : les sorties les plus attendues</p>
@@ -36,7 +39,7 @@ const { activeTab = "home" } = Astro.props;
       <a class={activeTab === "games" ? "tab active" : "tab"} href="/games">Jeux</a>
       <a class={activeTab === "upcoming" ? "tab active" : "tab"} href="/upcoming">À venir</a>
     </div>
-    {activeTab !== "home" && (
+    {activeTab !== "home" && activeTab !== "none" && (
       <>
         <span class="tabs-seam" aria-hidden="true"></span>
         <button type="button" class="tabs-filter" id="filterToggle" aria-label="Filtres" aria-expanded="false" aria-controls="filterPanel">

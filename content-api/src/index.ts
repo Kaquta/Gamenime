@@ -18,6 +18,9 @@ import { expandSearchTerm } from "./gamenime/search-aliases.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
 import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setStatsPool } from "./gamenime/dashboard.js";
 
+import { registerAdminRuns } from "./gamenime/admin-runs.js";
+import { registerPublication } from "./gamenime/publication.js";
+
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
 function sanitizeBigInt(value: any): any {
@@ -56,6 +59,11 @@ const pool = mariadb.createPool({
 
 // Phase B : exposer pool à Fastify pour le cron refetch
 (app as any).pool = pool;
+
+// Journal et verrou des process d'administration. Branche ici, au plus tot :
+// les hooks doivent exister avant l'enregistrement des routes qu'ils couvrent.
+await registerAdminRuns(app, pool);
+registerPublication(app);
 
 
 const COOKIE_NAME = process.env.APP_COOKIE_NAME || "gn_session";
@@ -2890,7 +2898,9 @@ app.post("/track", async (req, reply) => {
       trackVisit(String(body.path || "/"), String(body.ref || ""), vid);
     }
   } catch {}
-  reply.send({ ok: true });
+  // « return » : sans lui, Fastify renvoie une 2e fois apres le hook onSend asynchrone
+  // d'admin-runs, et l'API s'arrete (ERR_HTTP_HEADERS_SENT). Correction du 6 octobre 2026.
+  return reply.send({ ok: true });
 });
 
 setStatsPool(pool);

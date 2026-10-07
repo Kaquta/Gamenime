@@ -13,6 +13,13 @@ interface Props {
   image?: string;
   /** "video.tv_show" ou "video.other" sur une fiche, "website" ailleurs. */
   ogType?: string;
+  /** Accueil : la recherche se place dans la ligne des onglets (design Encre). */
+  accueil?: boolean;
+  /** Pages Anime, Jeux, A venir : design de l'accueil (Vitre · Cameleon) + bloc « CATALOGUE ». */
+  catalogue?: boolean;
+  /** Mes preferences, Connexion, Inscription : design de l'accueil (Vitre · Cameleon) + jetons de la page
+   *  (bloc « PAGES » de global.css), par exemple « braise prefs ». */
+  jetons?: string;
 }
 const {
   title = "GameNime",
@@ -20,10 +27,23 @@ const {
   canonical = "https://gamenime.fr",
   image = "https://gamenime.fr/og-image.jpg?v=2",
   ogType = "website",
+  accueil = false,
+  catalogue = false,
+  jetons = "",
 } = Astro.props;
+// Design Encre · Noir et or (maquette validee le 4 octobre 2026) : les jetons
+// lus par le bloc « DESIGN-ENCRE » de global.css. L'accueil seul porte la
+// recherche dans la ligne des onglets.
+// Accueil : design « Vitre », couleurs « Caméléon très léger » (maquettes validees le 5 octobre 2026),
+// lu par le bloc « DESIGN-BLEU » de global.css. Les autres pages : Encre · Noir et or.
+// Pages Anime, Jeux, A venir (prop catalogue) : le design de l'accueil (Vitre · Cameleon) et le bloc
+// « CATALOGUE » de global.css, cartes « C · Jaquettes » (maquette validee le 6 octobre 2026).
+// Mes preferences, Connexion, Inscription (prop jetons) : le design de l'accueil et le bloc « PAGES » de global.css,
+// boutons et icones en braise (maquettes validees le 6 octobre 2026).
+const gn = accueil ? "fond encre verre bleu vitre cameleon" : catalogue ? "fond encre verre bleu vitre cameleon catalogue" : jetons ? "fond encre verre bleu vitre cameleon " + jetons : "fond encre noir-or onglets";
 ---
 <!doctype html>
-<html lang="fr">
+<html lang="fr" data-gn={gn}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -59,9 +79,11 @@ const {
         });
       }
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+  {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/shippori-mincho-b1-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin />}
+  {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/shippori-mincho-b1-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />}
+  {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/gn-pinceau.woff2" as="font" type="font/woff2" crossorigin />}
+  {(accueil || catalogue || jetons) && <link rel="preload" href="/fonts/poppins-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin />}
+  {(accueil || catalogue || jetons) && <link rel="preload" href="/fonts/inter-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />}
 </head>
   <body>
     <div class="page-shell">

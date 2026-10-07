@@ -4298,3 +4298,2286 @@ body.is-authenticated .fav-heart {
   color:#c9bcff!important;
   box-shadow:none!important;
 }
+
+/* Titre de carte devenu lien vers la fiche : doit rester visuellement
+   identique au texte qu'il remplace. */
+.item-body h3 .item-link,
+.item-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCUEIL — maquette validee le 3 octobre 2026 (session 35)
+   ═══════════════════════════════════════════════════════════════════════════
+   Remplace le bloc « ACCUEIL EN GRILLE (session 34) ».
+ 
+   Trois rectangles en haut (Cette semaine, Derniers sortis jeux, Derniers
+   sortis anime) et deux Top 25 en dessous. Les trois du haut defilent seuls,
+   a la fleche, au doigt et au point.
+ 
+   TOUT est porte par .acc-haut / .acc-bas : aucune de ces regles ne peut
+   atteindre /anime, /games ou une fiche. Les cartes restent des .item-card,
+   donc le survol bande-annonce, le clic modale, les favoris et les liens
+   internes continuent de fonctionner sans une ligne de JavaScript en plus.
+ 
+   Les variables sont celles de la maquette, declarees ici et nulle part
+   ailleurs : elles ne sortent pas de ces deux conteneurs.
+   ═══════════════════════════════════════════════════════════════════════════ */
+ 
+.acc-haut,
+.acc-bas {
+  --fil: rgba(255, 140, 58, 0.22);
+  --fil2: rgba(255, 140, 58, 0.12);
+  --fil3: rgba(255, 140, 58, 0.06);
+  --txt: #fdf3e9;
+  --g1: #c3a897;
+  --g2: #997e6c;
+  --g3: #6b564a;
+  --or2: #ffa54f;
+  --or3: #e2691d;
+  --miel: #ffdcb8;
+  --m: ui-monospace, "SF Mono", Menlo, monospace;
+  --serif: Georgia, "Times New Roman", serif;
+}
+ 
+/* ── gabarit ───────────────────────────────────────────────────────────── */
+.acc-haut { display: grid; grid-template-columns: minmax(0, 1.62fr) minmax(0, 1fr); gap: 16px; }
+.acc-haut > #weekRadar { grid-row: span 2; }
+.acc-bas { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+ 
+/* ── le panneau : on reprend .section-block et on le ramene a .pan ──────── */
+.acc-haut .section-block,
+.acc-bas .section-block {
+  margin-top: 0;
+  padding: 0;
+  min-width: 0;
+  border-radius: 18px;
+  border: 1px solid var(--fil);
+  background: linear-gradient(180deg, rgba(44, 17, 9, 0.78), rgba(21, 10, 6, 0.9));
+  box-shadow: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.acc-haut .section-block[hidden],
+.acc-bas .section-block[hidden] { display: none !important; }
+ 
+/* ── l'en-tete : .section-head ramene a .pan-h ─────────────────────────── */
+.acc-haut .section-head,
+.acc-bas .section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 0;
+  padding: 12px 17px;
+  border-bottom: 1px solid var(--fil3);
+  justify-content: flex-start;
+  /* le site passe .section-head en colonne sous 640 px : dans un panneau de
+     l'accueil le titre et « Voir plus » doivent rester sur la meme ligne */
+  flex-direction: row;
+}
+/* Le degrade braise et la pastille › sont deja ceux du site (.section-head h2,
+   plus bas dans cette feuille) : on ne redefinit que la taille, parce qu'un
+   bloc de grille fait la moitie de la largeur d'une rangee pleine. */
+.acc-haut .section-head h2,
+.acc-bas .section-head h2 {
+  margin: 0;
+  font-size: clamp(1.2rem, 1.9vw, 1.5rem);
+  font-weight: 800;
+}
+/* La grande case porte son titre hors de tout .section-head : celui-la, il
+   faut bien lui donner le meme habillage. */
+#weekRadar .se-tit h2 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  background: linear-gradient(100deg, #fff8f0 20%, #ffcb9a 62%, #ff9d4d 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 26px rgba(255, 140, 58, 0.18);
+  letter-spacing: -0.025em;
+}
+#weekRadar .se-tit h2::after {
+  content: "›";
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 7px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: linear-gradient(180deg, rgba(255, 132, 41, 0.9), rgba(205, 74, 20, 0.85));
+  color: #2a110a;
+  -webkit-text-fill-color: #2a110a;
+  font-size: 0.62rem;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 2px 10px -2px rgba(255, 140, 58, 0.7);
+}
+/* « Voir plus » pousse a droite : .see-more garde son habillage du site. */
+.acc-haut .section-head .see-more,
+.acc-bas .section-head .see-more {
+  margin-left: auto;
+  padding: 9px 16px;
+  font-size: 0.86rem;
+}
+ 
+/* ═══ le defilement, commun aux trois rectangles du haut ═══════════════════
+   Une piste a scroll-snap : toutes les diapositives sont dans le HTML, le
+   glisse au doigt marche sans JavaScript, et le JS ne fait qu'avancer la
+   piste tout seul. */
+.acc-haut .sl { position: relative; overflow: hidden; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.acc-haut .sl-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  transition: opacity 0.18s;
+  flex: 1;
+  min-height: 0;
+  /* la grille de .items-row ne s'applique plus ici */
+  grid-template-columns: none;
+  gap: 0;
+}
+.acc-haut .sl-track::-webkit-scrollbar { display: none; }
+.acc-haut .sl-track > .item-card { flex: 0 0 100%; scroll-snap-align: start; }
+ 
+.acc-haut .sl-fl {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 1px solid var(--fil);
+  background: rgba(12, 6, 3, 0.78);
+  color: var(--miel);
+  font: 700 0.9rem var(--m);
+  display: grid;
+  place-items: center;
+  z-index: 16;
+  transition: 0.15s;
+  backdrop-filter: blur(4px);
+  opacity: 0;
+}
+.acc-haut .sl:hover .sl-fl,
+.acc-haut .sl:focus-within .sl-fl { opacity: 1; }
+.acc-haut .sl-fl:hover { background: rgba(255, 140, 58, 0.28); border-color: rgba(255, 140, 58, 0.55); }
+.acc-haut .sl-fl.g { left: 10px; }
+.acc-haut .sl-fl.d { right: 10px; }
+@media (hover: none) { .acc-haut .sl-fl { opacity: 1; } }
+ 
+.acc-haut .sl-pied { display: flex; align-items: center; justify-content: flex-end; padding: 9px 15px 11px; }
+.acc-haut .sl-cpt {
+  font: 700 0.7rem var(--m);
+  color: var(--g2);
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+ 
+/* ═══ la carte d'accueil : on defait .item-card avant de la rhabiller ═════ */
+.acc-haut .sl-track > .item-card {
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+  position: relative;
+  overflow: hidden;
+}
+.acc-haut .sl-track > .item-card:hover { transform: none; box-shadow: none; }
+ 
+/* le fond floute tire de la jaquette, sans dupliquer la balise <img> */
+.acc-haut .ds-sl::before {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  z-index: 0;
+  background-image: var(--cover);
+  background-size: cover;
+  background-position: center;
+  filter: blur(22px) saturate(1.25);
+  opacity: 0.95;
+}
+.acc-haut .ds-sl .item-overlay {
+  z-index: 1;
+  background: linear-gradient(90deg, rgba(11, 5, 3, 0.25) 0%, rgba(11, 5, 3, 0.72) 45%, rgba(11, 5, 3, 0.9) 100%);
+}
+ 
+/* ── DERNIERS SORTIS : jaquette a gauche, texte a droite ───────────────── */
+.acc-haut .ds-sl { min-height: 178px; display: flex; align-items: center; gap: 17px; padding: 16px 20px; }
+/* .item-media redevient la jaquette posee, au lieu de couvrir la carte */
+.acc-haut .ds-sl .item-media {
+  position: relative;
+  inset: auto;
+  z-index: 2;
+  width: 100px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+  border-radius: 11px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 18px 36px -16px rgba(0, 0, 0, 0.9);
+}
+.acc-haut .ds-info {
+  position: relative;
+  inset: auto;
+  padding: 0;
+  z-index: 2;
+  min-width: 0;
+  flex: 1;
+}
+/* La ligne d'information est celle du catalogue (.dbox / .dval / .dcd /
+   .chips). On ne la redessine pas : on la met juste a l'echelle, parce qu'elle
+   est calibree pour une vignette de 155 px et que les cartes de l'accueil sont
+   deux a cinq fois plus larges. La pastille d'etat se cache quand elle est
+   vide — sur la semaine, elle n'est remplie qu'au premier rafraichissement. */
+.acc-haut .dcd:empty { display: none; }
+.acc-haut .ds-info .dbox { margin-top: 9px; }
+.acc-haut .ds-info .dval { font-size: 0.72rem; }
+.acc-haut .ds-info .dcd { font-size: 0.64rem; }
+.acc-haut .ds-info .chip { font-size: 0.64rem; padding: 3px 8px; }
+.acc-haut .ds-info .hpill { font-size: 0.6rem; }
+ 
+.acc-haut .ds-t {
+  font-size: 1.06rem;
+  font-weight: 800;
+  line-height: 1.22;
+  margin: 0 0 8px;
+  color: #fff;
+  text-shadow: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+ 
+/* ═══ CETTE SEMAINE ═══════════════════════════════════════════════════════
+   Pas une carte posee sur un fond : l'affiche occupe la droite du rectangle
+   et se fond vers la gauche, le texte est pose dessus en bas a gauche, et les
+   jours flottent en verre au-dessus. */
+#weekRadar { position: relative; min-height: 560px; background: #120805; }
+#weekRadar .wr-zone { flex: 1; display: flex; min-height: 0; min-width: 0; }
+/* min-width:0 partout : sans lui les diapositives additionnent leur largeur
+   minimale et le defileur deborde du cadre. */
+#weekRadar .wr-jour { display: none; flex: 1; min-height: 0; min-width: 0; }
+#weekRadar .wr-jour.on { display: flex; }
+#weekRadar .wr-jour .sl { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+ 
+/* la barre des jours, en verre sur l'image */
+#weekRadar .se-barre {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 18;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 8px 7px 15px;
+  border-radius: 15px;
+  background: rgba(12, 6, 3, 0.52);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 10px 30px -18px #000;
+  margin: 0;
+}
+#weekRadar .se-tit { display: flex; align-items: center; gap: 8px; white-space: nowrap; flex: none; }
+#weekRadar .se-plage { font-family: var(--m); font-size: 0.67rem; color: var(--g2); }
+#weekRadar .jours {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+  justify-content: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 5px 2px 2px;
+}
+#weekRadar .jours::-webkit-scrollbar { display: none; }
+#weekRadar .jr {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 46px;
+  padding: 4px 9px 5px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--g1);
+  cursor: pointer;
+  transition: 0.15s;
+}
+#weekRadar .jr:hover { background: rgba(255, 255, 255, 0.07); color: var(--txt); }
+#weekRadar .jr .nj { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+#weekRadar .jr .dj { font-size: 1rem; font-weight: 800; line-height: 1.15; color: var(--txt); }
+#weekRadar .jr .ep {
+  position: absolute;
+  top: -4px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font: 700 0.55rem var(--m);
+  background: #2a1209;
+  border: 1px solid rgba(255, 140, 58, 0.42);
+  color: var(--or2);
+}
+#weekRadar .jr.passe { opacity: 0.5; }
+#weekRadar .jr.ajd .nj { color: var(--or2); }
+#weekRadar .jr.sel {
+  background: linear-gradient(160deg, var(--or2), var(--or3));
+  color: #2a0f02;
+  opacity: 1;
+  box-shadow: 0 5px 16px -5px rgba(255, 140, 58, 0.7);
+}
+#weekRadar .jr.sel .nj, #weekRadar .jr.sel .dj { color: #2a0f02; }
+#weekRadar .jr.sel .ep { background: #2a0f02; border-color: #2a0f02; color: var(--or2); }
+ 
+/* la diapositive : l'affiche a droite, fondue vers la gauche */
+#weekRadar .se-sl { display: flex; align-items: flex-end; padding: 96px 36px 72px 62px; background: #120805; }
+#weekRadar .se-sl .item-media {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: 66%;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 44%);
+          mask-image: linear-gradient(90deg, transparent 0%, #000 44%);
+}
+#weekRadar .se-sl .item-overlay {
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(14, 6, 3, 0.97) 0%, rgba(14, 6, 3, 0.86) 32%, rgba(14, 6, 3, 0.2) 66%, transparent 100%),
+    linear-gradient(0deg, rgba(14, 6, 3, 0.9) 0%, transparent 40%),
+    linear-gradient(180deg, rgba(14, 6, 3, 0.72) 0%, transparent 24%);
+}
+#weekRadar .se-txt { position: relative; inset: auto; padding: 0; z-index: 13; max-width: min(560px, 60%); }
+#weekRadar .se-t {
+  font-size: 2.15rem;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.018em;
+  margin: 0 0 11px;
+  color: #fff;
+  text-shadow: 0 2px 26px rgba(0, 0, 0, 0.65);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#weekRadar .se-m { font-size: 0.9rem; color: #e7d7cb; margin-bottom: 12px; }
+#weekRadar .se-m b { color: #fff; }
+/* Dans la grande case, la meme ligne d'information, a sa taille. */
+#weekRadar .se-txt .dbox { display: inline-block; margin-top: 0; }
+#weekRadar .se-txt .dline { gap: 10px; }
+#weekRadar .se-txt .dval { font-size: 0.8rem; }
+#weekRadar .se-txt .dcd { font-size: 0.72rem; padding: 3px 9px; }
+#weekRadar .se-txt .wbar { display: none; }
+#weekRadar .se-txt .chips { margin-top: 11px; }
+#weekRadar .se-txt .chip { font-size: 0.7rem; padding: 4px 10px; }
+#weekRadar .se-txt .hpill { font-size: 0.64rem; }
+/* les commandes, posees sur l'image */
+#weekRadar .sl-fl {
+  background: rgba(12, 6, 3, 0.55);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  width: 38px;
+  height: 38px;
+  font-size: 1.05rem;
+}
+#weekRadar .sl-fl:hover { background: rgba(255, 140, 58, 0.35); border-color: rgba(255, 140, 58, 0.6); }
+#weekRadar .sl-pied { position: absolute; left: 0; right: 0; bottom: 0; height: 0; padding: 0; z-index: 16; }
+#weekRadar .sl-cpt { position: absolute; right: 20px; bottom: 21px; min-width: 0; color: rgba(255, 255, 255, 0.62); }
+ 
+/* les points : l'actif s'allonge et porte l'heure de l'episode */
+#weekRadar .pts {
+  position: absolute;
+  left: 50%;
+  bottom: 21px;
+  transform: translateX(-50%);
+  z-index: 17;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#weekRadar .pt {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.38);
+  color: transparent;
+  font: 800 0.62rem var(--m);
+  white-space: nowrap;
+  transition: width 0.28s, height 0.28s, background 0.2s;
+}
+#weekRadar .pt:hover { background: rgba(255, 255, 255, 0.7); }
+#weekRadar .pt.on {
+  width: 54px;
+  height: 21px;
+  color: #2a0f02;
+  background: linear-gradient(135deg, var(--or2), var(--or3));
+  box-shadow: 0 4px 14px -4px rgba(255, 140, 58, 0.7);
+}
+ 
+/* ═══ TOP 25 — les vingt-cinq d'un coup d'oeil ════════════════════════════ */
+.acc-bas .items-row {
+  display: grid;
+  grid-template-rows: repeat(9, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  grid-template-columns: none;
+  gap: 2px 14px;
+  padding: 12px 15px 15px;
+}
+/* La ligne est une .item-card : on lui retire d'abord ce que la carte du
+   catalogue lui apporte (format 3/4.2, fond, bordure, ombre). */
+.acc-bas .tl {
+  position: relative;
+  aspect-ratio: auto;
+  background: none;
+  border: none;
+  box-shadow: none;
+  transform: none;
+  transition: background 0.13s;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  min-width: 0;
+  transition: background 0.13s;
+  text-decoration: none;
+  color: inherit;
+}
+.acc-bas .tl:hover { background: rgba(255, 140, 58, 0.07); }
+.acc-bas .tl .r {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font: 800 0.7rem var(--m);
+  color: var(--g2);
+  background: rgba(255, 255, 255, 0.04);
+}
+.acc-bas .tl.p3 .r {
+  background: linear-gradient(135deg, var(--or2), var(--or3));
+  color: #2a0f02;
+  box-shadow: 0 3px 9px -3px rgba(255, 140, 58, 0.6);
+}
+.acc-bas .tl .mv {
+  width: 26px;
+  aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  flex: none;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+.acc-bas .tl .mv img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.acc-bas .tl .n a { color: inherit; text-decoration: none; }
+.acc-bas .tl .tx { min-width: 0; flex: 1; }
+.acc-bas .tl .n {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.acc-bas .tl.p3 .n { font-weight: 800; }
+.acc-bas .tl .gn {
+  display: block;
+  font-size: 0.63rem;
+  color: var(--g3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+.acc-bas .tl:hover .n { color: var(--miel); }
+ 
+/* ═══ la bande-annonce ════════════════════════════════════════════════════
+   C'est l'iframe YouTube que le site pose deja (data-yt, .item-hover-video,
+   .trailer-band) apres 500 ms de survol. Ici on ne fait que la placer dans
+   la nouvelle mise en page et lui ajouter la pastille de la maquette. */
+.acc-haut .sl-track > .item-card .item-hover-video { z-index: 10; }
+ 
+/* Les deux bandes de 28 % en haut et en bas sont l'invite du catalogue :
+   « clique ici pour la bande-annonce ». Elles s'allument au survol avec
+   trailerBandGlow, un halo beige qui pulse — sur une vignette c'est discret,
+   sur les grandes cartes de l'accueil ce sont deux rectangles qui brillent.
+   Ici le clic ouvre la modale depuis n'importe quel point de la carte :
+   les bandes n'ont plus de role. */
+.acc-haut .trailer-band { display: none; }
+ 
+/* Et surtout : l'iframe ne doit jamais attraper le clic. Sans ca, YouTube
+   met sa propre video en pause au lieu de laisser la modale s'ouvrir — c'est
+   justement pour contourner ca que le catalogue avait mis des bandes
+   cliquables par-dessus. En la rendant transparente au clic, on obtient les
+   trois comportements demandes d'un coup : pas de pause, pas de retour en
+   arriere, et le clic ouvre la fiche ou qu'il tombe. */
+.acc-haut .item-hover-video,
+.acc-haut .item-hover-video.active { pointer-events: none; }
+ 
+/* Dans la grande case, la bande-annonce passe DERRIERE le texte : le titre et
+   l'heure restent lisibles pendant la lecture. Il faut donc defaire la regle
+   generale qui efface .item-body et .item-overlay des qu'une video demarre. */
+#weekRadar .se-sl .item-hover-video { z-index: 0; }
+#weekRadar .se-sl .trailer-band { z-index: 2; }
+#weekRadar .se-sl .item-hover-video.active ~ .item-overlay,
+#weekRadar .se-sl .item-hover-video.active ~ .item-body,
+#weekRadar .se-sl .item-hover-slides.active ~ .item-overlay,
+#weekRadar .se-sl .item-hover-slides.active ~ .item-body { opacity: 1 !important; }
+ 
+/* Le coeur des favoris reste cache sur les cartes larges : il n'y a pas de
+   place libre, il tomberait sur le titre. Dans la grande case il reprend sa
+   position habituelle, en haut a droite — mais descendu sous la barre des
+   jours, qui occupe deja ce coin. */
+.acc-haut .ds-sl .fav-heart { display: none !important; }
+#weekRadar .se-sl .fav-heart { top: 86px; right: 24px; }
+ 
+/* ═══ telephone et tablette ═══════════════════════════════════════════════ */
+@media (max-width: 1060px) {
+  .acc-haut, .acc-bas { grid-template-columns: minmax(0, 1fr); }
+  .acc-haut > #weekRadar { grid-row: auto; }
+}
+@media (max-width: 760px) {
+  #weekRadar .se-barre { flex-wrap: wrap; gap: 6px; }
+  #weekRadar .se-tit { flex: 1; }
+  #weekRadar .jours { order: 3; flex-basis: 100%; justify-content: flex-start; }
+  #weekRadar .se-sl { padding: 134px 22px 70px; }
+  #weekRadar .se-txt { max-width: 100%; }
+  #weekRadar .se-t { font-size: 1.6rem; }
+  #weekRadar .se-sl .item-media {
+    width: 100%;
+    -webkit-mask-image: linear-gradient(0deg, transparent 0%, #000 60%);
+            mask-image: linear-gradient(0deg, transparent 0%, #000 60%);
+  }
+  /* au telephone le titre tenait sur deux lignes et la pastille › se
+     retrouvait seule sur la seconde : on resserre plutot que de couper */
+  .acc-haut .section-head h2,
+  .acc-bas .section-head h2 { font-size: 1.02rem; }
+  .acc-haut .section-head h2::after,
+  .acc-bas .section-head h2::after { width: 19px; height: 19px; margin-left: 7px; }
+  .acc-haut .section-head .see-more,
+  .acc-bas .section-head .see-more { padding: 8px 13px; font-size: 0.78rem; }
+}
+@media (max-width: 700px) {
+  .acc-bas .items-row { grid-template-rows: none; grid-auto-flow: row; grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .acc-haut .sl-track { scroll-behavior: auto; }
+  .acc-haut .item-hover-video.active::before { animation: none; }
+}
+ 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TOP 25 — un mini rectangle a cote de la ligne
+   ═══════════════════════════════════════════════════════════════════════════
+   212 x 119, format 16:9 — celui de la video, donc rien n'est recadre : on voit
+   toute l'image, et l'apercu ne deborde qu'a peine sur la colonne voisine.
+ 
+   L'ancrage vertical est celui qui a ete mis au point pour l'ecran de
+   telephone, et c'est lui qui evite tout debordement : la grille fait neuf
+   lignes, donc la position de chaque ligne dans sa colonne est connue
+   d'avance.
+     lignes 1 a 3  -> ancre en haut,  il descend
+     lignes 4 a 6  -> centre sur la ligne
+     lignes 7 a 9  -> ancre en bas,   il monte
+   La troisieme colonne bascule a gauche pour ne pas sortir de l'ecran.
+ 
+   On ne touche qu'a .acc-bas : les deux Top 25, rien d'autre.
+   ═══════════════════════════════════════════════════════════════════════════ */
+ 
+.acc-bas .section-block { overflow: visible; }
+.acc-bas .section-head { border-radius: 18px 18px 0 0; }
+.acc-bas .items-row { border-radius: 0 0 18px 18px; }
+ 
+.acc-bas .tl .item-hover-video {
+  display: none;
+  position: absolute;
+  left: calc(100% + 9px);
+  right: auto;
+  width: 212px;
+  aspect-ratio: 16 / 9;
+  z-index: 60;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 140, 58, 0.38);
+  background: #0b0503;
+  box-shadow: 0 18px 40px -14px rgba(0, 0, 0, 0.95);
+  pointer-events: none;
+}
+.acc-bas .tl .item-hover-video.active { display: block; }
+ 
+/* ── l'ancrage vertical, par position dans la colonne (neuf lignes) ──────── */
+.acc-bas .tl .item-hover-video { top: 50%; bottom: auto; transform: translateY(-50%); }
+.acc-bas .tl:nth-child(9n + 1) .item-hover-video,
+.acc-bas .tl:nth-child(9n + 2) .item-hover-video,
+.acc-bas .tl:nth-child(9n + 3) .item-hover-video {
+  top: -6px;
+  bottom: auto;
+  transform: none;
+}
+.acc-bas .tl:nth-child(9n + 7) .item-hover-video,
+.acc-bas .tl:nth-child(9n + 8) .item-hover-video,
+.acc-bas .tl:nth-child(9n) .item-hover-video {
+  top: auto;
+  bottom: -6px;
+  transform: none;
+}
+ 
+/* ── troisieme colonne : a droite on sortirait de l'ecran ─────────────────── */
+.acc-bas .tl:nth-child(n + 19) .item-hover-video {
+  left: auto;
+  right: calc(100% + 9px);
+}
+ 
+/* ── au telephone : une seule colonne et pas de survol ────────────────────── */
+@media (max-width: 700px) {
+  .acc-bas .tl .item-hover-video { display: none !important; }
+  .acc-bas .section-block { overflow: hidden; }
+}
+
+/* DESIGN-ENCRE-DEBUT — bloc ajoute par design-encre.sh, a remplacer en entier, pas a la main */
+/* ═══════════════════════════════════════════════════════════════════════════
+   DESIGN ENCRE · NOIR ET OR — maquette validee le 4 octobre 2026
+   ═══════════════════════════════════════════════════════════════════════════
+   Fond 5 « Bande illustree » au-dessus de 1060 px, fond 3 « Affiche » en
+   dessous ; en-tete Encre, version B « Cachets », boutons B·2 « Noir et or » ;
+   recherche R3, dans la ligne des onglets.
+
+   Ce bloc est la copie mecanique du CSS de la maquette : memes regles, memes
+   valeurs, meme ordre. Les selecteurs des variantes non retenues ont ete
+   retires (ils ne s'appliquaient jamais) et les attributs de maquette sont
+   devenus des jetons sur <html data-gn="..."> sans changer la specificite :
+     fond      — fond noir, panneaux en verre neutre (et l'illustration
+                 de « Cette semaine » sur l'accueil)
+     encre     — en-tete, titres et « Voir plus » a l'encre
+     noir-or   — Sign in, Discord, titres et « Voir plus » en noir et or
+     onglets   — onglets a gauche sur un filet d'or (toutes les pages)
+     recherche — la recherche dans la ligne des onglets (accueil)
+   Verifie : styles calcules identiques sur les 2130 elements de l'accueil et
+   captures identiques au pixel, de 320 a 1566 px.
+
+   :is(body,#_) ne sert qu'a donner a ces regles le poids d'un identifiant,
+   pour passer devant les regles de l'accueil plus haut dans ce fichier.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── polices : Shippori Mincho B1 (latin) et deux sous-ensembles maison ──
+   GN Pinceau : Yuji Syuku, les seuls kanji des cachets (新 今週 新着 人気)
+   GN Kana    : Shippori Mincho B1, le nom vertical ゲームニメ */
+@font-face { font-family: "Shippori Mincho B1"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/shippori-mincho-b1-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Shippori Mincho B1"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/shippori-mincho-b1-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Shippori Mincho B1"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/shippori-mincho-b1-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Shippori Mincho B1"; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/shippori-mincho-b1-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: "GN Pinceau"; font-style: normal; font-weight: 400; font-display: block; src: url("/fonts/gn-pinceau.woff2") format("woff2"); }
+@font-face { font-family: "GN Kana"; font-style: normal; font-weight: 600; font-display: block; src: url("/fonts/gn-kana.woff2") format("woff2"); }
+
+/* ── commun : fond noir, calques d'illustration, lisibilite ─────────────── */
+html[data-gn~="fond"] body { background-image: none !important; background-color: #050506; }
+html[data-gn~="fond"] body::before { background: none; }
+.gf-a { pointer-events: none; z-index: 0; display: none; }
+.gf-a { position: absolute; left: 0; top: 0; width: 100%; overflow: hidden; }
+.gf-box { position: absolute; }
+.gf-box i { position: absolute; inset: 0; background: center 30% / cover no-repeat; opacity: 0; transition: opacity 900ms ease; }
+.gf-box i.on { opacity: 1; }
+html[data-gn~="fond"] .gf-a { display: block; }
+/* panneaux en verre neutre : c'est l'image qui porte la couleur */
+html[data-gn~="fond"] :is(body,#_) .section-block,
+html[data-gn~="fond"] :is(body,#_) .acc-haut .section-block:not(#weekRadar) {
+  background: linear-gradient(180deg, rgba(18, 17, 21, .66), rgba(9, 9, 12, .82));
+  backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-color: rgba(255, 255, 255, .10);
+}
+html[data-gn~="fond"] :is(body,#_) #weekRadar { background: #0a0a0d; }
+html[data-gn~="fond"] :is(body,#_) #weekRadar .se-sl { background: #0a0a0d; }
+html[data-gn~="fond"] :is(body,#_) #weekRadar .se-sl .item-overlay {
+  background: linear-gradient(90deg, rgba(8, 8, 11, .96) 0%, rgba(8, 8, 11, .82) 32%, rgba(8, 8, 11, .18) 66%, transparent 100%),
+  linear-gradient(0deg, rgba(8, 8, 11, .9) 0%, transparent 40%), linear-gradient(180deg, rgba(8, 8, 11, .7) 0%, transparent 24%);
+}
+html[data-gn~="fond"] :is(body,#_) .acc-haut .ds-sl .item-overlay { background: linear-gradient(90deg, rgba(9, 9, 12, .25) 0%, rgba(9, 9, 12, .72) 45%, rgba(9, 9, 12, .9) 100%); }
+html[data-gn~="fond"] :is(body,#_) .top-tabs,
+html[data-gn~="fond"] :is(body,#_) .search-input {
+  background: rgba(14, 14, 18, .76); border-color: rgba(255, 255, 255, .12);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+/* trois couleurs du site actuel echouent deja au contraste : corrigees ici */
+html[data-gn~="fond"] :is(body,#_) .top-tabs .tab.active { color: #160600; }
+html[data-gn~="fond"] :is(body,#_) .search-input::placeholder { color: #b6aca5; }
+html[data-gn~="fond"] :is(body,#_) .acc-bas .tl .gn { color: #a89d95; }
+html[data-gn~="fond"] :is(body,#_) .acc-bas .tl:not(.p3) .r { color: #dcd2ca; }
+html[data-gn~="fond"] :is(body,#_) #weekRadar .se-plage,
+html[data-gn~="fond"] :is(body,#_) .dcd.past { color: #bbb1aa; }
+html[data-gn~="fond"] :is(body,#_) .chip.tbc { color: #aea59e; }
+html[data-gn~="fond"] :is(body,#_) .sl-cpt { color: rgba(255, 255, 255, .68); }
+/* ── 3 · Poster cinema : l'illustration immersive derriere le haut, fondu noir ── */
+@media (max-width: 1060px) {
+  html[data-gn~="fond"] .gf-box i { background-position: center 22%; filter: brightness(.88) saturate(1.1); }
+  html[data-gn~="fond"] .gf-box {
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 34%, rgba(0, 0, 0, .5) 58%, transparent 88%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 34%, rgba(0, 0, 0, .5) 58%, transparent 88%);
+  }
+  html[data-gn~="fond"] .gf-box::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(5, 5, 6, .5), transparent 20%),
+    linear-gradient(90deg, rgba(5, 5, 6, .65), transparent 16%, transparent 84%, rgba(5, 5, 6, .65));
+  }
+  html[data-gn~="fond"] :is(body,#_) .hero-header { background: radial-gradient(ellipse 46% 56% at 50% 47%, rgba(3, 3, 5, .72) 0%, rgba(3, 3, 5, .62) 45%, transparent 80%); }
+  /* sur telephone l'en-tete occupe toute la largeur : on assombrit toute sa bande */
+  html[data-gn~="fond"] .gf-box::after {
+    background: linear-gradient(to bottom, rgba(5, 5, 6, .66), rgba(5, 5, 6, .5) 24%, transparent 36%),
+    linear-gradient(90deg, rgba(5, 5, 6, .4), transparent 18%, transparent 82%, rgba(5, 5, 6, .4));
+  }
+  /* ici les panneaux sont pleins : l'affiche est derriere, le contenu devant */
+  html[data-gn~="fond"] :is(body,#_) .section-block,
+  html[data-gn~="fond"] :is(body,#_) .acc-haut .section-block:not(#weekRadar) { background: linear-gradient(180deg, rgba(15, 14, 18, .9), rgba(8, 8, 11, .96)); }
+}
+/* ── 5 · Bande illustree : l'illustration sur la rangee du hero, noir profond ailleurs ── */
+@media (min-width: 1061px) {
+  html[data-gn~="fond"] .gf-box i { background-position: center 28%; filter: brightness(.5) saturate(1.15); }
+  html[data-gn~="fond"] .gf-box {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  }
+  html[data-gn~="fond"] .gf-box::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(5, 5, 6, .55), transparent 14%, transparent 86%, rgba(5, 5, 6, .55));
+  }
+}
+/* ── commun : l'en-tete devient une grille, rien d'autre ne bouge ───────── */
+html[data-gn~="encre"] :is(body,#_) .hero-header { display: grid; text-align: left; margin-bottom: 24px; position: relative; }
+html[data-gn~="encre"] :is(body,#_) .hero-topbar { display: contents; }
+html[data-gn~="encre"] :is(body,#_) .hero-topbar__left,
+html[data-gn~="encre"] :is(body,#_) .hero-topbar__right { display: flex; align-items: center; gap: 10px; flex: none; }
+html[data-gn~="encre"] :is(body,#_) .hero-glow,
+html[data-gn~="encre"] :is(body,#_) .brand-line { display: none; }
+html[data-gn~="encre"] :is(body,#_) .brand-mark { display: inline-flex; align-items: center; margin: 0; }
+html[data-gn~="encre"] :is(body,#_) .brand-text,
+html[data-gn~="encre"] :is(body,#_) .brand-kanji { text-shadow: none; }
+html[data-gn~="encre"] :is(body,#_) .brand-kanji { display: grid; place-items: center; line-height: 1; }
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle { margin: 0; text-shadow: none; }
+html[data-gn~="encre"] :is(body,#_) .top-tabs { width: auto; max-width: none; margin: 0; box-shadow: none; }
+html[data-gn~="encre"] :is(body,#_) .tab { flex: none; min-width: 0; }
+html[data-gn~="encre"] :is(body,#_) .discord-link { animation: none; }
+html[data-gn~="encre"] :is(body,#_) .discord-link svg { filter: none; width: 20px; height: 20px; }
+/* le vrai bouton Sign in (auth-user-menu.css) impose min-height: 48px et un flou
+   d'arriere-plan que la maquette n'avait pas : neutralises */
+html[data-gn~="encre"] :is(body,#_) .auth-ui__signin { box-sizing: border-box; white-space: nowrap; min-height: 0;
+  backdrop-filter: none; -webkit-backdrop-filter: none; }
+/* ── les titres : leur boite garde exactement la hauteur d'origine ───────
+   (le texte peut changer de police, la mise en page des panneaux non) */
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 {
+  --X: clamp(1.2rem, 1.9vw, 1.5rem);
+  height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 11px - var(--X) * .2734));
+  display: flex; align-items: center; white-space: nowrap; line-height: 1.1;
+}
+html[data-gn~="encre"] :is(body,#_) #weekRadar .se-tit h2 { height: 19.06px; display: flex; align-items: center; white-space: nowrap; line-height: 1.1; }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { flex: none; }
+/* le titre d'un panneau du haut ne pousse jamais « Voir plus » dehors : sa taille
+   suit la largeur du panneau (C = largeur du titre le plus long par px de police,
+   R = pastille + ecart + « Voir plus ») */
+html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head { container-type: inline-size; }
+html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { font-size: min(var(--fs-titre, var(--X)), calc((100cqi - var(--R, 146px)) / var(--C, 10.9))); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more { box-sizing: border-box; height: 36px; display: inline-flex; align-items: center; line-height: 1; }
+html[data-gn~="encre"] :is(body,#_) .see-more::after { content: "\00a0›"; opacity: 1; }
+@media (max-width: 760px) {
+  html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { --R: 128px; }
+  html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 {
+    --X: 1.02rem;
+    height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 9.5px - var(--X) * .2734));
+  }
+  html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more { height: 33px; }
+}
+/* sur telephone l'en-tete est pose sur l'affiche : on assombrit un peu plus son haut */
+@media (max-width: 1060px) {
+  html[data-gn~="fond"][data-gn~="encre"] .gf-box::after {
+    background: linear-gradient(to bottom, rgba(5, 5, 6, .78), rgba(5, 5, 6, .62) 22%, rgba(5, 5, 6, .18) 36%, transparent 44%),
+    linear-gradient(90deg, rgba(5, 5, 6, .4), transparent 18%, transparent 82%, rgba(5, 5, 6, .4));
+  }
+}
+html[data-gn~="encre"] { --sumi: #0b0a09; --washi: #f1e8da; --washi2: #d9cec0; --shu: #d8432b; --shuf: #c3351e; --shuc: #ff7f68; --kin: #cfaa6c; }
+/* ── l'en-tete : la marque au centre, Discord et Sign in aux coins ───────── */
+html[data-gn~="encre"] :is(body,#_) .hero-header {
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: "discord . compte" "marque marque marque" "slogan slogan slogan" "onglets onglets onglets"; align-items: center; isolation: isolate;
+}
+html[data-gn~="encre"] :is(body,#_) .hero-topbar__left { grid-area: discord; justify-self: start; }
+html[data-gn~="encre"] :is(body,#_) .hero-topbar__right { grid-area: compte; justify-self: end; }
+html[data-gn~="encre"] :is(body,#_) .brand-mark { grid-area: marque; justify-self: center; gap: 0; margin-top: -8px; position: relative; isolation: isolate; }
+html[data-gn~="encre"] :is(body,#_) .brand-kanji {
+  order: -1; width: 54px; height: 54px; margin-right: 20px; border-radius: 4px; background: var(--shuf); color: #fff8ef;
+  font: 400 35px/1 "GN Pinceau", serif; transform: rotate(-6deg); box-shadow: inset 0 0 0 2px rgba(255, 240, 225, .3);
+  -webkit-mask-image: url("/encre/tampon.svg"); mask-image: url("/encre/tampon.svg"); -webkit-mask-size: 70px; mask-size: 70px;
+}
+html[data-gn~="encre"] :is(body,#_) .brand-text {
+  font: 800 54px/1.12 "Shippori Mincho B1", serif; color: var(--washi); letter-spacing: .02em; font-style: normal;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, .6);
+}
+/* le nom en katakana, a la verticale, comme sur une affiche japonaise */
+html[data-gn~="encre"] :is(body,#_) .brand-mark::after {
+  content: "ゲームニメ"; writing-mode: vertical-rl; margin-left: 16px; padding-left: 13px; border-left: 1px solid rgba(207, 170, 108, .42);
+  font: 600 12px/1 "GN Kana", serif; letter-spacing: .2em; color: var(--kin); align-self: center;
+}
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle {
+  grid-area: slogan; justify-self: center; display: flex; align-items: center; gap: 16px; margin-top: 6px;
+  font: 500 15.5px/1.35 "Shippori Mincho B1", serif; color: var(--washi2); font-style: normal; text-align: center;
+}
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle::before,
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { content: ""; flex: none; width: 54px; height: 1px; background: linear-gradient(90deg, transparent, rgba(207, 170, 108, .75)); }
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { transform: scaleX(-1); }
+html[data-gn~="encre"] :is(body,#_) .top-tabs {
+  grid-area: onglets; justify-self: center; margin-top: 14px; display: flex; padding: 0; background: none; border: 0; border-radius: 0;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-gn~="encre"] :is(body,#_) .tabs-track { gap: 36px; }
+html[data-gn~="encre"] :is(body,#_) .tab { padding: 6px 4px 16px; font: 600 16.5px/1 "Shippori Mincho B1", serif; letter-spacing: .03em; color: var(--washi2); border-radius: 0; }
+html[data-gn~="encre"] :is(body,#_) .top-tabs .tab.active { color: #fff; }
+html[data-gn~="encre"] :is(body,#_) .tab-indicator { top: auto; bottom: 0; height: 12px; border-radius: 0; box-shadow: none; background: url("/encre/trait.png") center / 100% 100% no-repeat; }
+html[data-gn~="encre"] :is(body,#_) .discord-link {
+  width: 42px; height: 42px; border-radius: 3px; background: rgba(11, 10, 9, .6); border: 1px solid rgba(207, 170, 108, .6); color: var(--washi);
+  box-shadow: inset 0 0 0 3px rgba(11, 10, 9, .9), inset 0 0 0 4px rgba(207, 170, 108, .2);
+}
+html[data-gn~="encre"] :is(body,#_) .auth-ui__signin {
+  height: 42px; padding: 0 22px; border: 0; border-radius: 3px; background: var(--shuf); color: #fff; font: 700 15px/1 "Shippori Mincho B1", serif;
+  letter-spacing: .06em; box-shadow: 0 0 0 3px var(--sumi), 0 0 0 4px rgba(207, 170, 108, .55);
+}
+/* ── les panneaux : titres a l'encre, filet d'or, « Voir plus » encadre ──── */
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2) {
+  background: none; color: var(--washi); -webkit-text-fill-color: var(--washi); text-shadow: 0 2px 12px rgba(0, 0, 0, .7);
+  font-family: "Shippori Mincho B1", serif; font-weight: 800; letter-spacing: .01em;
+}
+html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { --C: 11.78; --R: 148px; }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { border-radius: 2px; background: var(--shuf); color: #fff; -webkit-text-fill-color: #fff; box-shadow: none; text-shadow: none; transform: rotate(-5deg); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head { position: relative; isolation: isolate; border-bottom-color: rgba(207, 170, 108, .3); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more {
+  border-radius: 2px; background: rgba(11, 10, 9, .6); border: 1px solid rgba(207, 170, 108, .62); color: var(--washi);
+  font-family: "Shippori Mincho B1", serif; font-weight: 700; letter-spacing: .02em; box-shadow: inset 0 0 0 2px rgba(11, 10, 9, .9), inset 0 0 0 3px rgba(207, 170, 108, .2);
+}
+html[data-gn~="encre"] :is(body,#_) .see-more::after { color: var(--shuc); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) { --or2: #ff7a62; --or3: #e2472f; --fil: rgba(207, 170, 108, .2); --fil2: rgba(207, 170, 108, .12); --fil3: rgba(255, 255, 255, .06); }
+html[data-gn~="encre"] :is(body,#_) #weekRadar .jr.sel :is(.nj, .dj) { color: #160400; }
+html[data-gn~="encre"] :is(body,#_) #weekRadar .jr .ep { border-color: rgba(216, 67, 43, .55); }
+html[data-gn~="encre"] :is(body,#_) .dcd:not(.past):not(.far) { color: #e8cc98; background: rgba(207, 170, 108, .12); border-color: rgba(207, 170, 108, .5); }
+html[data-gn~="encre"] :is(body,#_) .search-btn { background: linear-gradient(180deg, #d63f28, #b52e19); color: #fff; border-radius: 3px; }
+html[data-gn~="encre"] :is(body,#_) .search-input { border-radius: 3px; border-color: rgba(207, 170, 108, .28); }
+@media (max-width: 760px) {
+  html[data-gn~="encre"] :is(body,#_) .hero-header { grid-template-columns: auto 1fr auto; grid-template-areas: "discord marque compte" "slogan slogan slogan" "onglets onglets onglets"; }
+  html[data-gn~="encre"] :is(body,#_) .brand-mark { margin-top: 0; }
+  html[data-gn~="encre"] :is(body,#_) .brand-mark::after { display: none; }
+  html[data-gn~="encre"] :is(body,#_) .brand-kanji { width: 34px; height: 34px; margin-right: 11px; font-size: 22px; -webkit-mask-size: 46px; mask-size: 46px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-text { font-size: 29px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle { gap: 10px; margin-top: 6px; font-size: 13.5px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::before,
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { width: 22px; }
+  html[data-gn~="encre"] :is(body,#_) .discord-link { width: 38px; height: 38px; }
+  html[data-gn~="encre"] :is(body,#_) .auth-ui__signin { height: 38px; padding: 0 13px; font-size: 13.5px; }
+  html[data-gn~="encre"] :is(body,#_) .top-tabs { justify-self: stretch; margin-top: 10px; }
+  html[data-gn~="encre"] :is(body,#_) .tabs-track { flex: 1; gap: 0; justify-content: space-between; }
+  html[data-gn~="encre"] :is(body,#_) .tab { padding: 6px 4px 14px; font-size: 15px; }
+  html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { --R: 130px; }
+}
+@media (max-width: 400px) {
+  html[data-gn~="encre"] :is(body,#_) .brand-text { font-size: 25px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-kanji { width: 30px; height: 30px; margin-right: 9px; font-size: 19px; }
+  html[data-gn~="encre"] :is(body,#_) .auth-ui__signin { padding: 0 11px; font-size: 12.5px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle { font-size: 12.5px; gap: 8px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::before,
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { width: 14px; }
+  html[data-gn~="encre"] :is(body,#_) .tab { font-size: 14px; }
+}
+@media (max-width: 340px) {
+  html[data-gn~="encre"] :is(body,#_) .brand-text { font-size: 22px; }
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::before,
+  html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { display: none; }
+}
+/* ═══ B · CACHETS ════════════════════════════════════════════════════════════
+   Un grand 新 au pinceau derriere la marque ; chaque titre porte son cachet
+   vertical, comme un sceau appose : 今週, 新着, 人気. Pas d'or : encre et
+   vermillon. */
+html[data-gn~="encre"] :is(body,#_) { --kin: #d9cec0; }
+html[data-gn~="encre"] :is(body,#_) .hero-header::before {
+  content: "新"; position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%) rotate(-4deg); z-index: -1; pointer-events: none;
+  font: 400 250px/1 "GN Pinceau", serif; color: rgba(216, 67, 43, .1);
+}
+html[data-gn~="encre"] :is(body,#_) :is(.discord-link, :is(.acc-haut, .acc-bas) .section-head .see-more) { border-color: rgba(216, 67, 43, .7); box-shadow: inset 0 0 0 3px rgba(11, 10, 9, .9), inset 0 0 0 4px rgba(216, 67, 43, .22); }
+html[data-gn~="encre"] :is(body,#_) .auth-ui__signin { box-shadow: 0 0 0 3px var(--sumi), 0 0 0 4px rgba(216, 67, 43, .6); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head { border-bottom-color: rgba(216, 67, 43, .3); }
+html[data-gn~="encre"] :is(body,#_) .brand-mark::after { border-left-color: rgba(216, 67, 43, .45); }
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle::before { background: linear-gradient(90deg, transparent, rgba(216, 67, 43, .8)); }
+html[data-gn~="encre"] :is(body,#_) .brand-subtitle::after { background: linear-gradient(90deg, transparent, rgba(216, 67, 43, .8)); }
+html[data-gn~="encre"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before {
+  content: "新着"; flex: none; writing-mode: vertical-rl; margin-right: 11px; padding: 4px 2px; border-radius: 2px; background: var(--shuf);
+  color: #fff; -webkit-text-fill-color: #fff; text-shadow: none; font: 400 11.5px/1 "GN Pinceau", serif; letter-spacing: .04em; transform: rotate(-3deg);
+  -webkit-mask-image: url("/encre/tampon.svg"); mask-image: url("/encre/tampon.svg"); -webkit-mask-size: 40px; mask-size: 40px;
+}
+html[data-gn~="encre"] :is(body,#_) .acc-bas .section-head h2:not(#_)::before { content: "人気"; }
+html[data-gn~="encre"] :is(body,#_) #weekRadar .se-tit h2:not(#_)::before { content: "今週"; font-size: 9px; padding: 3px 2px; margin-right: 8px; }
+html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { --R: 176px; }
+html[data-gn~="encre"] :is(body,#_) .dcd:not(.past):not(.far) { color: #ffb4a6; background: rgba(216, 67, 43, .12); border-color: rgba(216, 67, 43, .5); }
+html[data-gn~="encre"] :is(body,#_) .search-input { border-color: rgba(216, 67, 43, .3); }
+@media (max-width: 760px) {
+  html[data-gn~="encre"] :is(body,#_) .hero-header::before { font-size: 160px; top: 44%; }
+  html[data-gn~="encre"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before { font-size: 9.5px; padding: 3px 2px; margin-right: 9px; }
+  html[data-gn~="encre"] :is(body,#_) .acc-haut .section-head h2 { --R: 152px; }
+}
+html[data-gn~="encre"][data-gn~="noir-or"] { --or-fin: #e8c480; --laque: #13110e; }
+/* ── les titres : un cinquieme plus petits, graisse 700, cachet plus fin ── */
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 { --fs-titre: calc(var(--X) * .8); }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .acc-bas .section-head h2 { font-size: var(--fs-titre); }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2) { font-weight: 700; letter-spacing: .02em; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before { font-size: 10px; padding: 3px 2px; margin-right: 10px; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { width: 18px; height: 18px; margin-left: 10px; font-size: .58rem; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) #weekRadar .se-tit h2 { font-size: .86rem; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) #weekRadar .se-tit h2::after { width: 16px; height: 16px; margin-left: 8px; }
+@media (max-width: 760px) {
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 { --fs-titre: calc(var(--X) * .92); }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before { font-size: 9px; }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { width: 16px; height: 16px; margin-left: 8px; }
+}
+/* ═══ B·2 · NOIR ET OR ═══════════════════════════════════════════════════════
+   Laque noire et or : Sign in et Discord cercles d'or, lettres d'or. Les titres
+   deviennent des intitules espaces, prolonges par un filet d'or jusqu'a
+   « Voir plus ». */
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .auth-ui__signin {
+  height: 44px; padding: 0 28px; border-radius: 999px; color: var(--or-fin); font: 600 12.5px/1 "Shippori Mincho B1", serif; letter-spacing: .24em;
+  text-transform: uppercase; background: linear-gradient(180deg, #1f1b16 0%, #0e0c0a 100%); border: 1px solid rgba(232, 196, 128, .85);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, .14), 0 0 22px -8px rgba(232, 196, 128, .5);
+}
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .discord-link:not(#_) {
+  width: 44px; height: 44px; border-radius: 50%; color: var(--or-fin);
+  background: linear-gradient(180deg, #1f1b16 0%, #0e0c0a 100%); border: 1px solid rgba(232, 196, 128, .85);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, .14), 0 0 22px -8px rgba(232, 196, 128, .5);
+}
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 { --fs-titre: calc(var(--X) * .74); }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .acc-haut .section-head h2 { --C: 13.05; --R: 190px; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2) { font-weight: 600; letter-spacing: .07em; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { background: transparent; color: var(--or-fin); -webkit-text-fill-color: var(--or-fin); box-shadow: inset 0 0 0 1px rgba(232, 196, 128, .8); transform: none; border-radius: 50%; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head::after {
+  content: ""; order: 1; flex: 1 1 auto; min-width: 0; height: 1px; margin: 0 4px 0 6px;
+  background: linear-gradient(90deg, rgba(232, 196, 128, .6), rgba(232, 196, 128, .06));
+}
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more { order: 2; margin-left: 0; }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head { border-bottom-color: rgba(255, 255, 255, .06); }
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more {
+  border-radius: 999px; color: var(--or-fin); background: rgba(11, 10, 9, .7); border: 1px solid rgba(232, 196, 128, .7); box-shadow: none;
+  font: 600 .68rem/1 "Shippori Mincho B1", serif; letter-spacing: .12em; text-transform: uppercase; padding-left: 14px; padding-right: 12px;
+}
+html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .see-more::after { color: var(--or-fin); }
+@media (max-width: 760px) {
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head h2 { --fs-titre: calc(var(--X) * .86); }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .auth-ui__signin { height: 38px; padding: 0 16px; font-size: 11px; letter-spacing: .18em; }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head .see-more { font-size: .62rem; letter-spacing: .08em; padding-left: 11px; padding-right: 9px; }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-head::after { display: none; }
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .acc-haut .section-head h2 { --R: 150px; }
+  /* ── telephone : boutons a 38 px ────────────────────────────────────────── */
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .discord-link:not(#_) { width: 38px; height: 38px; }
+}
+@media (max-width: 400px) {
+  html[data-gn~="encre"][data-gn~="noir-or"] :is(body,#_) .auth-ui__signin { padding: 0 12px; font-size: 10.5px; letter-spacing: .12em; }
+}
+/* ── la recherche habillee en noir et or ──────────────────────────────────── */
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-bar-home { gap: 10px; }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input {
+  height: 44px; padding: 0 20px; border-radius: 999px; color: #f1e8da; font: 500 14.5px/1 "Shippori Mincho B1", serif; letter-spacing: .01em;
+  background: linear-gradient(180deg, #1c1915 0%, #0d0c0a 100%); border: 1px solid rgba(232, 196, 128, .55);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, .08); backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input::placeholder { color: #cfc1a5; }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input:focus { border-color: rgba(232, 196, 128, .95); box-shadow: 0 0 0 3px rgba(232, 196, 128, .16); }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-btn {
+  flex: none; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; border-radius: 50%; color: #e8c480; font-size: 17px;
+  background: linear-gradient(180deg, #1f1b16 0%, #0e0c0a 100%); border: 1px solid rgba(232, 196, 128, .85);
+  box-shadow: inset 0 1px 0 rgba(255, 236, 200, .14), 0 0 22px -8px rgba(232, 196, 128, .5);
+}
+/* ═══ R3 · DANS LA LIGNE DES ONGLETS ═════════════════════════════════════════
+   Les onglets passent a gauche, la recherche a droite sur la meme ligne,
+   le tout pose sur un filet d'or. */
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .page-shell { display: grid; grid-template-columns: minmax(0, 1fr); }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .hero-header,
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-bar-home { grid-row: 1; grid-column: 1; }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .hero-header {
+  padding-bottom: 12px; border-bottom: 1px solid transparent;
+  border-image: linear-gradient(90deg, rgba(232, 196, 128, .05), rgba(232, 196, 128, .5) 20%, rgba(232, 196, 128, .5) 80%, rgba(232, 196, 128, .05)) 1;
+}
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .top-tabs { justify-self: start; margin-left: 2px; }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-bar-home { align-self: end; justify-self: end; margin: 0 max(20px, (100% - 1240px) / 2) 30px 0; width: auto; z-index: 2; }
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input { width: 300px; }
+@media (max-width: 960px) {
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input { width: 210px; }
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .tabs-track { gap: 24px; }
+}
+/* ── telephone et tablette etroite : une ligne pleine largeur sous les onglets ── */
+@media (max-width: 760px) {
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .page-shell { display: block; }
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-bar-home { margin: 16px auto 0; justify-self: auto; align-self: auto; width: min(1240px, calc(100% - 40px)); }
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-input { width: 100%; }
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .hero-header { padding-bottom: 0; border: 0; }
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .top-tabs { justify-self: stretch; margin-left: 0; }
+}
+@media (max-width: 640px) {
+  html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="recherche"] :is(body,#_) .search-bar-home { width: min(100%, calc(100% - 20px)); }
+}
+
+/* ── production : les tiroirs du compte passent devant ─────────────────────
+   Le menu du profil et les tiroirs (favoris, compte, notifications) sont rendus
+   DANS l'en-tete. Avec isolation: isolate, l'en-tete devenait une seule couche,
+   peinte sous les panneaux de l'accueil : ils se seraient ouverts derriere.
+   Sans isolation, ses enfants positionnes, l'en-tete se peint a l'identique
+   (verifie au pixel) et les tiroirs gardent leur z-index face au reste. */
+html[data-gn~="encre"] :is(body,#_) .hero-header { isolation: auto; }
+html[data-gn~="encre"] :is(body,#_) .hero-header::before { z-index: auto; }
+html[data-gn~="encre"] :is(body,#_) :is(.hero-topbar__left, .hero-topbar__right, .brand-subtitle, .top-tabs) { position: relative; }
+/* DESIGN-ENCRE-FIN */
+
+/* DESIGN-BLEU-DEBUT — bloc ajoute par design-cameleon.sh (Vitre + Caméléon très léger), a remplacer en entier, pas a la main */
+/* ── polices : Inter et JetBrains Mono (demandees par global.css, jamais fournies),
+   Poppins (marque et titres), GN Prisme JP (新, cachets, ゲームニメ : 12 signes) ── */
+@font-face { font-family: Inter; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/inter-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/inter-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/inter-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/inter-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/inter-latin-800-normal.woff2") format("woff2"); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 900; font-display: swap; src: url("/fonts/inter-latin-900-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+/* ── verre : regles communes (fond lumineux, jours de la semaine, cartes « Derniers sortis ») ── */
+@media (min-width: 1061px) {
+html[data-gn~="verre"] .gf-box i { filter: brightness(.82) saturate(1.1); }
+html[data-gn~="verre"] .gf-box {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 86%, transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, #000 12%, #000 86%, transparent 100%);
+  }
+html[data-gn~="verre"] .gf-box::after {
+    background: linear-gradient(90deg, rgba(5, 5, 6, .4), transparent 10%, transparent 90%, rgba(5, 5, 6, .4));
+  }
+}
+@media (max-width: 1060px) {
+html[data-gn~="verre"] .gf-box i { filter: brightness(.92) saturate(1.1); }
+}
+html[data-gn~="verre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-block:not(#weekRadar) { position: relative; isolation: isolate; }
+html[data-gn~="verre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-block::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 30;
+}
+html[data-gn~="verre"] :is(body,#_) #weekRadar .se-barre { border-color: rgba(255, 255, 255, .14); }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .ds-sl { background: transparent; }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .ds-sl::before { opacity: 0; }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .ds-sl .item-overlay { background: none; }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .ds-sl .item-media { box-shadow: 0 0 0 1px rgba(255, 255, 255, .16), 0 16px 30px -12px rgba(0, 0, 0, .75); }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .section-block:not(#weekRadar) .section-head { background: transparent; }
+html[data-gn~="verre"] :is(body,#_) .acc-haut .section-block:not(#weekRadar) :is(h3, .item-body, .dbox, .chip) { text-shadow: 0 1px 8px rgba(0, 0, 0, .55); }
+html[data-gn~="verre"] :is(body,#_) .search-input { color: #f6f1ea; }
+html[data-gn~="verre"] :is(body,#_) .search-input::placeholder { color: rgba(246, 241, 234, .72); }
+html[data-gn~="verre"] :is(body,#_) .acc-haut #weekRadar { border-color: rgba(255, 255, 255, .22); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 30px 64px -24px rgba(0, 0, 0, .8); }
+@media (max-width: 1060px) {
+html[data-gn~="verre"] :is(body,#_) :is(.acc-haut, .acc-bas) .section-block:not(#weekRadar) { background-color: rgba(10, 9, 10, .55); }
+}
+html[data-gn~="verre"] :is(body,#_) #weekRadar .jr .ep { top: -6px; right: -6px; }
+@media (min-width: 1200px) {
+html[data-gn~="verre"] :is(body,#_) #weekRadar .jr { padding-left: 11px; padding-right: 11px; }
+}
+@media (max-width: 760px), (min-width: 1061px) and (max-width: 1199px) {
+html[data-gn~="verre"] :is(body,#_) #weekRadar .jours { justify-content: space-between; gap: 2px; padding-right: 6px; overflow: visible; }
+html[data-gn~="verre"] :is(body,#_) #weekRadar .jr { flex: 1 1 0; min-width: 0; padding: 4px 2px 5px; }
+html[data-gn~="verre"] :is(body,#_) #weekRadar .jr .ep { right: -4px; }
+}
+/* ── verrous de structure : memes boites que la page validee, quelle que soit la police ── */
+@font-face { font-family: "GN Prisme JP"; font-weight: 100 900; font-display: block; src: url("/fonts/gn-prisme-jp.woff2") format("woff2"); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-kanji { -webkit-mask-image: none; mask-image: none; transform: none; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before { -webkit-mask-image: none; mask-image: none; transform: none; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { transform: none; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-block::after { background: none; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { position: relative; z-index: 1; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab-indicator { z-index: 0; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-mark::after { font-size: 12px; letter-spacing: .2em; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle { line-height: 20.925px; margin-top: 6px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { box-sizing: border-box; height: 38.5px; display: inline-flex; align-items: flex-start; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-input { box-sizing: border-box; height: 43px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-btn { box-sizing: border-box; height: 46px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .sl-cpt { line-height: 13px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .chip { line-height: 1.2; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .ds-t { line-height: 20.7px; }
+@media (max-width: 760px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .hero-header::before { font-size: 96px; top: 30%; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-text { line-height: 30px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle { line-height: 17px; margin-top: 6px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { height: 34px; }
+}
+/* ── bleu nuit, personnage de « Cette semaine » en haut a droite, effet « Vitre » ── */
+@font-face { font-family: "GN Poppins"; font-weight: 500; font-display: block; src: url("/fonts/poppins-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "GN Poppins"; font-weight: 600; font-display: block; src: url("/fonts/poppins-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "GN Poppins"; font-weight: 700; font-display: block; src: url("/fonts/poppins-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "GN Poppins"; font-weight: 800; font-display: block; src: url("/fonts/poppins-latin-800-normal.woff2") format("woff2"); }
+html[data-gn~="bleu"] {
+  --b-ink: #f3f6ff; --b-ink2: #c4d3ef; --b-ink3: #8ea5cc; --b-acc: #539dfc; --b-acc2: #2f6fe0; --b-acc3: #9cc9ff;
+  --b-nuit: #021637; --b-carte: #031330; --b-ligne: rgba(83, 157, 252, .32);
+  --b-grad: linear-gradient(180deg, #6aaeff 0%, #3b82f6 100%);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) { background-color: var(--b-nuit); }
+html[data-gn~="bleu"] :is(body,#_):not(#_)::before {
+  background:
+    radial-gradient(1000px 560px at 86% 4%, rgba(38, 104, 226, .3), transparent 64%),
+    radial-gradient(1100px 640px at 8% 104%, rgba(16, 66, 170, .22), transparent 64%),
+    linear-gradient(180deg, #0a1b40 0%, #03173a 26%, #021637 60%, #011433 100%);
+}
+.gc { display: none; }
+html[data-gn~="bleu"] .gc { display: block; position: absolute; left: 0; top: 0; width: 100%; overflow: hidden; pointer-events: none; z-index: 0; }
+html[data-gn~="bleu"] .gc-box {
+  position: absolute; top: 0; right: 0;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .55) 22%, #000 46%), linear-gradient(to bottom, #000 52%, transparent 100%);
+  -webkit-mask-composite: source-in; mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .55) 22%, #000 46%), linear-gradient(to bottom, #000 52%, transparent 100%);
+  mask-composite: intersect;
+}
+html[data-gn~="bleu"] .gc-box { --gc-fx: .62; --gc-fy: .42; --gc-fw: .17; }
+html[data-gn~="bleu"] .gc-box i { position: absolute; inset: 0; background: 50% 16% / 100% auto no-repeat; opacity: 0; transition: opacity 900ms ease; }
+html[data-gn~="bleu"] .gc-box i.on { opacity: 1; }
+html[data-gn~="bleu"] .gc-ep {
+  position: absolute; z-index: 3; left: 33%; top: 26px; writing-mode: vertical-rl; font: 400 64px/1 "GN Pinceau EP", serif; letter-spacing: .02em;
+  color: rgba(150, 200, 255, .58); -webkit-text-stroke: 1px rgba(2, 20, 60, .35); text-shadow: 0 0 24px rgba(60, 130, 255, .55); display: none;
+}
+html[data-gn~="bleu"] .gc-ep span { text-combine-upright: all; -webkit-text-combine: horizontal; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .hero-header::before { content: none; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-kanji {
+  width: 50px; height: 50px; margin-right: 18px; border-radius: 50%; background: linear-gradient(160deg, #78b6ff, #2f6fe0); color: #fff;
+  font: 700 25px/1 "GN Prisme JP", sans-serif; box-shadow: 0 0 0 4px rgba(83, 157, 252, .2), 0 10px 26px -8px rgba(47, 111, 224, .9), inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-text { font: 700 52px/1.12 "GN Poppins", sans-serif; letter-spacing: -.015em; color: #fff; text-shadow: 0 2px 24px rgba(0, 10, 40, .7); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-mark::after { font-family: "GN Prisme JP", sans-serif; font-weight: 500; color: var(--b-acc3); border-left-color: rgba(83, 157, 252, .45); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle { font: 500 15px/20.925px Inter, sans-serif; color: var(--b-ink2); text-shadow: 0 1px 10px rgba(0, 10, 40, .8); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle::before { background: linear-gradient(90deg, transparent, var(--b-acc)); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle::after { background: linear-gradient(90deg, transparent, var(--b-acc)); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .top-tabs {
+  padding: 4px; border-radius: 999px; background: rgba(3, 30, 74, .62); border: 1px solid rgba(83, 157, 252, .3);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 rgba(160, 205, 255, .14), 0 10px 26px -14px rgba(0, 6, 24, .9);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tabs-track { gap: 2px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab {
+  height: 28.5px; padding: 0 22px; align-items: center; border-radius: 999px; font: 600 14.5px/1 Inter, sans-serif; letter-spacing: 0; color: var(--b-ink2);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .top-tabs .tab.active { color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab-indicator {
+  top: 0; bottom: 0; height: auto; border-radius: 999px; background: var(--b-grad);
+  box-shadow: 0 6px 18px -6px rgba(59, 130, 246, .9), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .discord-link {
+  border-radius: 50%; background: rgba(6, 30, 74, .7); border: 1px solid rgba(83, 157, 252, .45); color: #fff;
+  box-shadow: inset 0 1px 0 rgba(160, 205, 255, .2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .auth-ui__signin {
+  border-radius: 999px; padding: 0 24px; background: var(--b-grad); color: #fff; font: 600 14.5px/1 Inter, sans-serif; letter-spacing: 0;
+  box-shadow: 0 10px 26px -10px rgba(59, 130, 246, .9), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-input {
+  border-radius: 999px; padding-left: 22px; background: rgba(3, 22, 56, .74); border: 1px solid rgba(83, 157, 252, .4); color: #fff;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: inset 0 1px 0 rgba(160, 205, 255, .12);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-input::placeholder { color: #a3b8dc; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-input:focus { border-color: var(--b-acc); box-shadow: 0 0 0 4px rgba(83, 157, 252, .2); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .search-btn { width: 46px; min-width: 46px; padding: 0; border-radius: 50%; background: var(--b-grad); color: #fff; box-shadow: 0 8px 22px -8px rgba(59, 130, 246, .9); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-block:not(#weekRadar) {
+  border-radius: 18px; background: linear-gradient(180deg, rgba(6, 34, 86, .6), rgba(2, 18, 50, .78));
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid var(--b-ligne); box-shadow: inset 0 1px 0 rgba(150, 195, 255, .2), 0 24px 52px -22px rgba(0, 6, 24, .9);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut #weekRadar {
+  border-radius: 18px; border: 1px solid rgba(83, 157, 252, .5); background: var(--b-carte);
+  box-shadow: inset 0 1px 0 rgba(170, 210, 255, .35), 0 0 44px -14px rgba(59, 130, 246, .55), 0 30px 64px -24px rgba(0, 6, 24, .9);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) {
+  --fil: rgba(83, 157, 252, .3); --fil2: rgba(83, 157, 252, .16); --fil3: rgba(83, 157, 252, .16);
+  --txt: #f3f6ff; --g1: #c4d3ef; --g2: #9fb2d6; --g3: #8ea5cc; --or2: #6aaeff; --or3: #3b82f6; --miel: #b7d6ff;
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-head { border-bottom: 1px solid rgba(83, 157, 252, .16); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2) {
+  font-family: "GN Poppins", sans-serif; font-weight: 600; letter-spacing: -.01em; color: #fff; -webkit-text-fill-color: #fff; text-shadow: none;
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before {
+  font: 700 9.5px/1 "GN Prisme JP", sans-serif; padding: 5px 4px; margin-right: 11px; border-radius: 7px; background: var(--b-grad); color: #fff;
+  -webkit-text-fill-color: #fff; text-shadow: none; box-shadow: 0 6px 14px -6px rgba(59, 130, 246, .9), inset 0 1px 0 rgba(255, 255, 255, .35);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-tit h2::before { font-size: 8px; padding: 4px 3px; margin-right: 8px; border-radius: 6px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after {
+  border-radius: 50%; background: rgba(83, 157, 252, .14); border: 1px solid rgba(83, 157, 252, .5); color: #cfe3ff; -webkit-text-fill-color: #cfe3ff; box-shadow: none; text-shadow: none;
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-head .see-more {
+  border-radius: 999px; background: rgba(83, 157, 252, .1); border: 1px solid rgba(83, 157, 252, .55); color: #e3eeff; box-shadow: none;
+  font: 600 13px/1 Inter, sans-serif; letter-spacing: 0; padding-left: 16px; padding-right: 14px;
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) .see-more::after { color: var(--b-acc); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .section-head h2 { --C: 11.2; --R: 176px; }
+@media (max-width: 760px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .section-head h2 { --R: 170px; }
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-barre {
+  border-radius: 14px; background: rgba(2, 16, 44, .62); border: 1px solid rgba(83, 157, 252, .32);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3); box-shadow: inset 0 1px 0 rgba(160, 205, 255, .2);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-plage { color: #9fb4d8; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr { border-radius: 12px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr .dj { font-family: "GN Poppins", sans-serif; font-weight: 700; font-size: 16.5px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr.ajd .nj { color: var(--b-acc3); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr.sel { background: var(--b-grad); box-shadow: 0 8px 20px -8px rgba(59, 130, 246, .95), inset 0 1px 0 rgba(255, 255, 255, .35); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr.sel :is(.nj, .dj) { color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr .ep { background: #04163c; border: 1px solid rgba(83, 157, 252, .75); color: #bfdcff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .jr.sel .ep { background: #fff; border-color: #fff; color: #1d4fbf; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar :is(.se-sl, .se-sl .item-media) { background-color: var(--b-carte); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-sl .item-overlay {
+  background: linear-gradient(90deg, rgba(3, 16, 42, .95) 0%, rgba(3, 16, 42, .8) 32%, rgba(3, 16, 42, .14) 66%, transparent 100%),
+    linear-gradient(0deg, rgba(3, 16, 42, .88) 0%, transparent 40%), linear-gradient(180deg, rgba(3, 16, 42, .6) 0%, transparent 24%);
+}
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-t { font-family: "GN Poppins", sans-serif; font-weight: 700; letter-spacing: -.015em; line-height: 1.12; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .se-m { color: #cddaf2; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .dbox { border-radius: 12px; background: rgba(2, 16, 44, .6); border: 1px solid rgba(83, 157, 252, .28); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .dval { color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .dcd:not(.past):not(.far) { color: #fff; background: rgba(59, 130, 246, .35); border-color: rgba(120, 180, 255, .7); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.dcd.past, .dcd.far) { color: #a9bddf; border-color: rgba(83, 157, 252, .28); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .chip { border-radius: 999px; color: #dbe7fb; background: rgba(4, 30, 76, .55); border-color: rgba(83, 157, 252, .38); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .chip.tbc { color: #9fb2d6; background: transparent; border-color: rgba(83, 157, 252, .3); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .hpill { border-color: rgba(120, 180, 255, .6); color: #b7d6ff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .wbar { border-color: rgba(83, 157, 252, .22); background: rgba(0, 6, 24, .5); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .wbar i { background: var(--b-grad); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .pt.on { background: var(--b-grad); color: #fff; box-shadow: 0 6px 16px -6px rgba(59, 130, 246, .95); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .sl-fl { background: rgba(2, 16, 44, .7); border-color: rgba(83, 157, 252, .5); color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .sl-cpt { color: rgba(220, 232, 255, .72); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) #weekRadar .fav-heart { background: rgba(2, 16, 44, .62); box-shadow: inset 0 0 0 1px rgba(83, 157, 252, .5); color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .ds-sl .item-media { border-radius: 12px; box-shadow: 0 0 0 1px rgba(120, 180, 255, .35), 0 18px 34px -14px rgba(0, 6, 24, .9); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-haut .ds-t { font-family: "GN Poppins", sans-serif; font-weight: 600; font-size: 1.04rem; letter-spacing: -.01em; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl { border-radius: 10px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl:hover { background: rgba(83, 157, 252, .1); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl .r { border-radius: 50%; font: 700 10.5px/1 "GN Poppins", sans-serif; color: #b9cbea; background: rgba(83, 157, 252, .1); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl.p3 .r { color: #fff; background: var(--b-grad); box-shadow: 0 4px 12px -4px rgba(59, 130, 246, .95); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl .mv { border-radius: 5px; border-color: rgba(120, 180, 255, .25); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl .n { color: #fff; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl .gn { color: #8ea5cc; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .acc-bas .tl:hover .n { color: #b7d6ff; }
+@media (max-width: 760px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-kanji { width: 30px; height: 30px; margin-right: 10px; font-size: 15px; box-shadow: 0 0 0 3px rgba(83, 157, 252, .2), 0 6px 16px -6px rgba(47, 111, 224, .9); }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-text { font-size: 26px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-subtitle { font-size: 12.5px; line-height: 17px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .top-tabs { padding: 3px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { height: 26px; padding: 0 14px; font-size: 13.5px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .auth-ui__signin { padding: 0 16px; font-size: 13.5px; }
+html[data-gn~="bleu"] .gc-ep { display: none !important; }
+}
+@media (max-width: 400px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-text { font-size: 23px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { padding: 0 11px; font-size: 13px; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) .auth-ui__signin { padding: 0 13px; font-size: 12.5px; }
+}
+@media (max-width: 340px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .brand-text { font-size: 20px; }
+}
+@media (max-width: 1060px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .hero-header { background: none; }
+html[data-gn~="bleu"] .gc-box {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .5) 24%, #000 52%), linear-gradient(to bottom, #000 40%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .5) 24%, #000 52%), linear-gradient(to bottom, #000 40%, transparent 100%);
+  }
+html[data-gn~="bleu"] .gc-box { --gc-fx: .6; --gc-fy: .4; --gc-fw: .2; opacity: .62; }
+html[data-gn~="bleu"] :is(body,#_):not(#_) :is(.brand-text, .brand-subtitle, .tab:not(.active)) { text-shadow: 0 1px 3px rgba(0, 8, 30, .9), 0 2px 16px rgba(0, 8, 30, .8); }
+}
+html[data-gn~="vitre"] .gc-box i { filter: saturate(1.05); }
+html[data-gn~="vitre"] .gc-box::after { content: ""; position: absolute; inset: 0; z-index: 2; background: linear-gradient(90deg, rgba(2, 22, 60, .6), rgba(2, 22, 60, .12) 60%, transparent); }
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl .item-media { width: 100%; -webkit-mask-image: none; mask-image: none; }
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl .item-media img { object-position: var(--fx, 50%) var(--fy, 30%); }
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl .item-overlay {
+  background: linear-gradient(90deg, rgba(3, 16, 42, .9) 0%, rgba(3, 16, 42, .7) 30%, rgba(3, 16, 42, .12) 58%, transparent 80%),
+    linear-gradient(0deg, rgba(3, 16, 42, .85) 0%, transparent 40%), linear-gradient(180deg, rgba(3, 16, 42, .55) 0%, transparent 22%);
+}
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl::after {
+  content: ""; position: absolute; inset: 0; z-index: 12; pointer-events: none; mix-blend-mode: screen;
+  background:
+    linear-gradient(118deg, transparent 0 30%, rgba(255, 255, 255, .22) 30.3%, rgba(255, 255, 255, .09) 44%, transparent 44.3%),
+    linear-gradient(118deg, transparent 0 47.5%, rgba(255, 255, 255, .2) 47.8%, transparent 50.5%),
+    linear-gradient(118deg, transparent 0 84%, rgba(255, 255, 255, .08) 84.3%, transparent 88%),
+    linear-gradient(180deg, rgba(255, 255, 255, .13) 0%, transparent 15%),
+    radial-gradient(70% 45% at 92% 0%, rgba(200, 225, 255, .22), transparent 70%);
+}
+html[data-gn~="vitre"] :is(body,#_):not(#_) .acc-haut #weekRadar {
+  box-shadow: inset 0 1px 0 rgba(230, 242, 255, .85), inset 1px 0 0 rgba(170, 210, 255, .35), inset -1px 0 0 rgba(170, 210, 255, .2),
+    0 0 46px -14px rgba(59, 130, 246, .6), 0 30px 64px -24px rgba(0, 6, 24, .9);
+}
+@media (max-width: 1060px) {
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl .item-media { width: 100%; }
+html[data-gn~="vitre"] :is(body,#_):not(#_) #weekRadar .se-sl .item-overlay {
+    background: linear-gradient(0deg, rgba(3, 16, 42, .92) 0%, rgba(3, 16, 42, .55) 32%, transparent 58%), linear-gradient(180deg, rgba(3, 16, 42, .6) 0%, transparent 24%);
+  }
+}
+/* ── Caméléon très léger : la couleur de l'episode affiche dans « Cette semaine »
+   (calculee par le script du personnage, posee en --ep-*), densite 30 % ; fonds,
+   verres et voiles neutres ou a peine teintes, accents a la couleur de l'episode ── */
+@property --ep-a { syntax: "<color>"; inherits: true; initial-value: hsl(0, 0%, 72%); }
+@property --ep-b { syntax: "<color>"; inherits: true; initial-value: hsl(0, 0%, 56%); }
+@property --ep-c { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 58%, .3); }
+@property --ep-c2 { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 58%, .16); }
+@property --ep-d { syntax: "<color>"; inherits: true; initial-value: hsl(0, 0%, 9%); }
+@property --ep-e { syntax: "<color>"; inherits: true; initial-value: hsl(0, 0%, 4%); }
+@property --ep-f { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 72%, .34); }
+@property --ep-g { syntax: "<color>"; inherits: true; initial-value: hsl(0, 0%, 87%); }
+@property --ep-h { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 76%, .55); }
+@property --ep-p1 { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 16%, .5); }
+@property --ep-p2 { syntax: "<color>"; inherits: true; initial-value: hsla(0, 0%, 7%, .8); }
+html[data-gn~="cameleon"] { --ep-rgb: 15, 15, 15; }
+html[data-gn~="cameleon"].ep-pret { transition: --ep-a 1.1s ease, --ep-b 1.1s ease, --ep-c 1.1s ease, --ep-c2 1.1s ease, --ep-d 1.1s ease, --ep-e 1.1s ease, --ep-f 1.1s ease, --ep-g 1.1s ease, --ep-h 1.1s ease, --ep-p1 1.1s ease, --ep-p2 1.1s ease; }
+html[data-gn~="cameleon"] {
+  --t-acc: var(--ep-a);
+  --t-acc-clair: var(--ep-g);
+  --t-acc-ombre: 0 8px 20px -8px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .15);
+  --t-acc-ombre-fort: 0 10px 28px -10px var(--ep-c), 0 0 0 1px rgba(255, 255, 255, .16), inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .15);
+  --t-acc-voile: var(--ep-c);
+  --t-arete: linear-gradient(180deg, rgba(255, 255, 255, .32) 0%, rgba(255, 255, 255, .1) 22%, rgba(255, 255, 255, .04) 62%, rgba(255, 255, 255, .08) 100%);
+  --t-barre-bg: linear-gradient(180deg, rgba(var(--ep-rgb), .5), rgba(var(--ep-rgb), .68));
+  --t-barre-bord: rgba(255, 255, 255, .14);
+  --t-barre-ombre: inset 0 1px 0 rgba(255, 255, 255, .14), 0 10px 30px -16px rgba(0, 0, 0, .9);
+  --t-boite-bg: linear-gradient(180deg, rgba(var(--ep-rgb), .55), rgba(var(--ep-rgb), .66));
+  --t-boite-bord: rgba(255, 255, 255, .14);
+  --t-cachet: linear-gradient(180deg, var(--ep-a) 0%, var(--ep-b) 100%);
+  --t-cachet-ombre: 0 6px 14px -6px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .55);
+  --t-cachet-txt: #0e0e12;
+  --t-carte: var(--ep-e);
+  --t-champ-bg: linear-gradient(180deg, rgba(var(--ep-rgb), .58), rgba(var(--ep-rgb), .74));
+  --t-champ-bord: rgba(255, 255, 255, .14);
+  --t-champ-ombre: inset 0 1px 0 rgba(255, 255, 255, .08), 0 10px 26px -14px rgba(0, 0, 0, .9);
+  --t-champ-ph: #a9abb3;
+  --t-coin-filtre: saturate(1.04);
+  --t-coin-voile: linear-gradient(90deg, rgba(var(--ep-rgb), .62), rgba(var(--ep-rgb), .12) 60%, rgba(var(--ep-rgb), 0));
+  --t-compteur: rgba(235, 235, 240, .7);
+  --t-ep-bg: #1b1c21;
+  --t-ep-bord: var(--ep-a);
+  --t-ep-sel-bg: #0e0e12;
+  --t-ep-sel-txt: var(--ep-a);
+  --t-ep-txt: var(--ep-g);
+  --t-filet: var(--ep-a);
+  --t-filet2: var(--ep-a);
+  --t-fleche-bg: rgba(var(--ep-rgb), .72);
+  --t-fleche-bord: rgba(255, 255, 255, .3);
+  --t-flou: blur(24px) saturate(1.15);
+  --t-fond: radial-gradient(1100px 700px at 86% -10%, var(--ep-c), transparent 62%), radial-gradient(1300px 760px at 24% 122%, var(--ep-c2), transparent 62%), linear-gradient(180deg, var(--ep-d) 0%, var(--ep-e) 100%);
+  --t-grad: linear-gradient(180deg, var(--ep-a) 0%, var(--ep-b) 100%);
+  --t-ink: #f5f5f7;
+  --t-ink2: #c5c6cc;
+  --t-ink3: #8d8f97;
+  --t-jaquette-ombre: 0 0 0 1px rgba(255, 255, 255, .14), 0 18px 36px -14px rgba(0, 0, 0, .95);
+  --t-jauge-bg: rgba(0, 0, 0, .45);
+  --t-jauge-bord: rgba(255, 255, 255, .12);
+  --t-kana: var(--ep-g);
+  --t-kana-fil: var(--ep-f);
+  --t-kanji: radial-gradient(42% 32% at 34% 24%, rgba(255, 255, 255, .7), rgba(255, 255, 255, 0) 100%), linear-gradient(160deg, var(--ep-a), var(--ep-b));
+  --t-kanji-ombre: 0 0 0 4px var(--ep-c2), 0 12px 28px -10px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .6);
+  --t-kanji-ombre-tel: 0 0 0 3px var(--ep-c2), 0 6px 16px -6px var(--ep-c);
+  --t-kanji-txt: #0e0e12;
+  --t-marque: #ffffff;
+  --t-marque-fond: linear-gradient(180deg, #ffffff 40%, var(--ep-g) 100%);
+  --t-meta: #d4d5da;
+  --t-nuit: var(--ep-e);
+  --t-ombre-rgb: 0, 0, 0;
+  --t-onglets-bg: linear-gradient(180deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03));
+  --t-onglets-bord: rgba(255, 255, 255, .12);
+  --t-onglets-ombre: inset 0 1px 0 rgba(255, 255, 255, .12), 0 12px 30px -16px rgba(0, 0, 0, .9);
+  --t-or2: var(--ep-a);
+  --t-or3: var(--ep-b);
+  --t-panneau: linear-gradient(160deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, 0) 36%), linear-gradient(180deg, var(--ep-p1), var(--ep-p2));
+  --t-panneau-bord: rgba(255, 255, 255, .07);
+  --t-panneau-ombre: 0 28px 60px -26px rgba(0, 0, 0, .9), 0 0 60px -34px var(--ep-c);
+  --t-pastille-bg: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .04));
+  --t-pastille-bord: rgba(255, 255, 255, .16);
+  --t-pastille-ombre: inset 0 1px 0 rgba(255, 255, 255, .14), 0 8px 20px -10px rgba(0, 0, 0, .9);
+  --t-puce-bg: rgba(255, 255, 255, .06);
+  --t-puce-bord: rgba(255, 255, 255, .16);
+  --t-puce-txt: #e6e7ea;
+  --t-puce2-bord: rgba(255, 255, 255, .14);
+  --t-rang-bg: rgba(255, 255, 255, .07);
+  --t-rang-ombre: 0 4px 12px -4px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .5);
+  --t-rang-sur: #0e0e12;
+  --t-rang-txt: #b9bbc2;
+  --t-rang1: var(--t-grad);
+  --t-rang2: var(--t-grad);
+  --t-rang3: var(--t-grad);
+  --t-rond-bg: rgba(255, 255, 255, .08);
+  --t-rond-bord: var(--ep-f);
+  --t-rond-txt: var(--ep-g);
+  --t-semaine-arete: linear-gradient(180deg, rgba(255, 255, 255, .75) 0%, rgba(255, 255, 255, .22) 14%, rgba(255, 255, 255, .07) 50%, rgba(255, 255, 255, .16) 100%);
+  --t-semaine-bord: rgba(255, 255, 255, .14);
+  --t-semaine-ombre: 0 0 64px -24px var(--ep-c), 0 34px 72px -28px rgba(0, 0, 0, .95);
+  --t-statut-bg: var(--ep-c2);
+  --t-statut-bord: var(--ep-a);
+  --t-statut-txt: #ffffff;
+  --t-statut2-bord: rgba(255, 255, 255, .16);
+  --t-statut2-txt: #a2a4ac;
+  --t-sur-acc: #0e0e12;
+  --t-survol: rgba(255, 255, 255, .06);
+  --t-tete-fil: rgba(255, 255, 255, .07);
+  --t-titre: #ffffff;
+  --t-vignette-bord: rgba(255, 255, 255, .14);
+  --t-vitre: linear-gradient(118deg, transparent 0 30%, rgba(255, 255, 255, .22) 30.3%, rgba(255, 255, 255, .09) 44%, transparent 44.3%), linear-gradient(118deg, transparent 0 47.5%, rgba(255, 255, 255, .2) 47.8%, transparent 50.5%), linear-gradient(118deg, transparent 0 84%, rgba(255, 255, 255, .08) 84.3%, transparent 88%), linear-gradient(180deg, rgba(255, 255, 255, .13) 0%, transparent 15%), radial-gradient(70% 45% at 92% 0%, rgba(255, 255, 255, .16), transparent 70%);
+  --t-voile-rgb: var(--ep-rgb);
+  --t-voir-bg: linear-gradient(180deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .03));
+  --t-voir-bord: var(--ep-f);
+  --t-voir-txt: #f2f2f5;
+}
+html[data-gn~="cameleon"] { --ep-k-fond: .25; --ep-k-lueur: .5; --ep-k-verre: .2; --ep-k-voile: .25; }
+html[data-gn~="cameleon"] { --t-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .07 0 0 0 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E"); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) { background-color: var(--t-nuit); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_)::before { background: var(--t-grain), var(--t-fond); }
+html[data-gn~="cameleon"] .gc-box i { filter: var(--t-coin-filtre); }
+html[data-gn~="cameleon"] .gc-box::after { background: var(--t-coin-voile); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-kanji { background: var(--t-kanji); color: var(--t-kanji-txt); box-shadow: var(--t-kanji-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .hero-header .brand-text {
+  color: var(--t-marque); background: var(--t-marque-fond); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: none; filter: drop-shadow(0 2px 14px rgba(var(--t-ombre-rgb), .6));
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-mark::after { color: var(--t-kana); border-left-color: var(--t-kana-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-subtitle { color: var(--t-ink2); text-shadow: 0 1px 10px rgba(var(--t-ombre-rgb), .8); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-subtitle::before { background: linear-gradient(90deg, transparent, var(--t-filet)); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-subtitle::after { background: linear-gradient(90deg, var(--t-filet2), transparent); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .top-tabs { background: var(--t-onglets-bg); border-color: var(--t-onglets-bord); box-shadow: var(--t-onglets-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .tab { color: var(--t-ink2); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .top-tabs .tab.active { color: var(--t-sur-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .tab-indicator { background: var(--t-grad); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .discord-link { background: var(--t-pastille-bg); border-color: var(--t-pastille-bord); color: var(--t-ink); box-shadow: var(--t-pastille-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-ui__signin { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre-fort); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .search-input { background: var(--t-champ-bg); border-color: var(--t-champ-bord); color: var(--t-ink); box-shadow: var(--t-champ-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .search-input::placeholder { color: var(--t-champ-ph); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .search-input:focus { border-color: var(--t-acc); box-shadow: 0 0 0 4px var(--t-acc-voile); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .search-btn { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre-fort); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-block:not(#weekRadar) {
+  background: var(--t-panneau); border-color: var(--t-panneau-bord); box-shadow: var(--t-panneau-ombre);
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-block::after {
+  padding: 1px; border-radius: 17px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-haut #weekRadar { border-color: var(--t-semaine-bord); background: var(--t-carte); box-shadow: var(--t-semaine-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-haut #weekRadar::after { background: var(--t-semaine-arete); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) {
+  --fil: var(--t-panneau-bord); --fil2: var(--t-tete-fil); --fil3: var(--t-tete-fil); --txt: var(--t-ink); --g1: var(--t-ink2); --g2: var(--t-ink3);
+  --g3: var(--t-ink3); --or2: var(--t-or2); --or3: var(--t-or3); --miel: var(--t-acc-clair);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-head { border-bottom-color: var(--t-tete-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2) { color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::before { background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt); box-shadow: var(--t-cachet-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut .section-head h2, .acc-bas .section-head h2, #weekRadar .se-tit h2)::after { background: var(--t-rond-bg); border-color: var(--t-rond-bord); color: var(--t-rond-txt); -webkit-text-fill-color: var(--t-rond-txt); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.acc-haut, .acc-bas) .section-head .see-more { background: var(--t-voir-bg); border-color: var(--t-voir-bord); color: var(--t-voir-txt); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .see-more::after { color: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-barre { background: var(--t-barre-bg); border-color: var(--t-barre-bord); box-shadow: var(--t-barre-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-plage { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .jr.ajd .nj { color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .jr.sel { background: var(--t-grad); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .jr.sel :is(.nj, .dj) { color: var(--t-sur-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .jr .ep { background: var(--t-ep-bg); border-color: var(--t-ep-bord); color: var(--t-ep-txt); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .jr.sel .ep { background: var(--t-ep-sel-bg); border-color: var(--t-ep-sel-bg); color: var(--t-ep-sel-txt); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar :is(.se-sl, .se-sl .item-media) { background-color: var(--t-carte); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-sl .item-overlay {
+  background: linear-gradient(90deg, rgba(var(--t-voile-rgb), .9), rgba(var(--t-voile-rgb), .7) 30%, rgba(var(--t-voile-rgb), .12) 58%, rgba(var(--t-voile-rgb), 0) 80%),
+    linear-gradient(0deg, rgba(var(--t-voile-rgb), .85), rgba(var(--t-voile-rgb), 0) 40%), linear-gradient(180deg, rgba(var(--t-voile-rgb), .55), rgba(var(--t-voile-rgb), 0) 22%);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-sl::after { background: var(--t-vitre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-m { color: var(--t-meta); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .dbox { background: var(--t-boite-bg); border-color: var(--t-boite-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .dval { color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .dcd:not(.past):not(.far) { color: var(--t-statut-txt); background: var(--t-statut-bg); border-color: var(--t-statut-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.dcd.past, .dcd.far) { color: var(--t-statut2-txt); border-color: var(--t-statut2-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .chip { color: var(--t-puce-txt); background: var(--t-puce-bg); border-color: var(--t-puce-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .chip.tbc { color: var(--t-ink3); background: transparent; border-color: var(--t-puce2-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .hpill { border-color: var(--t-statut-bord); color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .wbar { border-color: var(--t-jauge-bord); background: var(--t-jauge-bg); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .wbar i { background: var(--t-grad); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .pt.on { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-haut .sl-fl { background: var(--t-fleche-bg); border-color: var(--t-fleche-bord); color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .sl-cpt { color: var(--t-compteur); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .fav-heart { background: var(--t-fleche-bg); box-shadow: inset 0 0 0 1px var(--t-fleche-bord); color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-haut .ds-sl .item-media { box-shadow: var(--t-jaquette-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:hover { background: var(--t-survol); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .r { color: var(--t-rang-txt); background: var(--t-rang-bg); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .r { color: var(--t-rang-sur); background: var(--t-rang1); box-shadow: var(--t-rang-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 .r { background: var(--t-rang2); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 + .tl.p3 .r { background: var(--t-rang3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .mv { border-color: var(--t-vignette-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .n { color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .gn { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:hover .n { color: var(--t-acc-clair); }
+@media (max-width: 760px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .brand-kanji { box-shadow: var(--t-kanji-ombre-tel); }
+}
+@media (max-width: 1060px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #weekRadar .se-sl .item-overlay {
+    background: linear-gradient(0deg, rgba(var(--t-voile-rgb), .92), rgba(var(--t-voile-rgb), .55) 32%, rgba(var(--t-voile-rgb), 0) 58%), linear-gradient(180deg, rgba(var(--t-voile-rgb), .6), rgba(var(--t-voile-rgb), 0) 24%);
+  }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.brand-subtitle, .tab:not(.active)) { text-shadow: 0 1px 3px rgba(var(--t-ombre-rgb), .9), 0 2px 16px rgba(var(--t-ombre-rgb), .8); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .hero-header .brand-text { filter: drop-shadow(0 1px 2px rgba(var(--t-ombre-rgb), .9)) drop-shadow(0 2px 10px rgba(var(--t-ombre-rgb), .7)); }
+}
+/* DESIGN-BLEU-FIN */
+/* TOP25-DEBUT — bloc ajoute par top25-podium.sh puis top25-bande-annonce.sh (Top 25 : podium et lignes plus grandes, switch Anime / Jeux sous 1060 px, bande-annonce gardee dans le panneau ; maquettes « A · Podium » et « bande-annonce corrigee » validees le 6 octobre 2026), a remplacer en entier, pas a la main */
+/* ── la ligne, en plus grand ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl { gap: 12px; padding: 7px 8px; border-radius: 12px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .mv { border-radius: 6px; box-shadow: 0 8px 16px -10px rgba(0, 0, 0, .9); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .n { font-size: .88rem; line-height: 1.25; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .gn { font-size: .71rem; margin-top: 3px; }
+/* ── A « Podium » : 1, 2, 3 en cartes, puis 4-14 et 15-25 en deux colonnes ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .items-row {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: none;
+  grid-auto-flow: row dense; grid-auto-columns: auto; gap: 2px 16px; padding: 14px 16px 16px;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(-n + 3) { grid-column: span 2; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(n + 4):nth-child(-n + 14) { grid-column: 1 / 4; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(n + 15) { grid-column: 4 / 7; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .r { width: 24px; height: auto; border-radius: 0; background: none; box-shadow: none; font: 700 15px/1 "GN Poppins", sans-serif; color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .mv { width: 38px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 {
+  flex-direction: column; align-items: center; gap: 10px; margin-bottom: 12px; padding: 16px 10px 13px; text-align: center;
+  border-radius: 16px; background: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, .02));
+  border: 1px solid rgba(255, 255, 255, .09); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .mv { width: 86px; border-radius: 9px; box-shadow: var(--t-jaquette-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .r, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 .r, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 + .tl.p3 .r {
+  position: absolute; top: 9px; left: 9px; z-index: 2; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-rang-ombre);
+  font: 800 14px/1 "GN Poppins", sans-serif;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .tx { width: 100%; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .n { font-size: .9rem; font-weight: 700; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .gn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) {
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .items-row { gap: 2px 8px; padding: 12px 12px 14px; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(n + 4):nth-child(-n + 14), html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(n + 15) { grid-column: 1 / -1; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 { padding: 14px 6px 11px; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .mv { width: 80px; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .n { font-size: .8rem; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 .r, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 .r, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl.p3 + .tl.p3 + .tl.p3 .r { top: 7px; left: 7px; width: 26px; height: 26px; font-size: 12.5px; }
+}
+/* ── la bande-annonce (apercu 212 x 119) : toujours a l'interieur du panneau ──
+   podium : elle joue sur la carte (a gauche sur la 1, au centre sur la 2, a droite sur la 3) ;
+   liste : a cote de la ligne, vers l'interieur (colonne de gauche -> a droite, colonne de droite -> a gauche) */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl .item-hover-video { top: 50%; bottom: auto; left: calc(100% + 9px); right: auto; transform: translateY(-50%); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(n + 15) .item-hover-video { left: auto; right: calc(100% + 9px); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(1) .item-hover-video { left: 0; right: auto; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(2) .item-hover-video { left: 50%; right: auto; transform: translate(-50%, -50%); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(3) .item-hover-video { left: auto; right: 0; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(13) .item-hover-video, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(14) .item-hover-video,
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(24) .item-hover-video, html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .tl:nth-child(25) .item-hover-video { top: auto; bottom: -6px; transform: none; }
+/* ── le switch Anime / Jeux : sous 1060 px, un seul top a la fois ── */
+.acc-bas .top-switch { display: none; }
+.acc-bas .top-q { margin-left: .3em; }
+@media (max-width: 1060px) {
+  .acc-bas[data-top="anime"] > section[data-source="top-games"],
+  .acc-bas[data-top="jeux"] > section[data-source="top-anime"] { display: none; }
+  .acc-bas .top-q { display: none; }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .top-switch {
+    display: inline-flex; flex: none; margin-left: auto; padding: 3px; border-radius: 999px;
+    background: var(--t-onglets-bg); border: 1px solid var(--t-onglets-bord); box-shadow: var(--t-onglets-ombre);
+  }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .top-switch button {
+    height: 30px; padding: 0 16px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+    font: 600 13.5px/1 Inter, sans-serif; color: var(--t-ink2); -webkit-tap-highlight-color: transparent;
+  }
+  html[data-gn~="cameleon"] :is(body,#_):not(#_) .acc-bas .top-switch button.on { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+}
+/* TOP25-FIN */
+/* CATALOGUE-DEBUT — bloc ajoute par catalogue-c.sh (pages Anime, Jeux et A venir en Vitre · Cameleon,
+   cartes « C · Jaquettes » ; maquette validee le 6 octobre 2026), a remplacer en entier, pas a la main.
+   Jeton « catalogue » sur <html data-gn>, en plus de ceux de l'accueil (fond encre verre bleu vitre
+   cameleon) : memes matieres et memes valeurs que l'accueil, panneau de verre et son cachet (新着 /
+   予定), pastilles du style du bouton du Top 25, couleur de l'episode du jour (--t-*, posees par le
+   script du coin des pages, coin-catalogue). Prefixe : html[data-gn~="catalogue"] :is(body,#_):not(#_)
+   (deux identifiants, comme les regles Cameleon : passe devant le CSS d'origine sans !important). */
+
+/* ── 予定 (« a venir ») pour le cachet de la page A venir : ces deux signes seulement, meme police que
+   GN Prisme JP (Zen Kaku Gothic New 500, metriques verticales gardees) ; les autres signes restent servis
+   par gn-prisme-jp.woff2, qui ne change pas ── */
+@font-face { font-family: "GN Prisme JP"; font-weight: 100 900; font-display: block; src: url("/fonts/gn-prisme-yotei.woff2") format("woff2"); unicode-range: U+4E88, U+5B9A; }
+
+/* ── le panneau (meme verre que les panneaux de l'accueil) ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block {
+  margin-top: 22px; padding: 0; min-width: 0; display: flex; flex-direction: column; overflow: visible;
+  position: relative; isolation: isolate; z-index: 1;
+  border-radius: 18px; border: 1px solid var(--t-panneau-bord);
+  background: var(--t-panneau); box-shadow: var(--t-panneau-ombre);
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block::after {
+  content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  padding: 1px; border-radius: 17px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block + .section-block { margin-top: 18px; }
+
+/* ── l'en-tete du panneau : cachet, titre, rond ›, puis les pastilles a droite ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 10px;
+  margin: 0; padding: 12px 17px; border-bottom: 1px solid var(--t-tete-fil); border-radius: 18px 18px 0 0;
+  position: relative; isolation: isolate;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head h2 {
+  --X: clamp(1.2rem, 1.9vw, 1.5rem);
+  margin: 0; display: flex; align-items: center; white-space: nowrap;
+  height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 11px - var(--X) * .2734));
+  font: 600 var(--X)/1.1 "GN Poppins", sans-serif; letter-spacing: -.01em;
+  background: none; color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); text-shadow: none;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head h2::before {
+  content: "新着"; flex: none; writing-mode: vertical-rl; display: block;
+  font: 700 9.5px/1 "GN Prisme JP", sans-serif; letter-spacing: .04em;
+  padding: 5px 4px; margin-right: 11px; border-radius: 7px; transform: none;
+  background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt);
+  box-shadow: var(--t-cachet-ombre); text-shadow: none; -webkit-mask-image: none; mask-image: none;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block[data-source$="-upcoming"] > .section-head h2::before { content: "予定"; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head h2::after {
+  content: "›"; flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-left: 10px;
+  border-radius: 50%; border: 1px solid var(--t-rond-bord); background: var(--t-rond-bg);
+  color: var(--t-rond-txt); -webkit-text-fill-color: var(--t-rond-txt);
+  font: 900 .72rem/1 "GN Poppins", sans-serif; box-shadow: none; text-shadow: none; transform: none;
+}
+
+/* ── les pastilles Anime / Film / Sorti JP : le meme bouton que le Top 25 (style des onglets) ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pills {
+  display: inline-flex; flex: none; width: auto; gap: 0; margin-left: auto; padding: 3px; border-radius: 999px;
+  background: var(--t-onglets-bg); border: 1px solid var(--t-onglets-bord); box-shadow: var(--t-onglets-ombre);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 30px; padding: 0 16px; border: 0; border-radius: 999px; background: none; box-shadow: none;
+  font: 600 13.5px/1 Inter, sans-serif; color: var(--t-ink2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color .18s ease, background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill:hover { color: var(--t-ink); background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill.on { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill[hidden] { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill .kn { font: 600 11px/1 "JetBrains Mono", ui-monospace, monospace; opacity: .62; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill.on .kn { opacity: .78; }
+
+/* ── la grille ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .items-row { padding: 18px 17px 20px; }
+
+/* ── le bouton des filtres, dans la ligne des onglets ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-seam { background: var(--t-onglets-bord); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-filter {
+  width: 30px; height: 30px; margin-right: 1px; border-radius: 50%; border: 1px solid var(--t-onglets-bord);
+  background: transparent; color: var(--t-ink2); box-shadow: none; transition: background-color .18s ease, color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-filter:hover { background: var(--t-survol); color: var(--t-ink); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-filter.open { background: var(--t-grad); color: var(--t-sur-acc); border-color: transparent; box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-filter-badge { background: var(--t-acc); color: var(--t-sur-acc); border-color: var(--t-nuit); font-family: Inter, sans-serif; }
+
+/* ── le panneau des filtres (ferme par defaut, s'ouvre sous les onglets) ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .filter-bar { width: min(100%, 640px); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-panel-body {
+  margin-top: 14px; padding: 16px 18px; border-radius: 18px; border: 1px solid var(--t-panneau-bord);
+  background: var(--t-panneau); box-shadow: var(--t-panneau-ombre); backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-grp-label { font: 600 11px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--t-ink3); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) :is(.gn-select, .gn-input) {
+  background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord); color: var(--t-ink); box-shadow: var(--t-champ-ombre);
+  border-radius: 12px; font: 500 13.5px/1.2 Inter, sans-serif;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-input::placeholder { color: var(--t-champ-ph); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) :is(.gn-select, .gn-input):focus { outline: none; border-color: var(--t-acc); box-shadow: 0 0 0 4px var(--t-acc-voile); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-chip {
+  padding: 7px 13px; border-radius: 999px; border: 1px solid var(--t-pastille-bord); background: var(--t-pastille-bg); color: var(--t-ink2);
+  font: 500 12.5px/1 Inter, sans-serif; box-shadow: none;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-chip:hover { border-color: var(--t-voir-bord); color: var(--t-ink); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-chip:has(input:checked) { background: var(--t-grad); color: var(--t-sur-acc); border-color: transparent; box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-chip:focus-within { outline: 2px solid var(--t-acc); outline-offset: 2px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-select option { background: #141416; color: var(--t-ink); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-actions { border-top-color: var(--t-tete-fil); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-apply { border: 0; border-radius: 999px; background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre-fort); font: 600 13.5px/1 Inter, sans-serif; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-reset { border-radius: 999px; border: 1px solid var(--t-voir-bord); background: var(--t-voir-bg); color: var(--t-voir-txt); box-shadow: none; font: 600 13.5px/1 Inter, sans-serif; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .gn-reset:hover { background: var(--t-survol); }
+
+/* ── le pied de page ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .site-footer { margin-top: 30px; padding: 22px 0 10px; border-top: 1px solid var(--t-tete-fil); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .site-footer__links a { color: var(--t-ink3); font: 500 13px/1.4 Inter, sans-serif; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .site-footer__links a:hover { color: var(--t-acc-clair); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .site-footer__credit { color: var(--t-ink3); opacity: .75; font: 400 12px/1.4 Inter, sans-serif; }
+
+/* ── les cartes : details communs ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .item-body h3 { text-shadow: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .item-link { color: inherit; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .fav-heart {
+  top: 8px; right: 8px; width: 30px; height: 30px; font-size: 15px;
+  background: var(--t-fleche-bg); box-shadow: inset 0 0 0 1px var(--t-fleche-bord); color: var(--t-ink);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .dbox { margin-top: 0; padding: 6px 8px 7px; border-radius: 10px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .dline { flex-wrap: wrap; row-gap: 5px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .dval { font-size: .68rem; white-space: nowrap; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .dcd { font-size: .6rem; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .wbar { margin-top: 6px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .chips { margin-top: 7px; gap: 4px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .chip { font: 500 .62rem/1.2 Inter, sans-serif; padding: 3px 8px; border-radius: 999px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .hpill { margin-top: 6px; }
+
+/* ═══ les cartes « C · Jaquettes » : la carte d'aujourd'hui, a la couleur de l'episode : image pleine, texte en bas ═══ */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .items-row {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 16px;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card {
+  aspect-ratio: 2 / 3; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: var(--t-carte);
+  box-shadow: var(--t-jaquette-ombre); transition: transform .22s ease, box-shadow .22s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card:hover {
+  transform: translateY(-4px); box-shadow: 0 0 0 2px var(--t-acc), 0 24px 40px -16px rgba(0, 0, 0, .95);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .item-overlay {
+  background: linear-gradient(0deg, rgba(var(--t-voile-rgb), .97) 0%, rgba(var(--t-voile-rgb), .9) 34%, rgba(var(--t-voile-rgb), .5) 56%, rgba(var(--t-voile-rgb), 0) 74%);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .item-body { padding: 12px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .item-card .item-body h3 {
+  margin: 0 0 8px; font: 600 15px/1.25 "GN Poppins", sans-serif; letter-spacing: -.01em; color: #fff;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ── tablette et telephone ── */
+@media (max-width: 760px) {
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head h2 { --X: 1.02rem; height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 9.5px - var(--X) * .2734)); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head h2::after { width: 19px; height: 19px; margin-left: 7px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .section-head { row-gap: 12px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pills { display: flex; width: 100%; margin-left: 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block .kind-pill { flex: 1 1 0; padding: 0 8px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .items-row { padding: 14px 12px 16px; }
+}
+/* ── telephone : deux jaquettes par ligne (au-dessus de 560 px, la grille garde ses colonnes de 172 px au moins) ── */
+@media (max-width: 560px) {
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block > .items-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+/* CATALOGUE-FIN */
+/* COMPTE-DEBUT — bloc ajoute par compte-b.sh (en-tete connecte, menu du profil et tiroirs en Vitre ·
+   Cameleon, matiere « B · Nuit » ; maquette validee le 6 octobre 2026), a remplacer en entier, pas a la main.
+   La cloche, le profil, le menu et les tiroirs (Notifications de la cloche, Mon compte, Mes favoris, Mot de
+   passe oublie, et le tiroir Notifications que SectionBlock rouvre apres un modal) dans le vocabulaire de
+   l'accueil : cloche et profil dans la matiere du champ de recherche, a 42 px comme Sign in (38 px sur
+   telephone) ; panneaux pleins a peine teintes, lignes du Top 25, pastilles, accents a la couleur du jour
+   (--t-*). Les pastilles qui portent un sens (type de notification, Anime / Jeu, Verifie) gardent leurs
+   couleurs. Pages avec le jeton « cameleon » seulement (accueil, Anime, Jeux) : les autres pages gardent
+   leurs tiroirs. Prefixe : html[data-gn~="cameleon"] :is(body,#_):not(#_) (deux identifiants, comme les
+   regles Cameleon : passe devant le CSS d'origine sans !important). */
+
+/* ── l'en-tete connecte : la cloche (ronde, comme Discord) et le profil, dans la matiere du champ
+      de recherche (ils sont poses sur le personnage du coin : il faut un fond sombre pour les lire).
+      42 px, comme Sign in et Discord : l'en-tete garde sa hauteur une fois connecte ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell {
+  box-sizing: border-box; width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border-radius: 50%; color: var(--t-ink);
+  background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord); box-shadow: var(--t-champ-ombre);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell:hover { transform: translateY(-1px); background: var(--t-champ-bg); border-color: var(--t-voir-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell__icon { display: grid; place-items: center; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell__icon .pg-ic { width: 19px; height: 19px; color: var(--t-ink); opacity: 1; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell__badge {
+  top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  background: var(--t-grad); color: var(--t-sur-acc); font: 700 10.5px/1 Inter, sans-serif; box-shadow: 0 0 0 2px var(--t-nuit);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__trigger {
+  box-sizing: border-box; min-height: 0; height: 42px; padding: 0 18px 0 4px; gap: 10px; border-radius: 999px; color: var(--t-ink);
+  background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord); box-shadow: var(--t-champ-ombre);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__trigger:hover { transform: translateY(-1px); background: var(--t-champ-bg); border-color: var(--t-voir-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__avatar { width: 32px; height: 32px; flex: none; background: var(--t-carte); box-shadow: 0 0 0 2px var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__name { font: 600 14px/1 Inter, sans-serif; color: var(--t-ink); }
+/* abonnes (l'offre est retiree, mais un compte deja abonne garde ses marques) : la couleur du jour */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__avatar.is-premium { padding: 0; background: var(--t-carte); box-shadow: 0 0 0 2px var(--t-acc), 0 0 14px -2px var(--ep-c); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__avatar.is-premium img { background: transparent; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .premium-pill { margin-left: 0; padding: 6px 11px; gap: 6px; border: 0; border-radius: 999px; background: var(--t-grad); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .premium-pill svg { color: var(--t-sur-acc); filter: none; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .premium-pill__text {
+  font: 600 13px/1 Inter, sans-serif; letter-spacing: 0; color: var(--t-sur-acc); -webkit-text-fill-color: var(--t-sur-acc);
+  background: none; text-shadow: none; filter: none;
+}
+
+/* ── le menu du profil ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__dropdown {
+  min-width: 228px; padding: 6px; border-radius: 16px; border: 1px solid var(--t-panneau-bord); box-shadow: var(--t-panneau-ombre), 0 24px 60px -20px rgba(0, 0, 0, .8);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__item {
+  min-height: 42px; padding: 0 12px; border-radius: 11px; color: var(--t-ink); font: 500 14px/1.2 Inter, sans-serif;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__item:hover { background: var(--t-survol); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .mnu-ic { color: var(--t-acc); opacity: 1; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .mnu-sep { margin: 6px 8px; background: var(--t-tete-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .mnu--dg { color: var(--t-ink2); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .mnu--dg .mnu-ic { color: #f08b7f; opacity: 1; }
+
+/* ── panneaux des tiroirs : la forme (commune) ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-overlay, .notif-overlay) { background: rgba(var(--ep-rgb), .58); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) {
+  border-radius: 22px; border: 1px solid var(--t-panneau-bord); color: var(--t-ink);
+  box-shadow: var(--t-panneau-ombre), 0 30px 80px -24px rgba(0, 0, 0, .85);
+  scrollbar-color: var(--t-voir-bord) transparent;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer)::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  padding: 1px; border-radius: 21px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__content, .notif-drawer__content) { scrollbar-width: thin; scrollbar-color: var(--t-voir-bord) transparent; }
+
+/* ── en-tete du tiroir : icone en cachet, titre Poppins, filet du panneau ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__header, .notif-drawer__header) { position: relative; margin-bottom: 16px; padding-bottom: 14px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__header, .notif-drawer__header)::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: var(--t-tete-fil);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__header, .notif-drawer__header) h2 {
+  display: flex; align-items: center; gap: 12px; margin: 0;
+  font: 600 1.35rem/1.15 "GN Poppins", sans-serif; letter-spacing: -.01em;
+  color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); background: none; text-shadow: none;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__header, .notif-drawer__header) h2 :is(.dp-ic, svg) {
+  box-sizing: content-box; flex: none; width: 16px; height: 16px; padding: 7px; border-radius: 9px; opacity: 1;
+  background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt); box-shadow: var(--t-cachet-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__close, .notif-drawer__close) {
+  flex: none; width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 50%;
+  color: var(--t-ink); font-size: 13px; line-height: 1;
+  background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__close, .notif-drawer__close):hover { border-color: var(--t-voir-bord); }
+
+/* ── lignes d'information, etats vides, intitules de rubrique ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__meta, .notif-drawer__section-label) { font: 500 13px/1.3 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-state, .notif-state) { font: 500 14px/1.5 Inter, sans-serif; color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.acc-sec, .f-sec) {
+  display: flex; align-items: center; gap: 10px; margin: 20px 0 10px; padding-left: 2px; opacity: 1;
+  font: 600 11px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--t-ink3);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.acc-sec, .f-sec)::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--t-tete-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-sec:first-child { margin-top: 2px; }
+
+/* ── boutons : pastilles (Discord), action principale a la couleur du jour (Sign in), retirer en rouge doux ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-act, .drawer-panel__readall, .notif-drawer__readall, .fav-bar-b, .fav-lnk, .acc-pen) {
+  border-radius: 999px; color: var(--t-ink); font: 600 12.5px/1 Inter, sans-serif;
+  background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-act, .drawer-panel__readall, .notif-drawer__readall, .fav-bar-b, .fav-lnk, .acc-pen):hover:not(:disabled) { border-color: var(--t-voir-bord); background: var(--t-pastille-bg); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-act, .acc-pen) svg { color: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-act--del, .fav-bar-b--del) { color: #f2a093; border-color: rgba(240, 139, 127, .42); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-act--del svg { color: #f2a093; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-act--del, .fav-bar-b--del):hover:not(:disabled) { background: rgba(240, 139, 127, .1); border-color: rgba(240, 139, 127, .7); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-act .nt-n { font: 600 11px/1 "JetBrains Mono", ui-monospace, monospace; opacity: .7; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.account-btn, .account-btn-sm) {
+  border: 0; border-radius: 999px; background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre-fort); font: 600 14px/1 Inter, sans-serif;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .fav-lnk.on { background: var(--t-grad); color: var(--t-sur-acc); border-color: transparent; box-shadow: var(--t-acc-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .fav-lnk { padding: 7px 13px; }
+
+/* ── les lignes : notifications, favoris, reglages (les lignes du Top 25) ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.notif-card, .drawer-card, .acc-row, .acc-tog, .f-c, .nt-row) {
+  background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .07); color: var(--t-ink);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.notif-card, .acc-row, .f-c, .nt-row):hover { background: var(--t-survol); border-color: var(--t-voir-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) { gap: 12px; padding: 11px 34px 11px 11px; border-radius: 12px; margin-bottom: 8px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__thumb { width: 48px; height: 48px; overflow: hidden; border: 1px solid var(--t-vignette-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__thumb img { border-radius: 0; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__title { margin-bottom: 3px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__text { margin-bottom: 4px; font: 500 12.5px/1.35 Inter, sans-serif; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__time { font-size: 11.5px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card:not(.nt-row) .notif-card__remove { top: 8px; right: 8px; width: 20px; height: 20px; border-radius: 6px; background: transparent; font-size: .7rem; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-row { gap: 11px; padding: 10px; border-radius: 12px; margin-bottom: 7px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-row .nt-x { top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 6px; background: transparent; font-size: .7rem; }
+/* non lu, bientot : la couleur du jour */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-row.is-unread, .notif-card--unread, .f-c.soon) {
+  background: linear-gradient(90deg, var(--ep-c2), rgba(255, 255, 255, .02)); border-color: var(--t-voir-bord);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-row.is-unread, .f-c.soon)::before { background: var(--t-grad); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .notif-card__dot { background: var(--t-acc); box-shadow: 0 0 10px var(--ep-c); }
+/* vignettes */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-th .nt-cov, .f-th .cov, .notif-card__thumb) { background: var(--t-carte); border-color: var(--t-vignette-bord); border-radius: 8px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-th .cov { color: var(--t-ink3); font: 400 1.2rem/1 "GN Prisme JP", sans-serif; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-pin { border-color: var(--t-nuit); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-pin.t-def { background: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-pin.t-def svg { stroke: var(--t-sur-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-tag.t-def { background: var(--ep-c2); border-color: var(--t-voir-bord); color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .ev-def { background: var(--ep-c2); border-color: var(--t-voir-bord); color: var(--t-acc-clair); }
+/* textes */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-t, .f-t, .notif-card__title) { font: 600 13.5px/1.28 "GN Poppins", sans-serif; letter-spacing: -.005em; color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-sub, .f-sub, .notif-card__text, .drawer-card__sub) { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-w, .f-cd, .notif-card__time) { color: var(--t-ink3); font-family: "JetBrains Mono", ui-monospace, monospace; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-day { color: var(--t-ink2); font-family: "JetBrains Mono", ui-monospace, monospace; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-c.soon .f-cd { color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-x, .f-x, .drawer-card__remove, .notif-card__remove) { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.nt-x, .f-x, .drawer-card__remove, .notif-card__remove):hover { color: #f2a093; background: rgba(240, 139, 127, .14); }
+
+/* ── favoris : mode selection ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-c .fav-ck { border-color: var(--t-pastille-bord); background: rgba(0, 0, 0, .35); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-c .fav-ck svg { stroke: var(--t-sur-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-c.picked { background: var(--ep-c2); border-color: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .f-c.picked .fav-ck { background: var(--t-grad); border-color: transparent; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .fav-bar { background: linear-gradient(180deg, rgba(var(--ep-rgb), .82), rgba(var(--ep-rgb), .98)); border-top-color: var(--t-tete-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .fav-bar-n { color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .fav-bar-n small { color: var(--t-ink3); }
+
+/* ── compte : en-tete, reglages, interrupteurs ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-head { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .08); border-radius: 16px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-av { border: 0; background: var(--t-carte); box-shadow: 0 0 0 2px var(--t-acc), 0 10px 24px -10px var(--ep-c); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-av::after { background: var(--t-grad); color: var(--t-sur-acc); border-color: var(--t-nuit); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-name { font: 600 1.1rem/1.15 "GN Poppins", sans-serif; letter-spacing: -.01em; color: var(--t-titre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-mail { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-pen { padding: 7px 12px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.acc-row, .acc-tb) { color: var(--t-ink); font-family: Inter, sans-serif; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.acc-rs, .acc-tb small) { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-ic { color: var(--t-acc); opacity: 1; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-chev { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-sw { background: rgba(255, 255, 255, .08); border-color: var(--t-pastille-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-sw::after { background: #8d8f97; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-tog input:checked + .acc-sw { background: var(--t-grad); border-color: transparent; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-tog input:checked + .acc-sw::after { background: var(--t-nuit); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-forgot { color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-out {
+  border-radius: 999px; color: #f2a093; font: 600 13.5px/1 Inter, sans-serif;
+  background: rgba(240, 139, 127, .05); border: 1px solid rgba(240, 139, 127, .42);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-out .acc-ic { color: #f2a093; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-out:hover { background: rgba(240, 139, 127, .12); border-color: rgba(240, 139, 127, .7); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-row--prem { background: linear-gradient(90deg, var(--ep-c2), rgba(255, 255, 255, .02)); border-color: var(--t-voir-bord); color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-row--prem .acc-ic { color: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.acc-row--prem .acc-rs, .acc-row--prem .acc-chev) { color: var(--t-acc-clair); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .premium-text-badge {
+  margin-left: 6px; padding: 3px 7px; border-radius: 999px; font: 700 10px/1 Inter, sans-serif; letter-spacing: .1em; vertical-align: 2px;
+  color: var(--t-acc-clair); background: var(--ep-c2); border: 1px solid var(--t-voir-bord); text-shadow: none; animation: none;
+}
+
+/* ── champs (pseudo, mot de passe, mot de passe oublie) : les champs des filtres ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .account-input {
+  height: 44px; padding: 0 14px; border-radius: 12px; color: var(--t-ink); font: 500 14px/1 Inter, sans-serif;
+  background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord); box-shadow: var(--t-champ-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .account-input::placeholder { color: var(--t-champ-ph); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .account-input:focus { border-color: var(--t-acc); box-shadow: 0 0 0 4px var(--t-acc-voile); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .account-field label { color: var(--t-ink2); font: 600 12px/1.2 Inter, sans-serif; }
+
+/* ── grille des avatars ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .avatar-pick { box-shadow: 0 0 0 1px var(--t-pastille-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .avatar-pick:hover { box-shadow: 0 0 0 2px var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .avatar-pick--selected { border-color: var(--t-acc); box-shadow: 0 0 14px -4px var(--ep-c); }
+
+/* ═══ la matiere « B · Nuit » : un panneau plein, a peine teinte, rien ne passe au travers ═══ */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer, .auth-user-menu__dropdown) {
+  background: linear-gradient(160deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, 0) 40%), linear-gradient(180deg, var(--ep-d), var(--ep-e));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-overlay, .notif-overlay) { background: rgba(var(--ep-rgb), .66); }
+
+/* ── telephone : 38 px, comme Sign in et Discord ── */
+@media (max-width: 760px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .notif-bell { width: 38px; height: 38px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__trigger { height: 38px; padding: 0 14px 0 4px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__avatar { width: 28px; height: 28px; }
+}
+@media (max-width: 640px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .auth-user-menu__trigger { min-width: 38px; padding: 0 4px; gap: 6px; justify-content: center; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) { border-radius: 0; border: 0; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer)::after { content: none; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) :is(.drawer-panel__close, .notif-drawer__close) { width: 38px; height: 38px; }
+}
+@media (max-width: 400px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-act { font-size: 12px; }
+}
+@media (max-width: 340px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-acts { flex-wrap: wrap; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .nt-act { flex: 1 1 100%; }
+}
+/* COMPTE-FIN */
+/* PAGES-DEBUT — bloc ajoute par pages-finales.sh (A venir, Mes preferences, Connexion et Inscription en Vitre ·
+   Cameleon ; maquettes validees le 6 octobre 2026), a remplacer en entier, pas a la main.
+   Le vocabulaire de l'accueil, des pages Anime / Jeux et des tiroirs : panneaux de verre et leur arete,
+   cachet, titres Poppins, boutons du style des onglets (bouton du Top 25), pastilles, champs de la recherche,
+   action principale comme Sign in. A venir : le bouton Animes / Jeux ; le Top 3 du mois defile en haut a droite
+   et donne sa couleur a la page (script du coin des pages). Mes preferences et Connexion : pas d'image, la page
+   reste neutre, boutons et icones en braise (jeton « braise »). Les icones et les emojis ne changent pas.
+   Jetons : catalogue (A venir), prefs, connexion, braise. Prefixe : html[data-gn~="..."] :is(body,#_):not(#_)
+   (deux identifiants, comme les regles Cameleon : passe devant le CSS d'origine). */
+
+/* ── 通知 et 会員 pour les cachets des pages Preferences et Connexion : ces quatre signes seulement,
+   meme police que GN Prisme JP (Zen Kaku Gothic New 500, metriques verticales gardees) ── */
+@font-face { font-family: "GN Prisme JP"; font-weight: 100 900; font-display: block; src: url("/fonts/gn-prisme-pages.woff2") format("woff2"); unicode-range: U+901A, U+77E5, U+4F1A, U+54E1; }
+
+/* ═══ A VENIR — le bouton Animes / Jeux : le bouton du Top 25 (style des onglets) ═══ */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .upcoming-tabs { display: flex; justify-content: center; margin: 18px auto 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .up-segment {
+  display: inline-flex; gap: 0; width: min(100%, 340px); max-width: none; margin: 0; padding: 4px; border-radius: 999px;
+  background: var(--t-onglets-bg); border: 1px solid var(--t-onglets-bord); box-shadow: var(--t-onglets-ombre);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .up-tab {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 36px; padding: 0 18px; border: 0; border-radius: 999px; background: none; box-shadow: none;
+  font: 600 14.5px/1 Inter, sans-serif; color: var(--t-ink2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color .18s ease, background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .up-tab:not(.active):hover { color: var(--t-ink); background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .up-tab.active { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .up-tab-emoji { font-size: 1rem; line-height: 1; }
+/* la bascule de la page (up-visible / up-hidden) doit passer devant le display: flex du panneau catalogue */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block[data-source="games-upcoming"]:not(.up-visible),
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block[data-source="anime-upcoming"].up-hidden { display: none; }
+
+/* ═══ BRAISE — Mes preferences et Connexion n'ont pas d'image en haut a droite : la page reste neutre
+   (gris et noir), seuls les boutons et les icones prennent la couleur d'origine du site, l'orange feu
+   « braise » (Rey, 14 h 46 : « uniquement les boutons, icones, pas la page complete »).
+   Valeurs de l'ancien global.css : accent #ff9c4c (pastilles) et degrade jusqu'a #d7501e (boutons),
+   lueur rgb(255, 130, 40), bords rgba(255, 170, 100), liens #ffb877.
+   Restent neutres : la nuit, le verre et les voiles (--ep-d, -e, -p1, -p2, -rgb : valeurs par defaut),
+   et ce qui, en Caméléon, prend aussi l'accent : lueurs du fond et des panneaux, filets de la devise,
+   kana et degrade de la marque (valeurs neutres de Caméléon, sans couleur). ═══ */
+html[data-gn~="braise"] {
+  --ep-a: #ff9c4c;
+  --ep-b: #d7501e;
+  --ep-c: rgba(255, 130, 40, .2);
+  --ep-c2: rgba(255, 130, 40, .1);
+  --ep-f: rgba(255, 170, 100, .3);
+  --ep-g: #ffb877;
+  --t-fond: radial-gradient(1100px 700px at 86% -10%, hsla(0, 0%, 58%, .3), transparent 62%), radial-gradient(1300px 760px at 24% 122%, hsla(0, 0%, 58%, .16), transparent 62%), linear-gradient(180deg, var(--ep-d) 0%, var(--ep-e) 100%);
+  --t-panneau-ombre: 0 28px 60px -26px rgba(0, 0, 0, .9), 0 0 60px -34px hsla(0, 0%, 58%, .3);
+  --t-filet: hsl(0, 0%, 72%);
+  --t-filet2: hsl(0, 0%, 72%);
+  --t-kana: hsl(0, 0%, 87%);
+  --t-kana-fil: hsla(0, 0%, 72%, .34);
+  --t-marque-fond: linear-gradient(180deg, #ffffff 40%, hsl(0, 0%, 87%) 100%);
+}
+
+/* ═══ MES PREFERENCES ═══ */
+/* ── la page : fil d'Ariane en pastille, titre Poppins et son cachet ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page { max-width: 760px; padding: 26px 0 72px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page::before { content: none; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-breadcrumb { margin-bottom: 18px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-breadcrumb a {
+  display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: 999px; text-decoration: none;
+  background: var(--t-voir-bg); border: 1px solid var(--t-voir-bord); color: var(--t-voir-txt); font: 600 13px/1 Inter, sans-serif;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-breadcrumb a:hover { background: var(--t-survol); color: var(--t-ink); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page__title {
+  display: flex; align-items: center; margin: 0 0 8px; font: 700 clamp(1.7rem, 3vw, 2.3rem)/1.12 "GN Poppins", sans-serif;
+  letter-spacing: -.015em; background: none; color: var(--t-titre); -webkit-text-fill-color: var(--t-titre);
+  text-shadow: 0 2px 18px rgba(var(--t-ombre-rgb), .6);
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page__title::before {
+  content: "通知"; flex: none; writing-mode: vertical-rl; display: block; align-self: center;
+  font: 700 11px/1 "GN Prisme JP", sans-serif; letter-spacing: .04em; padding: 6px 5px; margin-right: 14px; border-radius: 8px;
+  background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt); box-shadow: var(--t-cachet-ombre); text-shadow: none;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page__sub { margin: 0 0 22px; font: 400 15px/1.5 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-state { color: var(--t-ink3); font: 500 14px/1.5 Inter, sans-serif; }
+
+/* ── les panneaux (resume et cartes) : le verre de l'accueil et son arete ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) :is(.prefs-summary, .prefs-card) {
+  position: relative; isolation: isolate; border-radius: 18px !important; border: 1px solid var(--t-panneau-bord) !important;
+  background: var(--t-panneau) !important; box-shadow: var(--t-panneau-ombre) !important;
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) :is(.prefs-summary, .prefs-card)::after {
+  content: ""; position: absolute; inset: 0; left: 0; right: 0; top: 0; height: auto; z-index: 2; pointer-events: none;
+  padding: 1px; border-radius: 17px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) #prefsForm { margin: 0 0 32px; padding: 0; border: 0; border-radius: 0; background: none; }
+
+/* ── le resume : trois anneaux a la couleur du jour ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary { margin: 0 0 18px; padding: 14px 20px 18px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__label { gap: 8px; margin-bottom: 14px; font: 600 11px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--t-ink3); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__label .pg-ic { width: 15px; height: 15px; color: var(--t-acc); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__ring { --c: var(--t-acc); width: 52px; height: 52px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__ring::after { box-shadow: 0 0 12px -2px var(--ep-c); opacity: .7; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__num { font: 700 18px/1 "GN Poppins", sans-serif; color: var(--t-titre); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary__cap { font: 500 12px/1 Inter, sans-serif; color: var(--t-ink3); }
+
+/* ── les cartes : numero en anneau, titre Poppins ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card {
+  --accent: var(--t-acc); --accent-bg: var(--ep-c2); --accent-dim: var(--t-pastille-bord); --accent-faint: var(--t-ink3); --halo: transparent;
+  margin-bottom: 16px !important; padding: 18px 20px 20px !important;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card::before { content: none; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__head { gap: 12px; margin-bottom: 14px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__num { width: 36px !important; height: 36px !important; color: var(--t-acc-clair) !important; font: 700 14px/1 "GN Poppins", sans-serif !important; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__num::before { background: conic-gradient(var(--t-acc) calc(var(--ring, .25) * 360deg), rgba(255, 255, 255, .12) 0); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__num::after { box-shadow: 0 0 10px -2px var(--ep-c); opacity: .6; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__title { gap: 8px; font: 600 17px/1.2 "GN Poppins", sans-serif; letter-spacing: -.01em; color: var(--t-titre); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__title .pg-ic { width: 18px; height: 18px; color: var(--t-acc); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card__sub { margin-top: 3px; font: 400 13px/1.35 Inter, sans-serif; color: var(--t-ink3); }
+
+/* ── Tout / Animes / Jeux : le bouton du Top 25 ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-seg {
+  display: inline-flex; flex-wrap: nowrap; gap: 0 !important; margin: 0 0 14px !important; padding: 3px !important;
+  border: 1px solid var(--t-onglets-bord); border-radius: 999px; background: var(--t-onglets-bg); box-shadow: var(--t-onglets-ombre);
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-seg__btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 16px !important; border: 0 !important; border-radius: 999px !important;
+  background: none !important; color: var(--t-ink2) !important; font: 600 13.5px/1 Inter, sans-serif; -webkit-tap-highlight-color: transparent;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-seg__btn:hover { color: var(--t-ink) !important; background: var(--t-survol) !important; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-seg__btn.active { background: var(--t-grad) !important; color: var(--t-sur-acc) !important; box-shadow: var(--t-acc-ombre); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-seg__btn.active::after { content: none; }
+
+/* ── intitules (🎬 Anime, 🎮 Jeux) et pastilles : les puces des filtres ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-grp-sub {
+  display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; padding-left: 2px;
+  font: 600 11px/1 Inter, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--t-ink3);
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-grp-sub::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--t-tete-fil); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-grp-sub:first-child { margin-top: 2px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipset { gap: 8px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipC {
+  gap: 7px; padding: 7px 13px !important; border-radius: 999px; border: 1px solid var(--t-pastille-bord) !important;
+  background: var(--t-pastille-bg) !important; color: var(--t-ink2); font: 500 12.5px/1 Inter, sans-serif;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipC:hover { border-color: var(--t-voir-bord) !important; color: var(--t-ink); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipC__dot { width: 6px; height: 6px; background: var(--t-ink3); opacity: .6; box-shadow: none; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipC.active { background: var(--t-grad) !important; border-color: transparent !important; color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-chipC.active .prefs-chipC__dot { background: var(--t-sur-acc); opacity: .75; box-shadow: none; }
+
+/* ── canaux : les lignes et les interrupteurs du tiroir Mon compte ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channels-grid { gap: 8px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-row { padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .07); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-row:hover { background: var(--t-survol); border-color: var(--t-voir-bord); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-info { gap: 12px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-icon {
+  display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 10px;
+  background: var(--ep-c2); border: 1px solid var(--t-voir-bord); font-size: 1.15rem; line-height: 1;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-icon .pg-ic { width: 18px; height: 18px; color: var(--t-acc); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-info strong { font: 600 14px/1.25 Inter, sans-serif; color: var(--t-ink); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-info small { margin-top: 3px; font: 400 12.5px/1.35 Inter, sans-serif; color: var(--t-ink3); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-channel-info small a { color: var(--t-acc-clair); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-switch { width: 44px; height: 26px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-switch-slider { background: rgba(255, 255, 255, .08); border: 1px solid var(--t-pastille-bord); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-switch-slider::before { width: 18px; height: 18px; left: 3px; bottom: 3px; background: #8d8f97; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-switch input:checked + .prefs-switch-slider { background: var(--t-grad); border-color: transparent; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-switch input:checked + .prefs-switch-slider::before { transform: translateX(18px); background: var(--t-nuit); }
+
+/* ── agenda : champ de la recherche, Copier a la couleur du jour ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-url-row { gap: 8px; margin-bottom: 12px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-url-input {
+  height: 42px; padding: 0 14px; border-radius: 12px; background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord);
+  box-shadow: var(--t-champ-ombre); color: var(--t-ink2); font: 500 12.5px/1 "JetBrains Mono", ui-monospace, monospace;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-copy-btn {
+  height: 42px; padding: 0 18px; border: 0; border-radius: 999px; background: var(--t-grad); color: var(--t-sur-acc);
+  box-shadow: var(--t-acc-ombre); font: 600 13.5px/1 Inter, sans-serif;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-copy-btn:hover { filter: brightness(1.06); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-sync-info { margin-bottom: 12px; font: 400 12.5px/1.55 Inter, sans-serif; color: var(--t-ink3); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-help { padding-top: 12px; border-top: 1px solid var(--t-tete-fil); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-help summary { font: 600 13px/1.3 Inter, sans-serif; color: var(--t-acc-clair); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-steps { font: 400 13px/1.7 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-steps li::before { color: var(--t-acc); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .agenda-steps strong { color: var(--t-ink); }
+
+/* ── enregistrer : l'action principale (Sign in) ; messages ── */
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-save-btn {
+  height: 52px; margin-top: 6px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--t-grad); color: var(--t-sur-acc);
+  box-shadow: var(--t-acc-ombre-fort); font: 600 15px/1 Inter, sans-serif;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-save-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-msg { padding: 10px 14px; border-radius: 12px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08); font: 600 13.5px/1.3 Inter, sans-serif; }
+
+@media (max-width: 760px) {
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page { padding: 18px 0 56px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-summary { padding: 12px 12px 14px; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-card { padding: 16px 14px !important; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page__title::before { padding: 5px 4px; margin-right: 11px; font-size: 9.5px; }
+}
+
+/* ═══ MES PREFERENCES · DEUX COLONNES (ordinateur) : le titre et le resume a gauche, les cartes a droite ═══ */
+@media (min-width: 1100px) {
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page {
+  max-width: 1240px; display: grid; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: auto auto auto auto auto 1fr;
+  column-gap: 26px; align-items: start;
+}
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page > * { grid-column: 1; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page > #prefsForm { grid-column: 2; grid-row: 1 / span 6; }
+html[data-gn~="prefs"] :is(body,#_):not(#_) .prefs-page__title { font-size: 2rem; }
+}
+
+/* ═══ CONNEXION ET INSCRIPTION ═══ */
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-page { box-sizing: border-box; min-height: 100vh; padding: 48px 16px; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card {
+  position: relative; isolation: isolate; max-width: 420px; padding: 30px 30px 26px; border-radius: 22px;
+  border: 1px solid var(--t-panneau-bord); background: var(--t-panneau);
+  box-shadow: var(--t-panneau-ombre), 0 30px 80px -24px rgba(0, 0, 0, .85);
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  padding: 1px; border-radius: 21px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__title {
+  display: flex; align-items: center; margin: 0 0 6px; font: 700 1.75rem/1.15 "GN Poppins", sans-serif; letter-spacing: -.015em;
+  color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); background: none; text-shadow: none;
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__title::before {
+  content: "会員"; flex: none; writing-mode: vertical-rl; display: block;
+  font: 700 10px/1 "GN Prisme JP", sans-serif; letter-spacing: .04em; padding: 5px 4px; margin-right: 12px; border-radius: 7px;
+  background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt); box-shadow: var(--t-cachet-ombre);
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__subtitle { margin: 0 0 22px; font: 400 14.5px/1.5 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__error { border-radius: 12px; font: 500 13.5px/1.4 Inter, sans-serif; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__field { margin-bottom: 14px; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__field label { margin-bottom: 7px; font: 600 12.5px/1.2 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__field input {
+  height: 46px; padding: 0 16px; border-radius: 12px; background: var(--t-champ-bg); border: 1px solid var(--t-champ-bord);
+  box-shadow: var(--t-champ-ombre); color: var(--t-ink); font: 500 15px/1 Inter, sans-serif;
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__field input::placeholder { color: var(--t-champ-ph); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__field input:focus { border-color: var(--t-acc); box-shadow: 0 0 0 4px var(--t-acc-voile); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__btn {
+  height: 50px; margin-top: 6px; border: 0; border-radius: 999px; background: var(--t-grad); color: var(--t-sur-acc);
+  box-shadow: var(--t-acc-ombre-fort); font: 600 15.5px/1 Inter, sans-serif;
+}
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__btn:hover { opacity: 1; filter: brightness(1.05); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot { margin-top: 14px; font: 500 13px/1.3 Inter, sans-serif; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot a { color: var(--t-ink3); border-bottom: 1px dotted var(--t-voir-bord); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot a:hover { color: var(--t-acc-clair); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__switch { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--t-tete-fil); font: 400 14px/1.4 Inter, sans-serif; color: var(--t-ink3); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__switch a { color: var(--t-acc-clair); font-weight: 600; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--t-tete-fil); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot-intro { font: 400 13px/1.5 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card__forgot-msg { border-radius: 12px; font: 600 13px/1.4 Inter, sans-serif; }
+
+@media (max-width: 760px) {
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-page { padding: 32px 12px; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-card { padding: 24px 20px 22px; }
+}
+
+/* ═══ CONNEXION · L'EN-TETE DU SITE : la marque et sa devise au-dessus de la carte, sans les onglets, ni
+   Discord, ni Sign in (sur ordinateur la barre du haut garde sa place : la marque ne bouge pas) ; la marque mene a l'accueil ═══ */
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-page { min-height: 0; padding: 40px 16px 72px; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .hero-topbar { visibility: hidden; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .top-tabs { display: none; }
+/* la marque mene a l'accueil (lien pose dessus par HeroHeader, invisible) */
+html[data-gn~="connexion"] :is(body,#_):not(#_) .brand-mark { position: relative; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .brand-home { position: absolute; inset: -8px -14px; z-index: 3; border-radius: 16px; }
+html[data-gn~="connexion"] :is(body,#_):not(#_) .brand-home:focus-visible { outline: 2px solid var(--t-acc); outline-offset: 2px; }
+@media (max-width: 760px) {
+html[data-gn~="connexion"] :is(body,#_):not(#_) .auth-page { padding: 26px 12px 56px; }
+/* au telephone la marque partage sa ligne avec Discord et Sign in : la barre sort du flux, la marque reste au centre */
+html[data-gn~="connexion"] :is(body,#_):not(#_) .hero-topbar { display: none; }
+}
+/* PAGES-FIN */

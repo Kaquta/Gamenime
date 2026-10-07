@@ -1,217 +1,279 @@
 ---
-// Radar hebdo — session 33.
-// Rendu client : compte a rebours et marqueur "aujourd'hui" doivent etre
-// justes a l'heure de la visite, pas a celle du build.
-// L'API renvoie de l'UTC -> conversion Europe/Paris a l'affichage.
-// Le clic reutilise window.__openItemModal exposee par SectionBlock.
+// « Cette semaine » — maquette validee le 3 octobre (session 35).
+//
+// Grande case gauche de l'accueil. Rendu CLIENT : le compte a rebours et le
+// repere « aujourd'hui » doivent etre justes a l'heure de la VISITE, pas a
+// celle du build. L'API renvoie de l'UTC -> conversion Europe/Paris a
+// l'affichage.
+//
+// Les diapositives sont les .item-card du site, fabriquees par
+// renderCardSemaine : le survol bande-annonce, le clic vers la modale et les
+// favoris sont donc geres par les ecouteurs delegues de SectionBlock, sans une
+// ligne de plus ici. Seul le defilement est a nous (lib/slider).
 ---
-<section class="wr container" id="weekRadar" hidden>
-  <div class="wr-head">
-    <h2 class="wr-title">Cette semaine <span class="wr-chev">›</span></h2>
-    <span class="wr-sub" id="wrSub"></span>
+<section class="section-block" id="weekRadar" hidden>
+  <div class="se-barre">
+    <div class="se-tit"><h2>Cette semaine</h2><span class="se-plage" id="semPlage"></span></div>
+    <div class="jours" id="semJours"></div>
   </div>
-  <div class="wr-days-wrap"><div class="wr-days" id="wrDays"></div></div>
-  <div class="wr-daylab" id="wrDayLab"></div>
-  <div class="wr-feed" id="wrFeed"></div>
+  <div class="wr-zone" id="semZone"></div>
 </section>
-
+ 
 <script>
-import { getFeedWeek, displayTitle } from "../lib/api";
-
+import { getFeedWeek } from "../lib/api";
+import { renderCardSemaine } from "../lib/fiche";
+import { monterFenetre } from "../lib/slider";
+ 
 const TZ = "Europe/Paris";
-const JOURS_COURT = { Lun:"Lun", Mar:"Mar", Mer:"Mer", Jeu:"Jeu", Ven:"Ven", Sam:"Sam", Dim:"Dim" };
+const MOIS = ["janv.","févr.","mars","avr.","mai","juin","juil.","août","sept.","oct.","nov.","déc."];
 const JOURS_LONG = { Lun:"Lundi", Mar:"Mardi", Mer:"Mercredi", Jeu:"Jeudi", Ven:"Vendredi", Sam:"Samedi", Dim:"Dimanche" };
-const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
-
+ 
 let DATA = null;
-let sel = 0;
-let timer = null;
+let jourSel = 0;
+const FENETRES = [];
 
-function heure(iso) {
-  return new Date(iso).toLocaleTimeString("fr-FR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+// IMAGES-HD-DEBUT — images HD de « Cette semaine » (patch images-hd, 5 octobre 2026)
+// La jaquette d'AniList ne fait que 460 px de large : la case et le coin du
+// personnage l'agrandissaient jusqu'a 3 fois, d'ou le flou. La tache gn-hd du
+// serveur (toutes les heures) l'agrandit 4 fois par IA pour chaque nouvelle
+// jaquette de la semaine et publie /hd/manifeste.json : pour chaque jaquette,
+// ses images HD (960 et 1600 px de large), le visage du personnage (f : centre
+// et largeur, en % de l'image) et sa teinte dominante (h, de 0 a 360).
+// La diapositive prend l'image HD a la taille utile a l'ecran (la case et le
+// coin prennent la meme : une seule image a telecharger), se cadre sur le
+// visage (--fx, --fy), et donne au coin son cadrage (data-foyer) et sa couleur
+// (data-couleur). Sans manifeste, ou pour une jaquette pas encore faite : la
+// jaquette d'AniList, exactement comme avant.
+let HD = null;
+const HD_PRET = chargerHD();      // lance tout de suite, en meme temps que le flux
+
+function chargerHD() {
+  const ctl = typeof AbortController === "function" ? new AbortController() : null;
+  const minuterie = ctl ? setTimeout(() => ctl.abort(), 2000) : 0;   // jamais plus de 2 s d'attente
+  return fetch("/hd/manifeste.json", ctl ? { signal: ctl.signal } : {})
+    .then((r) => (r.ok ? r.json() : null))
+    .then((m) => (m && m.images && typeof m.images === "object" ? m : null))
+    .catch(() => null)
+    .finally(() => clearTimeout(minuterie));
 }
 
-function reste(iso) {
-  const diff = new Date(iso).getTime() - Date.now();
-  if (diff <= 0) return "maintenant";
-  const min = Math.floor(diff / 60000);
-  if (min < 60) return "dans " + min + " min";
-  const h = Math.floor(min / 60), r = min % 60;
-  if (h < 24) return r ? "dans " + h + " h " + String(r).padStart(2, "0") : "dans " + h + " h";
-  return "dans " + Math.floor(h / 24) + " j";
+// La plus petite image qui couvre le coin (la plus grande des deux zones), en
+// pixels de l'ecran : 1600 px seulement quand 960 ne suffit pas.
+function largeurHD(liste) {
+  const tel = window.matchMedia("(max-width: 1060px)").matches;
+  const besoin = (tel ? window.innerWidth : Math.min(900, window.innerWidth / 2)) * (window.devicePixelRatio || 1);
+  const l = liste.filter((x) => Number.isInteger(x) && x > 0).sort((a, b) => a - b);
+  return l.find((x) => x >= besoin * 0.9) || l[l.length - 1];
 }
 
-function plateformes(p) {
-  if (!p) return "Plateforme EU non annoncée";
-  return p.split(",").map(x => x.trim()).filter(Boolean).slice(0, 2).join(" · ");
+function imageHD(cover) {
+  const e = HD && cover && Object.prototype.hasOwnProperty.call(HD.images, cover) ? HD.images[cover] : null;
+  return e && typeof e.n === "string" && /^[\w-]+$/.test(e.n) ? e : null;
 }
 
-function esc(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
-    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+function coverHD(cover) {
+  const e = imageHD(cover);
+  const l = e ? largeurHD(Array.isArray(e.l) && e.l.length ? e.l : HD.largeurs || [960, 1600]) : 0;
+  return e && l ? "/hd/" + e.n + "-" + l + ".webp" : cover || null;
 }
 
-// Cle du prochain episode a venir, tous jours confondus
-function prochaine() {
-  let cle = null, best = Infinity;
-  const now = Date.now();
-  DATA.days.forEach(d => d.episodes.forEach((e, i) => {
-    const t = new Date(e.airingAt).getTime();
-    if (t > now && t < best) { best = t; cle = d.date + "#" + i; }
-  }));
-  return cle;
-}
-
-// Rail mobile : amener le jour actif dans le champ de vision.
-function centrerJour() {
-  const rail = document.getElementById("wrDays");
-  if (!rail) return;
-  const actif = rail.querySelector(".wr-day.on");
-  if (!actif) return;
-  rail.scrollTo({
-    left: actif.offsetLeft - (rail.clientWidth - actif.offsetWidth) / 2,
-    behavior: "smooth"
+// Apres le dessin d'un jour : cadrage sur le visage, couleur de l'episode.
+function annoterHD(bloc, episodes) {
+  if (!HD) return;
+  const cartes = bloc.querySelectorAll(".sl-track > .item-card");
+  episodes.forEach((ep, k) => {
+    const e = imageHD(ep.cover), c = cartes[k];
+    if (!e || !c) return;
+    const f = e.f;
+    if (Array.isArray(f) && f.length === 3 && f.every((x) => typeof x === "number" && isFinite(x)) && f[2] > 0) {
+      c.setAttribute("data-foyer", f.join(" "));
+      c.style.setProperty("--fx", f[0] + "%");
+      c.style.setProperty("--fy", f[1] + "%");
+    }
+    if (typeof e.h === "number" && isFinite(e.h)) c.setAttribute("data-couleur", String(e.h));
   });
 }
-
-function rendreJours() {
-  const max = Math.max(1, ...DATA.days.map(d => d.count));
-  document.getElementById("wrDays").innerHTML = DATA.days.map((d, i) => {
-    const pc = Math.round(d.count / max * 100);
-    const cls = "wr-day" + (i === sel ? " on" : "") + (d.date < DATA.today && i !== sel ? " dim" : "");
-    const tod = (d.date === DATA.today && i !== sel) ? '<span class="wr-tod"></span>' : "";
-    return '<button type="button" class="' + cls + '" data-i="' + i + '">' +
-      '<span class="wr-dn">' + esc(JOURS_COURT[d.dayName] || d.dayName) + '</span>' +
-      '<span class="wr-dd">' + d.dayNum + '</span>' +
-      '<span class="wr-db"><i style="width:' + pc + '%"></i></span>' + tod + '</button>';
+// IMAGES-HD-FIN
+ 
+const E = (id) => document.getElementById(id);
+const heure = (iso) =>
+  new Date(iso).toLocaleTimeString("fr-FR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+ 
+// Date YYYY-MM-DD EN HEURE DE PARIS, pas en UTC. Sans ca, un episode diffuse a
+// 00h30 a Paris (22h30 UTC la veille) porterait la date de la veille et la
+// carte annoncerait « hier » au lieu d'« aujourd'hui ». fr-CA produit
+// directement le format attendu.
+function dateParis(iso) {
+  return new Intl.DateTimeFormat("fr-CA", {
+    timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date(iso));
+}
+ 
+// « dans 2 h 14 », « demain », « diffusé » : le compte a rebours fait d'un
+// programme une raison de revenir.
+function relatif(iso) {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return ["diffusé", true];
+  const min = Math.round(ms / 60000);
+  if (min < 60) return ["dans " + min + " min", false];
+  const h = Math.floor(min / 60), m = min % 60;
+  if (h < 24) return ["dans " + h + " h " + String(m).padStart(2, "0"), false];
+  const j = Math.round(h / 24);
+  return [j === 1 ? "demain" : "dans " + j + " jours", false];
+}
+ 
+// Un episode vu comme un item de catalogue. titleEnglish et popularity sont
+// bien renvoyes par /feed/week : sans eux la carte afficherait le titre romaji,
+// alors que tout le reste du site montre l'anglais.
+// accLibelle et accEpisode sont lus par renderCardSemaine.
+function versItem(e, jour) {
+  const plates = String(e.platform || "").split(",").map((x) => x.trim()).filter(Boolean);
+  return {
+    id: e.id,
+    slug: e.slug || null,
+    title: e.title,
+    titleEnglish: e.titleEnglish || null,
+    cover: coverHD(e.cover),
+    platform: e.platform || null,
+    popularity: e.popularity || 0,
+    releaseDate: dateParis(e.airingAt),
+    releaseDatetime: e.airingAt,
+    releasePrecision: "day",
+    description: e.episodeNumber ? "[NEXT_EP:" + e.episodeNumber + "]" : "",
+    trailerUrl: e.trailerUrl || null,
+    accLibelle: libelleJour(jour) + " · " + heure(e.airingAt),
+    accEpisode: e.episodeNumber || null,
+    accPlateforme: plates[0] || null,
+  };
+}
+ 
+function libelleJour(d) {
+  if (d.date === DATA.today) return "Aujourd'hui";
+  return (JOURS_LONG[d.dayName] || d.dayName) + " " + d.dayNum + " " + MOIS[Number(d.date.slice(5, 7)) - 1];
+}
+ 
+// Le compte a rebours, rafraichi toutes les 30 secondes dans la carte deja
+// construite. On ne la refabrique pas : refaire le HTML couperait une
+// bande-annonce en cours de lecture.
+function majCompteurs() {
+  if (!DATA) return;
+  DATA.days.forEach((d, j) => {
+    const zone = E("semZone").children[j];
+    if (!zone) return;
+    const cartes = zone.querySelectorAll(".item-card");
+    d.episodes.forEach((e, k) => {
+      const cd = cartes[k] && cartes[k].querySelector(".dcd");
+      if (!cd) return;
+      const [txt, passe] = relatif(e.airingAt);
+      cd.textContent = txt;
+      cd.classList.toggle("fait", passe);
+    });
+  });
+}
+ 
+function dessinerJours() {
+  const zone = E("semJours");
+  zone.innerHTML = DATA.days.map((d, j) => {
+    const cls = "jr" + (j === jourSel ? " sel" : "")
+      + (d.date === DATA.today ? " ajd" : "")
+      + (d.date < DATA.today ? " passe" : "");
+    const nom = JOURS_LONG[d.dayName] || d.dayName;
+    return '<button type="button" class="' + cls + '" data-j="' + j + '"'
+      + ' aria-label="' + nom + " " + d.dayNum + ", " + d.count + (d.count > 1 ? " épisodes" : " épisode") + '">'
+      + '<span class="nj">' + (d.date === DATA.today ? "Auj." : (d.dayName || "")) + "</span>"
+      + '<span class="dj">' + d.dayNum + "</span>"
+      + (d.count ? '<span class="ep">' + d.count + "</span>" : "")
+      + "</button>";
   }).join("");
+  zone.querySelectorAll(".jr").forEach((b) => {
+    b.addEventListener("click", () => choisirJour(Number(b.dataset.j)));
+  });
+  // Sur mobile la bande des jours glisse : on amene le jour choisi dans le champ.
+  const actif = zone.querySelector(".jr.sel");
+  if (actif && zone.scrollWidth > zone.clientWidth) {
+    zone.scrollTo({ left: actif.offsetLeft - (zone.clientWidth - actif.offsetWidth) / 2, behavior: "smooth" });
+  }
+  const a = DATA.days[0], z = DATA.days[DATA.days.length - 1];
+  E("semPlage").textContent =
+    a.dayNum + " " + MOIS[Number(a.date.slice(5, 7)) - 1] + " – " +
+    z.dayNum + " " + MOIS[Number(z.date.slice(5, 7)) - 1];
 }
-
-function rendreListe() {
-  const d = DATA.days[sel];
-  const cle = prochaine();
-  const now = Date.now();
-
-  const lab = document.getElementById("wrDayLab");
-  const mois = MOIS[Number(d.date.slice(5, 7)) - 1];
-  lab.className = "wr-daylab" + (d.date === DATA.today ? " now" : "");
-  lab.innerHTML = '<span>' + (d.date === DATA.today ? "Aujourd'hui · " : "") +
-    esc(JOURS_LONG[d.dayName] || d.dayName) + " " + d.dayNum + " " + mois +
-    '</span><span class="wr-ln"></span><span>' + d.count + (d.count > 1 ? ' épisodes' : ' épisode') + '</span>';
-
-  const feed = document.getElementById("wrFeed");
-  if (!d.episodes.length) {
-    feed.innerHTML = '<p class="wr-vide">Aucun épisode ce jour-là.</p>';
-    return;
-  }
-
-  const VUS = 8;
-
-  function ligne(e, i) {
-    const est = (d.date + "#" + i) === cle;
-    const fini = new Date(e.airingAt).getTime() <= now;
-    const droite = est
-      ? '<span class="wr-cd"><i></i>' + esc(reste(e.airingAt)) + '</span>'
-      : '<span class="wr-h">' + heure(e.airingAt) + '</span>';
-    const num = e.episodeTotal
-      ? 'EP ' + e.episodeNumber + '/' + e.episodeTotal
-      : (e.episodeNumber != null ? 'EP ' + e.episodeNumber : 'Épisode');
-    const art = e.cover
-      ? '<span class="wr-th" style="background-image:url(' + esc(e.cover) + ')"></span>'
-      : '<span class="wr-th wr-th-void">新</span>';
-    return '<button type="button" class="wr-row' + (fini ? " done" : "") + (est ? " next" : "") +
-      '" data-id="' + e.id + '">' + art +
-      '<span class="wr-b"><span class="wr-t">' + esc(displayTitle(e)) + '</span>' +
-      '<span class="wr-m"><span class="wr-ep">' + esc(num) + '</span>' +
-      '<span class="wr-p">' + esc(plateformes(e.platform)) + '</span></span></span>' +
-      droite + '</button>';
-  }
-
-  const visibles = d.episodes.slice(0, VUS);
-  const caches = d.episodes.slice(VUS);
-
-  let html = '<div class="wr-list">' + visibles.map(ligne).join("") + '</div>';
-
-  if (caches.length) {
-    // Tout est deja dans la reponse /feed/week : le depliage ne coute aucun appel.
-    html += '<div class="wr-extra" id="wrExtra"><div class="wr-extra-in"><div>' +
-      caches.map((e, k) => ligne(e, k + VUS)).join("") +
-      '</div></div></div>' +
-      '<button type="button" class="wr-foot" id="wrFoot">' +
-      '<span class="fx">▾</span><span id="wrFootTxt">+ ' + caches.length +
-      (caches.length > 1 ? ' autres épisodes' : ' autre épisode') + ' ce jour-là</span></button>';
-  }
-
-  feed.innerHTML = html;
-
-  const foot = document.getElementById("wrFoot");
-  if (foot) {
-    const extra = document.getElementById("wrExtra");
-    const txt = document.getElementById("wrFootTxt");
-    const libelle = '+ ' + caches.length + (caches.length > 1 ? ' autres épisodes' : ' autre épisode') + ' ce jour-là';
-    foot.addEventListener("click", () => {
-      const ouvert = extra.classList.toggle("open");
-      foot.classList.toggle("open", ouvert);
-      txt.textContent = ouvert ? "Réduire" : libelle;
+ 
+function coquille(diapos, points) {
+  return '<div class="sl">'
+    + '<div class="sl-track" tabindex="0">' + diapos + "</div>"
+    + '<button type="button" class="sl-fl g" aria-label="Épisode précédent">‹</button>'
+    + '<button type="button" class="sl-fl d" aria-label="Épisode suivant">›</button>'
+    + '<div class="sl-pied"><span class="sl-cpt"></span></div>'
+    + '<div class="pts">' + points + "</div>"
+    + "</div>";
+}
+ 
+function dessinerSemaine() {
+  const zone = E("semZone");
+  zone.innerHTML = "";
+  DATA.days.forEach((d, j) => {
+    const bloc = document.createElement("div");
+    bloc.className = "wr-jour" + (j === jourSel ? " on" : "");
+    if (!d.episodes.length) {
+      bloc.innerHTML = '<p class="section-empty">Aucun épisode ce jour-là.</p>';
+      zone.appendChild(bloc);
+      FENETRES.push(null);
+      return;
+    }
+    const diapos = d.episodes.map((e) => renderCardSemaine(versItem(e, d), "anime")).join("");
+    const points = d.episodes.map((e) =>
+      '<button type="button" class="pt" aria-label="' + (e.titleEnglish || e.title) + ", " + heure(e.airingAt) + '">'
+      + heure(e.airingAt) + "</button>").join("");
+    bloc.innerHTML = coquille(diapos, points);
+    annoterHD(bloc, d.episodes);
+    zone.appendChild(bloc);
+ 
+    const sl = bloc.querySelector(".sl");
+    const f = monterFenetre(sl, {
+      duree: 6500,
+      actif: j === jourSel,
+      vignettes: Array.prototype.slice.call(bloc.querySelectorAll(".pt")),
     });
-  }
+    FENETRES.push(f);
+    // Aujourd'hui, on ouvre sur le prochain episode a venir plutot que sur un
+    // episode deja diffuse ce matin.
+    if (f && d.date === DATA.today) {
+      const k = d.episodes.findIndex((e) => new Date(e.airingAt).getTime() > Date.now());
+      if (k > 0) f.aller(k, true);
+    }
+  });
+  majCompteurs();
 }
-
-function rafraichir() {
-  const d = DATA.days[sel];
-  if (d.date !== DATA.today) return;
-  rendreListe();
+ 
+function choisirJour(j) {
+  jourSel = j;
+  E("semJours").querySelectorAll(".jr").forEach((b, k) => b.classList.toggle("sel", k === j));
+  E("semZone").querySelectorAll(".wr-jour").forEach((b, k) => b.classList.toggle("on", k === j));
+  FENETRES.forEach((f, k) => { if (f) f.actif(k === j); });
 }
-
-async function monter() {
-  const root = document.getElementById("weekRadar");
-  if (!root) return;
+ 
+async function demarrer() {
+  let data;
   try {
-    DATA = await getFeedWeek();
-    if (!DATA || !DATA.total) return;
-
-    sel = DATA.days.findIndex(d => d.date === DATA.today);
-    if (sel < 0) sel = 0;
-
-    const sub = document.getElementById("wrSub");
-    if (sub) sub.textContent = DATA.total + " épisodes";
-
-    rendreJours();
-    rendreListe();
-    root.hidden = false;
-    centrerJour();
-
-    if (timer) clearInterval(timer);
-    timer = setInterval(rafraichir, 60000);
-
-    document.getElementById("wrDays").addEventListener("click", ev => {
-      const b = ev.target.closest(".wr-day");
-      if (!b) return;
-      sel = Number(b.getAttribute("data-i"));
-      rendreJours();
-      rendreListe();
-      centrerJour();
-    });
-
-    document.getElementById("wrFeed").addEventListener("click", ev => {
-      const r = ev.target.closest(".wr-row");
-      if (!r) return;
-      const id = r.getAttribute("data-id");
-      const w = window;
-      if (typeof w.__openItemModal === "function") {
-        w.__openItemModal("anime", id);
-      } else {
-        // SectionBlock pas encore initialise : on retente au tick suivant
-        setTimeout(() => {
-          if (typeof w.__openItemModal === "function") w.__openItemModal("anime", id);
-        }, 120);
-      }
-    });
+    data = await getFeedWeek();
   } catch (e) {
-    console.log("week radar:", e && e.message);
+    return;                       // bloc absent plutot que bloc casse
   }
+  HD = await HD_PRET;             // IMAGES-HD : le manifeste (null s'il manque : jaquettes d'AniList)
+  if (!data || !data.days || !data.days.length) return;
+  const total = data.days.reduce((n, d) => n + (d.episodes ? d.episodes.length : 0), 0);
+  if (!total) return;
+ 
+  DATA = data;
+  const i = DATA.days.findIndex((d) => d.date === DATA.today);
+  jourSel = i >= 0 ? i : 0;
+ 
+  E("weekRadar").hidden = false;
+  dessinerJours();
+  dessinerSemaine();
+  setInterval(majCompteurs, 30000);
 }
-
-monter();
-document.addEventListener("astro:page-load", monter);
+ 
+demarrer();
 </script>
