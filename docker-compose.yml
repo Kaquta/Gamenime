@@ -39,9 +39,10 @@ services:
       DISCORD_WEBHOOK_WORKFLOWS: ${DISCORD_WEBHOOK_WORKFLOWS}
       DISCORD_WEBHOOK_ERRORS: ${DISCORD_WEBHOOK_ERRORS}
       PORT: 3000
-      SYNOPSIS_ENABLED: "1"
+      SYNOPSIS_ENABLED: "0"
       SYNOPSIS_WINDOW: "0-24"
       SYNOPSIS_MAX_PER_RUN: "10"
+      SERPER_API_KEY: ${SERPER_API_KEY}
     volumes:
       # Le rapport et le journal du build, en lecture seule : l'API les affiche,
       # elle ne les ecrit jamais.

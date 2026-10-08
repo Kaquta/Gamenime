@@ -6602,3 +6602,87 @@ html[data-gn~="cameleon"]:not([data-gn~="braise"]) :is(body,#_):not(#_) .hero-he
 html[data-gn~="cameleon"]:not([data-gn~="braise"]) :is(body,#_):not(#_) .brand-mark::after { text-shadow: 0 1px 3px rgba(var(--t-ombre-rgb), .9), 0 2px 16px rgba(var(--t-ombre-rgb), .8); }
 }
 /* REFLET-FIN */
+/* LEGAL-DEBUT — bloc ajoute par pages-legales.sh (maquette « A · Une feuille » validee le 8 octobre 2026) :
+   Mentions legales, Confidentialite, CGU et Cookies en Vitre · Cameleon, page neutre comme Mes preferences
+   (jetons « braise legal », pas d'image en haut a droite, aucun onglet allume) ; le texte dans une seule
+   feuille de verre, sections separees par un filet. Les textes ne changent pas. A remplacer en entier, pas a la main */
+/* ── la page : colonne de lecture, titre Poppins, date, liens et puces en braise ── */
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal { max-width: 780px; margin: 0 auto; padding: 26px 0 64px; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__title {
+  margin: 0 0 8px; font: 700 clamp(1.7rem, 3vw, 2.3rem)/1.12 "GN Poppins", sans-serif; letter-spacing: -.015em;
+  background: none; color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); text-shadow: 0 2px 18px rgba(var(--t-ombre-rgb), .6);
+}
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__updated { margin: 0 0 22px; font: 400 15px/1.5 Inter, sans-serif; color: var(--t-ink3); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section h2 { margin: 0 0 10px; font: 600 17px/1.25 "GN Poppins", sans-serif; letter-spacing: -.01em; color: var(--t-titre); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section :is(p, li) { font: 400 14.5px/1.7 Inter, sans-serif; color: var(--t-ink2); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section p { margin: 0 0 10px; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section ul { margin: 0 0 10px; padding: 0; list-style: none; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section li { position: relative; margin: 0 0 6px; padding-left: 18px; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section li::before { content: ""; position: absolute; left: 3px; top: .72em; width: 6px; height: 6px; border-radius: 50%; background: var(--t-acc); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section > :last-child { margin-bottom: 0; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section strong { font-weight: 600; color: var(--t-ink); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal a { color: var(--t-acc-clair); text-decoration: underline; text-decoration-color: rgba(255, 184, 119, .35); text-underline-offset: 3px; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal a:hover { text-decoration-color: currentColor; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__back { margin: 22px 0 0; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__back a {
+  display: inline-flex; align-items: center; height: 30px; padding: 0 14px; border-radius: 999px; text-decoration: none;
+  background: var(--t-voir-bg); border: 1px solid var(--t-voir-bord); color: var(--t-voir-txt); font: 600 13px/1 Inter, sans-serif;
+}
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__back a:hover { background: var(--t-survol); color: var(--t-ink); }
+/* ── A · une feuille : toutes les sections dans un seul panneau de verre, separees par un filet ── */
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section {
+  position: relative; margin: 0; padding: 20px 26px; background: var(--t-panneau);
+  border: 1px solid var(--t-panneau-bord); border-width: 0 1px; backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section + .legal__section { border-top: 1px solid var(--t-tete-fil); }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section:first-of-type { padding-top: 24px; border-top: 1px solid var(--t-panneau-bord); border-radius: 18px 18px 0 0; }
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section:last-of-type { padding-bottom: 24px; border-bottom: 1px solid var(--t-panneau-bord); border-radius: 0 0 18px 18px; box-shadow: var(--t-panneau-ombre); }
+@media (max-width: 760px) {
+html[data-gn~="legal"] :is(body,#_):not(#_) .legal__section { padding: 16px 18px; }
+}
+/* LEGAL-FIN */
+/* VERRE-DEBUT — bloc ajoute par bandeau-ultra-verre.sh (maquette « U1 · Ultra verre net » validee le 8 octobre 2026,
+   remplace « A2 · Verre net, degrade marque ») : au telephone et a la tablette (1060 px et moins), l'image du coin
+   passe sur toute la largeur du bandeau, vue a travers une vitre claire (deux reflets en diagonale, lumiere du haut,
+   couleurs un peu plus vives, pas de flou), et s'efface vers la gauche (transparente au bord, pleine aux 3/4).
+   Accueil, Anime, Jeux, A venir. Ordinateur : rien ne change (reflet du bloc REFLET). A remplacer en entier, pas a la main */
+@media (max-width: 1060px) {
+html[data-gn~="bleu"] .gc-box {
+  width: 100% !important; opacity: .8; --gc-fx: .74; --gc-fy: .42; --gc-fw: .15;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .25) 28%, rgba(0, 0, 0, .7) 52%, #000 78%), linear-gradient(to bottom, #000 42%, transparent 100%); -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .25) 28%, rgba(0, 0, 0, .7) 52%, #000 78%), linear-gradient(to bottom, #000 42%, transparent 100%); mask-composite: intersect;
+}
+html[data-gn~="cameleon"] .gc-box i { filter: saturate(1.15) contrast(1.05); }
+html[data-gn~="cameleon"] .gc-box::after {
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0) 6%, rgba(255, 255, 255, .24) 19%, rgba(255, 255, 255, .05) 28%, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, .12) 58%, rgba(255, 255, 255, 0) 66%),
+    radial-gradient(120% 70% at 78% -10%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .03) 24%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(90deg, rgba(var(--ep-rgb), .55), rgba(var(--ep-rgb), .24) 55%, rgba(var(--ep-rgb), .1));
+}
+}
+/* VERRE-FIN */
+/* BANDEAU-PC-DEBUT — bloc ajoute par bandeau-pc-verre.sh (maquette « D3 · Couleur + vitre » validee le 8 octobre 2026) :
+   sur ordinateur, plus de reflet en miroir (pas de doublon) ; l'image du coin garde sa taille, s'efface plus
+   longuement vers la gauche, couleurs un peu plus vives ; une vitre (reflets en diagonale, lumiere en haut) couvre
+   tout le bandeau et, a gauche, prend la couleur de l'episode. Accueil, Anime, Jeux, A venir. Telephone : rien ne
+   change (bloc VERRE). A remplacer en entier, pas a la main */
+@media not all and (max-width: 1060px) {
+html[data-gn~="bleu"] .gc-reflet { display: none; }
+html[data-gn~="bleu"] .gc-box {
+  --gc-fx: .62; --gc-fy: .42; --gc-fw: .17;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .3) 24%, rgba(0, 0, 0, .75) 48%, #000 70%), linear-gradient(to bottom, #000 46%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, .3) 24%, rgba(0, 0, 0, .75) 48%, #000 70%), linear-gradient(to bottom, #000 46%, transparent 100%);
+}
+html[data-gn~="cameleon"] .gc-box i { filter: saturate(1.15) contrast(1.05); }
+html[data-gn~="bleu"] .gc::after {
+  content: ""; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0) 6%, rgba(255, 255, 255, .24) 19%, rgba(255, 255, 255, .05) 28%, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, .12) 58%, rgba(255, 255, 255, 0) 66%),
+    radial-gradient(120% 70% at 78% -10%, rgba(255, 255, 255, .16), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .03) 24%, rgba(255, 255, 255, 0) 42%),
+    radial-gradient(55% 95% at 18% 18%, color-mix(in srgb, var(--ep-b) 30%, transparent), transparent 72%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%); mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+}
+}
+/* BANDEAU-PC-FIN */

@@ -1,9 +1,10 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
 import HeroHeader from "../components/HeroHeader.astro";
+import Footer from "../components/Footer.astro";
 ---
-<BaseLayout title="Politique cookies — GameNime">
-  <HeroHeader />
+<BaseLayout title="Politique cookies — GameNime" jetons="braise legal">
+  <HeroHeader activeTab="none" />
   <main class="legal container">
     <h1 class="legal__title">Politique relative aux cookies</h1>
     <p class="legal__updated">Dernière mise à jour : juin 2026</p>
@@ -45,4 +46,5 @@ import HeroHeader from "../components/HeroHeader.astro";
 
     <p class="legal__back"><a href="/">← Retour à l'accueil</a></p>
   </main>
+  <Footer />
 </BaseLayout>
