@@ -59,6 +59,11 @@ export interface GameNimeItem {
    */
   ratingScore?: number | null;
   popularity?: number | null;
+  /**
+   * Bonus européen (animes et jeux, europe.ts) : lecteurs de Wikipédia en français, allemand,
+   * italien et espagnol sur 30 jours, en points de score. NULL = pas encore relevé → 0.
+   */
+  europeBonus?: number | null;
   releaseDate?: string | null;          // ISO date "YYYY-MM-DD"
   releasePrecision?: ReleasePrecision | null;
   trailerUrl?: string | null;
@@ -451,6 +456,18 @@ const HANGUL_RE = /[\uAC00-\uD7AF\u1100-\u11FF]/;
 // Pinyin avec tons (mā má mǎ mà ...) = signal fort de chinois romanisé
 const PINYIN_TONES_RE = /[ǎěǐǒǔǍĚǏǑǓ]/;  // SESSION 12.5b : caron uniquement (ton 3 pinyin), évite faux positifs Pokémon/Tokyo/Café
 
+// Nos plateformes de streaming disponibles en Europe (noms de la liste blanche, constants.ts) : celles qui admettent un
+// anime de toute origine. Liste fermée : une plateforme ajoutée plus tard à la liste blanche (jeux ou streaming) n'y
+// compte qu'une fois ajoutée ici. Hulu compte (Rey, 16 octobre : « Hulu parce que c'est Europe OUI, introduit dans
+// Disney+ »).
+const PLATEFORMES_STREAMING_EUROPE = new Set(["Crunchyroll", "ADN", "Netflix", "Amazon Prime Video", "Disney+", "HIDIVE", "HBO Max", "Hulu"]);
+
+/** Au moins une de nos plateformes de streaming disponibles en Europe (après la mise au propre de la liste blanche). */
+function surNosPlateformesStreaming(platform: string | null | undefined): boolean {
+  const p = sanitizePlatform(platform);
+  return !!p && p.split(",").some((x) => PLATEFORMES_STREAMING_EUROPE.has(x.trim()));
+}
+
 /**
  * Décide si un item est probablement un anime japonais (vs donghua KR/CN).
  *
@@ -461,12 +478,20 @@ const PINYIN_TONES_RE = /[ǎěǐǒǔǍĚǏǑǓ]/;  // SESSION 12.5b : caron uniq
  *   4. PAR DÉFAUT — laisser passer (cas titres romaji JP : "Naruto", "Bleach")
  *
  * Source unique de vérité : workflows poussent BRUT (avec titleNative), API tranche.
+ *
+ * 16 octobre 2026 (Rey : « il faut aussi les animes coréens, américain, européen ») : un anime sur une de nos
+ * plateformes de streaming disponibles en Europe (PLATEFORMES_STREAMING_EUROPE) est admis quelle que soit son origine ;
+ * les passes ci-dessus ne jouent plus que pour un anime sans aucune de ces plateformes (un anime non japonais sans
+ * plateforme serait de toute façon masqué sur le site). Les plateformes de jeux (PC, PlayStation…) n'y comptent pas :
+ * /games/bulk passe aussi par ici, et rien ne change pour les jeux.
  */
 export function isLikelyJapaneseAnime(item: {
   title?: string | null;
   titleEnglish?: string | null;
   titleNative?: string | null;
+  platform?: string | null;
 }): { likely: boolean; reason: string } {
+  if (surNosPlateformesStreaming(item.platform)) return { likely: true, reason: "plateforme_streaming" };
   const all =
     (item.title || "") + " " +
     (item.titleEnglish || "") + " " +
@@ -687,7 +712,26 @@ function ratingNormalized(ratingScore: number | null | undefined): number {
  */
 export function computeGameNimeScore(item: GameNimeItem, _now: Date = new Date()): number {
   return popularityNormalized(item.popularity)
-       + ratingNormalized(item.ratingScore);
+       + ratingNormalized(item.ratingScore)
+       + europeNormalized(item.europeBonus);
+}
+
+/**
+ * Bonus européen (europe.ts ; animes le 12 octobre 2026, jeux le 14 octobre) : déjà en points,
+ * calculé une fois par jour d'après les lecteurs européens de Wikipédia (40 × log10(1 + vues/100) :
+ * 1 000 vues → 42, 10 000 → 80). NULL ou négatif → 0.
+ */
+function europeNormalized(bonus: number | null | undefined): number {
+  const b = Number(bonus) || 0;
+  return b > 0 ? b : 0;
+}
+
+/**
+ * Listes qui mêlent animes et jeux (accueil mélangé, recherche « all ») : sans le bonus européen,
+ * pour que les deux restent comparables comme avant (leurs bonus ne se lisent pas aux mêmes articles).
+ */
+export function sansBonusEurope<T extends GameNimeItem>(items: T[]): T[] {
+  return items.map((item) => (item.europeBonus != null ? { ...item, europeBonus: null } : item));
 }
 
 // ============================================================

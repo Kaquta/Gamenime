@@ -5,6 +5,7 @@
 
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
+import { planifier } from "./pilotage.js";
 
 const LOOKUP_INTERVAL_MS = 60 * 60 * 1000;  // 1 heure
 const LOOKUP_DELAY_MS = 1500;
@@ -282,18 +283,13 @@ export function startLookupCron(app: FastifyInstance): NodeJS.Timeout {
     "Lookup cron demarre (Phase C)"
   );
 
-  // 1er run après 10 min (laisser Phase B prendre le devant après le boot)
-  setTimeout(() => {
-    lookupMissingIdsCycle(app, { releasedOnly: false, limit: LOOKUP_CRON_LIMIT, dryRun: false }).catch(
-      (e) => app.log.error({ err: e?.message }, "Lookup cycle error")
-    );
-  }, 10 * 60 * 1000);
-
-  // Puis toutes les heures
-  return setInterval(() => {
-    lookupMissingIdsCycle(app, { releasedOnly: false, limit: LOOKUP_CRON_LIMIT, dryRun: false }).catch(
-      (e) => app.log.error({ err: e?.message }, "Lookup cycle error")
-    );
-  }, LOOKUP_INTERVAL_MS);
+  // Pilotage (pilotage.ts) : 1er passage après 10 min (laisser Phase B prendre le devant après le boot), puis toutes les heures
+  planifier({
+    id: "phase-c", premierMs: 10 * 60 * 1000, rythmeMs: LOOKUP_INTERVAL_MS, suivi: "lookup-cron", processAdmin: "lookup-anilist-ids",
+    passage: async () => {
+      await lookupMissingIdsCycle(app, { releasedOnly: false, limit: LOOKUP_CRON_LIMIT, dryRun: false });
+    },
+  });
+  return setTimeout(() => {}, 0);
 }
 

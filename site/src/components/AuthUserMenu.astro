@@ -158,7 +158,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       return { j:lib, c:String(d.getFullYear()), etat:"" };
     }
     function favCard(f){
-      var info=simplifyPlatform(f.platform)||f.genre||"";
+      var info=simplifyPlatform(f.platform)||(f.cinemaFr?"Au cinéma":"")||f.genre||"";
       var est=f.itemType==="anime";
       var dt=favDate(f);
       var cls = dt.etat==="out" ? " out" : (dt.etat==="soon" ? " soon" : "");

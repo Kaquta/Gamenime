@@ -6686,3 +6686,476 @@ html[data-gn~="bleu"] .gc::after {
 }
 }
 /* BANDEAU-PC-FIN */
+/* FICHE-VITRE-DEBUT — bloc ajoute par fiche-vitre.sh (maquette « B · couleur de la jaquette » validee le 11 octobre
+   2026), a remplacer en entier, pas a la main.
+   Le modal (sur toutes les pages en Cameleon : accueil, Anime, Jeux, A venir) et la page d'une fiche (jeton « fiche »
+   sur <html data-gn>) : memes matieres et memes couleurs que les panneaux du site (--t-*), plus rien de l'ancienne
+   palette (vermillon, beige, orange, bleu) ; titres en Poppins, dates en JetBrains Mono, comme le reste du site.
+   La page et le modal prennent la couleur de leur jaquette (lib/teinte). Le modal redeclare les jetons dont il se
+   sert, pour suivre les couleurs --ep-* posees sur lui seul ; jaquette illisible : celles de la page.
+   Prefixe : html[data-gn~="cameleon"] :is(body,#_):not(#_) ; !important seulement contre les regles d'origine
+   qui en portent. */
+
+/* ── les couleurs du modal (les memes definitions que le design, rattachees au modal) ── */
+html[data-gn~="cameleon"] .detail-modal {
+  --t-acc: var(--ep-a);
+  --t-acc-clair: var(--ep-g);
+  --t-acc-ombre: 0 8px 20px -8px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .55), inset 0 -1px 0 rgba(0, 0, 0, .15);
+  --t-acc-voile: var(--ep-c);
+  --t-boite-bg: linear-gradient(180deg, rgba(var(--ep-rgb), .55), rgba(var(--ep-rgb), .66));
+  --t-cachet: linear-gradient(180deg, var(--ep-a) 0%, var(--ep-b) 100%);
+  --t-cachet-ombre: 0 6px 14px -6px var(--ep-c), inset 0 1px 0 rgba(255, 255, 255, .55);
+  --t-fond: radial-gradient(1100px 700px at 86% -10%, var(--ep-c), transparent 62%), radial-gradient(1300px 760px at 24% 122%, var(--ep-c2), transparent 62%), linear-gradient(180deg, var(--ep-d) 0%, var(--ep-e) 100%);
+  --t-grad: linear-gradient(180deg, var(--ep-a) 0%, var(--ep-b) 100%);
+  --t-nuit: var(--ep-e);
+  --t-panneau: linear-gradient(160deg, rgba(255, 255, 255, .06) 0%, rgba(255, 255, 255, 0) 36%), linear-gradient(180deg, var(--ep-p1), var(--ep-p2));
+  --t-panneau-ombre: 0 28px 60px -26px rgba(0, 0, 0, .9), 0 0 60px -34px var(--ep-c);
+  --t-rond-bord: var(--ep-f);
+  --t-rond-txt: var(--ep-g);
+  --t-statut-bg: var(--ep-c2);
+  --t-statut-bord: var(--ep-a);
+  --t-voile-rgb: var(--ep-rgb);
+}
+/* couleur de la jaquette calculee apres l'ouverture : en fondu (classe posee par le script du modal) */
+html[data-gn~="cameleon"] .detail-modal.ep-pret {
+  transition: --ep-a .8s ease, --ep-b .8s ease, --ep-c .8s ease, --ep-c2 .8s ease, --ep-d .8s ease, --ep-e .8s ease, --ep-f .8s ease, --ep-g .8s ease, --ep-h .8s ease, --ep-p1 .8s ease, --ep-p2 .8s ease;
+}
+
+/* ── le voile et le panneau : le verre des panneaux du site, sur la nuit de la page ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-backdrop { background: rgba(var(--t-voile-rgb), .88); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-content {
+  border-radius: 18px; border: 1px solid var(--t-panneau-bord) !important;
+  background: var(--t-panneau), var(--t-fond) !important;
+  box-shadow: var(--t-panneau-ombre), inset 0 1px 0 rgba(255, 255, 255, .14);
+  scrollbar-width: thin; scrollbar-color: var(--ep-f) transparent;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-content::-webkit-scrollbar-thumb { background: var(--ep-f) !important; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-close {
+  width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--t-pastille-bord) !important; background: var(--t-pastille-bg);
+  box-shadow: var(--t-pastille-ombre); color: var(--t-ink); font-size: 13px; line-height: 1;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-close:hover { background: var(--t-pastille-bg) !important; border-color: var(--t-voir-bord) !important; }
+
+/* ── l'en-tete : jaquette (a la hauteur de son image), titre en Poppins comme les titres des pages, autres titres ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-cover { align-self: flex-start; box-shadow: var(--t-jaquette-ombre); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.detail-info h2, .detail-info h1) {
+  font-family: "GN Poppins", sans-serif; font-weight: 700; line-height: 1.12; letter-spacing: -.015em; color: var(--t-titre) !important;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .alt-titles { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .alt-nat { color: var(--t-ink2); }
+
+/* ── la date : la boite, la jauge et la police des dates des cartes, l'accent pour le compte a rebours ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-dateblock {
+  background: var(--t-boite-bg); border: 1px solid var(--t-boite-bord); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-datevalue { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-datevalue.soft { color: var(--t-ink3); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-datevalue.soft b { color: var(--t-ink); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-countdown {
+  font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 600; color: var(--t-statut-txt); background: var(--t-statut-bg); border-color: var(--t-statut-bord);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-countdown .cd-dot { background: var(--t-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-countdown.is-out { color: var(--t-statut2-txt); background: transparent; border-color: var(--t-statut2-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-window { background: var(--t-jauge-bg); border-color: var(--t-jauge-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-window span { background: var(--t-grad); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-windowlegend { color: var(--t-ink3); opacity: 1; }
+
+/* ── Ou le regarder : les pastilles de verre du site ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-section-label { color: var(--t-ink3); font-weight: 600; letter-spacing: .08em; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .plat-chip {
+  color: var(--t-ink); background: var(--t-pastille-bg); border-color: var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .plat-chip .plat-yt { color: var(--t-ink3); border-left-color: var(--t-puce2-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .plat-chip.tbc { color: var(--t-ink3); background: transparent; border-color: var(--t-puce2-bord); box-shadow: none; }
+
+/* ── genres, age, infos de l'anime : puces neutres, icones a l'accent ; Populaire / Tres attendu : la pastille des cartes ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.genre-tag, .pegi-tag, .info-tag) {
+  background: var(--t-puce-bg) !important; border: 1px solid var(--t-puce-bord) !important; color: var(--t-puce-txt) !important;
+  box-shadow: none; animation: none;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.genre-tag, .pegi-tag) .tag-ic,
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .info-tag .info-ic { color: var(--t-acc); opacity: 1; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .info-tag.countdown-info { background: var(--t-statut-bg) !important; border-color: var(--t-statut-bord) !important; color: var(--t-statut-txt) !important; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.popular-tag, .anticipated-tag) {
+  padding: 5px 14px; border-radius: 999px; border: 1px solid var(--t-statut-bord) !important; background: transparent !important;
+  color: var(--t-acc-clair) !important; box-shadow: none !important; text-shadow: none; animation: none;
+  font-size: .76rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+}
+@media (max-width: 640px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.popular-tag, .anticipated-tag) { padding: 4px 11px; font-size: .7rem; }
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.popular-tag, .anticipated-tag) .tag-ic { opacity: 1; }
+
+/* ── bande-annonce et captures : le cadre des jaquettes ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.detail-trailer, .fiche-trailer, .gallery-main) {
+  box-shadow: var(--t-jaquette-ombre); outline: 1px solid var(--t-vignette-bord); outline-offset: -1px;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .fiche-play { background: var(--t-grad); box-shadow: var(--t-acc-ombre-fort); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .fiche-play svg { fill: var(--t-sur-acc); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .fiche-trailer-lab { color: var(--t-ink); background: rgba(var(--t-voile-rgb), .8); border: 1px solid var(--t-vignette-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .gallery-thumb.active { border-color: var(--t-acc); }
+
+/* ── la description : titre blanc en Poppins et son cachet a l'accent, texte gris clair ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.detail-description h3, .detail-description h2) {
+  display: flex; align-items: center; gap: 10px; font-family: "GN Poppins", sans-serif; font-weight: 600; letter-spacing: -.01em; color: var(--t-titre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) :is(.detail-description h3, .detail-description h2)::before {
+  content: ""; flex: none; width: 5px; height: 1.05em; border-radius: 3px; background: var(--t-cachet); box-shadow: var(--t-cachet-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-description p { color: var(--t-ink2); }
+
+/* ── les votes : boutons de verre, le pourcentage en Poppins a l'accent ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .detail-votes { border-top-color: var(--t-tete-fil); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .vote-btn {
+  color: var(--t-ink); background: var(--t-pastille-bg); border-color: var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .vote-up:hover { color: var(--t-acc-clair); background: var(--t-statut-bg); border-color: var(--t-statut-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .vote-down:hover { color: var(--t-ink); background: var(--t-survol); border-color: var(--t-rond-bord); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) .smiley-percent { font-family: "GN Poppins", sans-serif; font-weight: 700; color: var(--t-acc-clair); text-shadow: none; }
+
+/* ── la page d'une fiche : le panneau de verre des pages, fil d'Ariane et liens a l'accent, pied de page des pages Anime et
+   Jeux ; pas de filet au bout des onglets (il precede le bouton des filtres, que la page n'a pas) ── */
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-sheet {
+  position: relative; isolation: isolate; border-radius: 18px; border: 1px solid var(--t-panneau-bord);
+  background: var(--t-panneau); box-shadow: var(--t-panneau-ombre);
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-sheet::after {
+  content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  padding: 1px; border-radius: 17px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+html[data-gn~="fiche"] :is(body,#_):not(#_) .tabs-seam { display: none; }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-fil { color: var(--t-ink3); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-fil a { color: var(--t-acc-clair); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-retour { border-top-color: var(--t-tete-fil); color: var(--t-ink3); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .fiche-retour a { color: var(--t-acc-clair); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .site-footer { margin-top: 30px; padding: 22px 0 10px; border-top: 1px solid var(--t-tete-fil); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .site-footer__links a { color: var(--t-ink3); font: 500 13px/1.4 Inter, sans-serif; }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .site-footer__links a:hover { color: var(--t-acc-clair); }
+html[data-gn~="fiche"] :is(body,#_):not(#_) .site-footer__credit { color: var(--t-ink3); opacity: .75; font: 400 12px/1.4 Inter, sans-serif; }
+/* FICHE-VITRE-FIN */
+/* RECHERCHE-DEBUT — bloc ajoute par recherche-vitre.sh (resultats de la recherche de l'accueil en Vitre · Cameleon,
+   comme les pages Anime et Jeux), a remplacer en entier, pas a la main.
+   Le panneau, son en-tete et les cartes « C · Jaquettes » reprennent mot pour mot les regles du bloc CATALOGUE,
+   pour #homeSearchResults ; le cachet dit 検索 (« recherche »). Le bloc CATALOGUE ne change pas.
+   Prefixe : html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block */
+
+/* ── 検索 pour le cachet : ces deux signes seulement, meme police que GN Prisme JP (Zen Kaku Gothic New 500,
+   metriques verticales gardees) ── */
+@font-face { font-family: "GN Prisme JP"; font-weight: 100 900; font-display: block; src: url("/fonts/gn-prisme-recherche.woff2") format("woff2"); unicode-range: U+691C, U+7D22; }
+
+/* ── le panneau : meme verre que les panneaux de l'accueil, et meme largeur (classe container, comme eux) ;
+   colle sous la barre de recherche comme eux, 16 px au-dessus du reste de l'accueil ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block {
+  margin: 0 auto 16px; padding: 0; min-width: 0; display: flex; flex-direction: column; overflow: visible;
+  position: relative; isolation: isolate; z-index: 1;
+  border-radius: 18px; border: 1px solid var(--t-panneau-bord);
+  background: var(--t-panneau); box-shadow: var(--t-panneau-ombre);
+  backdrop-filter: var(--t-flou); -webkit-backdrop-filter: var(--t-flou);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block::after {
+  content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  padding: 1px; border-radius: 17px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* ── l'en-tete du panneau : cachet, titre, rond › ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head {
+  display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 10px;
+  margin: 0; padding: 12px 17px; border-bottom: 1px solid var(--t-tete-fil); border-radius: 18px 18px 0 0;
+  position: relative; isolation: isolate;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head h2 {
+  --X: clamp(1.2rem, 1.9vw, 1.5rem);
+  margin: 0; display: flex; align-items: center; white-space: nowrap;
+  height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 11px - var(--X) * .2734));
+  font: 600 var(--X)/1.1 "GN Poppins", sans-serif; letter-spacing: -.01em;
+  background: none; color: var(--t-titre); -webkit-text-fill-color: var(--t-titre); text-shadow: none;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head h2::before {
+  content: "検索"; flex: none; writing-mode: vertical-rl; display: block;
+  font: 700 9.5px/1 "GN Prisme JP", sans-serif; letter-spacing: .04em;
+  padding: 5px 4px; margin-right: 11px; border-radius: 7px; transform: none;
+  background: var(--t-cachet); color: var(--t-cachet-txt); -webkit-text-fill-color: var(--t-cachet-txt);
+  box-shadow: var(--t-cachet-ombre); text-shadow: none; -webkit-mask-image: none; mask-image: none;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head h2::after {
+  content: "›"; flex: none; display: grid; place-items: center; width: 22px; height: 22px; margin-left: 10px;
+  border-radius: 50%; border: 1px solid var(--t-rond-bord); background: var(--t-rond-bg);
+  color: var(--t-rond-txt); -webkit-text-fill-color: var(--t-rond-txt);
+  font: 900 .72rem/1 "GN Poppins", sans-serif; box-shadow: none; text-shadow: none; transform: none;
+}
+
+/* ── la grille ; « Recherche… » et « Aucun résultat. » sur toute la largeur ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .items-row {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(172px, 1fr)); gap: 16px; padding: 18px 17px 20px;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .items-row > p { grid-column: 1 / -1; margin: 0; }
+
+/* ── les cartes « C · Jaquettes » (les memes que les pages Anime et Jeux) ── */
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card {
+  aspect-ratio: 2 / 3; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: var(--t-carte);
+  box-shadow: var(--t-jaquette-ombre); transition: transform .22s ease, box-shadow .22s ease;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card:hover {
+  transform: translateY(-4px); box-shadow: 0 0 0 2px var(--t-acc), 0 24px 40px -16px rgba(0, 0, 0, .95);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .item-overlay {
+  background: linear-gradient(0deg, rgba(var(--t-voile-rgb), .97) 0%, rgba(var(--t-voile-rgb), .9) 34%, rgba(var(--t-voile-rgb), .5) 56%, rgba(var(--t-voile-rgb), 0) 74%);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .item-body { padding: 12px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .item-body h3 {
+  margin: 0 0 8px; font: 600 15px/1.25 "GN Poppins", sans-serif; letter-spacing: -.01em; color: #fff; text-shadow: none;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .item-link { color: inherit; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .fav-heart {
+  top: 8px; right: 8px; width: 30px; height: 30px; font-size: 15px;
+  background: var(--t-fleche-bg); box-shadow: inset 0 0 0 1px var(--t-fleche-bord); color: var(--t-ink);
+}
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .dbox { margin-top: 0; padding: 6px 8px 7px; border-radius: 10px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .dline { flex-wrap: wrap; row-gap: 5px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .dval { font-size: .68rem; white-space: nowrap; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .dcd { font-size: .6rem; padding: 2px 6px; border-radius: 99px; border: 1px solid; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .wbar { margin-top: 6px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .chips { margin-top: 7px; gap: 4px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .chip { font: 500 .62rem/1.2 Inter, sans-serif; padding: 3px 8px; border-radius: 999px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block .item-card .hpill { margin-top: 6px; }
+
+/* ── tablette et telephone ── */
+@media (max-width: 760px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head h2 { --X: 1.02rem; height: calc(round(nearest, var(--X) * .96875, 1px) + max(round(nearest, var(--X) * .2421875, 1px), 9.5px - var(--X) * .2734)); }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .section-head h2::after { width: 19px; height: 19px; margin-left: 7px; }
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .items-row { padding: 14px 12px 16px; }
+}
+/* ── telephone : deux jaquettes par ligne ── */
+@media (max-width: 560px) {
+html[data-gn~="cameleon"] :is(body,#_):not(#_) #homeSearchResults > .section-block > .items-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+/* RECHERCHE-FIN */
+/* CALENDRIER-DEBUT — bloc ajoute par calendrier.sh (onglet « Calendrier », pages /calendrier/ et
+   /calendrier/AAAA-MM/, et page 404), a remplacer en entier, pas a la main.
+   Le panneau et son en-tete sont ceux du bloc CATALOGUE (.page-shell > .section-block) ; ce bloc ajoute le
+   cachet 暦 (« calendrier ») ou 迷子 (« perdu », page 404), le filtre Tout / Anime / Jeux (memes pastilles
+   que Anime / Film), la barre du mois, la bande des 24 mois, la grille du lundi au dimanche et ses sorties
+   (jaquette, titre, type et plateformes), et, au telephone, l'agenda (un jour par ligne).
+   Prefixe : html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal (et .perdu) */
+
+/* ── 暦 et 迷子 pour les cachets : ces trois signes seulement, meme police que GN Prisme JP (Zen Kaku Gothic
+   New 500, metriques verticales gardees) ── */
+@font-face { font-family: "GN Prisme JP"; font-weight: 100 900; font-display: block; src: url("/fonts/gn-prisme-calendrier.woff2") format("woff2"); unicode-range: U+5B50, U+66A6, U+8FF7; }
+
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal > .section-head h2::before { content: "暦"; padding: 6px 4px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.perdu > .section-head h2::before { content: "迷子"; }
+
+/* ── l'onglet Calendrier : cinq onglets ; au telephone, la ligne tient (avec le bouton des filtres des pages Anime,
+   Jeux et A venir) jusqu'a 320 px de large ── */
+@media (max-width: 760px) {
+html[data-gn~="encre"][data-gn~="noir-or"][data-gn~="onglets"] :is(body,#_) .tabs-track { gap: 0; }
+}
+@media (max-width: 400px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { padding: 0 8px; font-size: 12.5px; }
+}
+@media (max-width: 370px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { padding: 0 6px; font-size: 12px; }
+html[data-gn~="encre"] :is(body,#_) .tab { font-size: 13px; }
+}
+@media (max-width: 340px) {
+html[data-gn~="bleu"] :is(body,#_):not(#_) .tab { padding: 0 4px; font-size: 11.5px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-filter { width: 26px; height: 26px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .tabs-seam { margin: 0 1px; }
+}
+
+/* ── le filtre Tout / Anime / Jeux, a droite de l'en-tete (memes pastilles que Anime / Film) ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtres {
+  display: inline-flex; flex: none; gap: 0; margin-left: auto; padding: 3px; border-radius: 999px;
+  background: var(--t-onglets-bg); border: 1px solid var(--t-onglets-bord); box-shadow: var(--t-onglets-ombre);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtre {
+  flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 30px; padding: 0 16px; border: 0; border-radius: 999px; background: none; box-shadow: none;
+  font: 600 13.5px/1 Inter, sans-serif; color: var(--t-ink2); cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color .18s ease, background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtre:hover { color: var(--t-ink); background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtre.on { background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .kn { font: 600 11px/1 "JetBrains Mono", ui-monospace, monospace; opacity: .62; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtre.on .kn { opacity: .78; }
+
+/* ── le corps : la barre du mois, la bande des mois ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-corps { padding: 16px 17px 20px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-barre { display: flex; align-items: center; justify-content: center; gap: 18px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-titre-mois {
+  margin: 0; min-width: 220px; text-align: center; font: 600 25px/1.2 "GN Poppins", sans-serif; letter-spacing: -.015em; color: var(--t-titre);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-fleche {
+  flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%;
+  border: 1px solid var(--t-voir-bord); background: var(--t-voir-bg); color: var(--t-voir-txt); text-decoration: none;
+  font: 700 19px/1 "GN Poppins", sans-serif; transition: background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal a.cal-fleche:hover { background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-fleche.off { opacity: .3; border-color: var(--t-tete-fil); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-annees { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 14px 0 18px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-annee { display: flex; align-items: center; gap: 4px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-an {
+  width: 46px; flex: none; font: 700 11px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; color: var(--t-ink3);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-m {
+  position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 26px; padding: 0 9px;
+  border-radius: 999px; border: 1px solid var(--t-pastille-bord); background: var(--t-pastille-bg); color: var(--t-ink2);
+  font: 600 12px/1 Inter, sans-serif; text-decoration: none; transition: background-color .18s ease, color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-m:hover { color: var(--t-ink); background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-m.vide { opacity: .42; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-m.on { background: var(--t-grad); color: var(--t-sur-acc); border-color: transparent; box-shadow: var(--t-acc-ombre); opacity: 1; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-m.maintenant::after {
+  content: ""; position: absolute; left: 50%; bottom: -5px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--t-acc);
+}
+
+/* ── la grille : du lundi au dimanche ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal :is(.cal-tete, .cal-grille) {
+  list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-tete { margin-bottom: 6px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-tete li {
+  padding: 0 10px; font: 700 10.5px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--t-ink3);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour {
+  min-width: 0; min-height: 118px; padding: 7px 6px 6px; border-radius: 12px;
+  border: 1px solid var(--t-tete-fil); background: rgba(255, 255, 255, .025);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour:not(.sans) { background: rgba(255, 255, 255, .045); border-color: rgba(255, 255, 255, .09); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.hors { border-color: transparent; background: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.hors .cal-n { opacity: .32; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.auj { border-color: var(--t-voir-bord); box-shadow: 0 0 0 1px var(--t-voir-bord), 0 0 34px -18px var(--t-acc-voile); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-date { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 4px; margin-bottom: 4px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-js { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-n { font: 600 13px/1 "GN Poppins", sans-serif; color: var(--t-ink2); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.passe .cal-n { color: var(--t-ink3); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.auj .cal-n {
+  display: grid; place-items: center; min-width: 24px; height: 24px; margin-left: -4px; padding: 0 5px; border-radius: 999px;
+  background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre);
+}
+
+/* ── une sortie : jaquette, titre (deux lignes), type et plateformes ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-sorties { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-s { margin: 0; padding: 0; min-width: 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-lien {
+  display: grid; grid-template-columns: 26px minmax(0, 1fr); align-items: center; gap: 7px; padding: 4px; border-radius: 8px;
+  color: var(--t-ink); text-decoration: none; transition: background-color .15s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-lien:hover { background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-lien:hover .cal-t { color: var(--t-acc-clair); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jaq {
+  display: block; width: 26px; height: 36px; border-radius: 5px; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .03)); box-shadow: inset 0 0 0 1px var(--t-vignette-bord);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jaq img { display: block; width: 100%; height: 100%; object-fit: cover; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-t {
+  font: 600 11.5px/1.25 Inter, sans-serif; color: var(--t-ink); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: color .15s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-meta {
+  font: 500 10px/1.2 Inter, sans-serif; color: var(--t-ink3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* filtre et « +N » (le script range les sorties en trop) */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal[data-filtre="anime"] .cal-s:not([data-type="anime"]),
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal[data-filtre="game"] .cal-s:not([data-type="game"]),
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-s.trop { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-plus {
+  display: block; width: calc(100% - 8px); margin: 4px 4px 0; height: 24px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--t-voir-bord); background: var(--t-voir-bg); color: var(--t-voir-txt);
+  font: 600 11px/1 Inter, sans-serif; transition: background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-plus:hover { background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-plus[hidden] { display: none; }
+
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal :is(.cal-aucune, .cal-rien) { display: none; }
+
+/* ── sous la grille : jour non annonce, prevus dans l'annee ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vagues { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague[hidden] { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague {
+  border-radius: 14px; border: 1px solid var(--t-pastille-bord); background: var(--t-pastille-bg); overflow: hidden;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague[open] { border-color: var(--t-voir-bord); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > summary {
+  display: flex; align-items: center; gap: 12px; padding: 11px 14px; cursor: pointer; list-style: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > summary::-webkit-details-marker { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > summary:hover { background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vt { flex: 1; min-width: 0; font: 600 14px/1.2 "GN Poppins", sans-serif; color: var(--t-titre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > summary .kn {
+  flex: none; min-width: 34px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--t-pastille-bord); text-align: center; color: var(--t-ink2); opacity: 1;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague[open] > summary .kn { background: var(--t-grad); color: var(--t-sur-acc); border-color: transparent; box-shadow: var(--t-acc-ombre); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > .cal-sorties {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 14px; padding: 8px 10px 10px; border-top: 1px solid var(--t-tete-fil);
+}
+
+/* ── les liens du bas (et ceux de la page 404) : pastilles du style « Voir plus » ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block:is(.cal, .perdu) :is(.cal-pied, .perdu-liens) { display: flex; flex-wrap: wrap; gap: 10px; margin: 18px 0 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-pied { justify-content: space-between; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block:is(.cal, .perdu) :is(.cal-pied, .perdu-liens) a {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 15px; border-radius: 999px; text-decoration: none;
+  background: var(--t-voir-bg); border: 1px solid var(--t-voir-bord); color: var(--t-voir-txt); font: 600 13px/1 Inter, sans-serif;
+  transition: background-color .18s ease;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block:is(.cal, .perdu) :is(.cal-pied, .perdu-liens) a:hover { background: var(--t-survol); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-pied a:only-child:last-child { margin-left: auto; }
+
+/* ── la page 404 : le meme panneau, un texte et les liens ── */
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.perdu { max-width: 760px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.perdu .perdu-corps { padding: 18px 17px 22px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.perdu .perdu-corps > p:first-child { margin: 0; font: 400 15px/1.6 Inter, sans-serif; color: var(--t-ink2); }
+
+/* ── tablette et telephone : l'agenda, un jour par ligne ── */
+@media (max-width: 760px) {
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtres { display: flex; width: 100%; margin-left: 0; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-filtre { flex: 1 1 0; padding: 0 8px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-corps { padding: 14px 12px 16px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-barre { gap: 12px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-titre-mois { min-width: 0; flex: 1; font-size: 20px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-annees {
+  flex-direction: row; align-items: center; gap: 14px; margin: 12px -12px 14px; padding: 2px 12px 8px; overflow-x: auto; scrollbar-width: none;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-annees::-webkit-scrollbar { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-an { width: auto; margin-right: 4px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-tete { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-grille { display: flex; flex-direction: column; gap: 8px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour:is(.hors, .sans, .vide) { display: none; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.auj:not(.hors) { display: grid; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.auj:is(.sans, .vide) .cal-aucune {
+  display: block; align-self: center; margin: 0; font: 500 13px/1.3 Inter, sans-serif; color: var(--t-ink3);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal.sans-jour .cal-rien {
+  display: block; margin: 0; padding: 14px 6px 4px; text-align: center; font: 500 13.5px/1.4 Inter, sans-serif; color: var(--t-ink3);
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 8px; min-height: 0; padding: 8px 8px 8px 6px;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-date {
+  flex-direction: column; justify-content: flex-start; gap: 4px; height: auto; margin: 4px 0 0; padding: 0;
+}
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-js { display: block; font: 700 9.5px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--t-ink3); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-n { font-size: 20px; color: var(--t-ink); }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jour.auj .cal-n { min-width: 34px; height: 30px; margin-left: 0; font-size: 17px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-lien { grid-template-columns: 36px minmax(0, 1fr); gap: 10px; padding: 5px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-jaq { width: 36px; height: 50px; border-radius: 6px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-t { font-size: 14px; line-height: 1.3; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-meta { font-size: 11.5px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-vague > .cal-sorties { grid-template-columns: minmax(0, 1fr); padding: 6px 6px 8px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.cal .cal-pied a { height: 30px; padding: 0 12px; font-size: 12.5px; }
+html[data-gn~="catalogue"] :is(body,#_):not(#_) .page-shell > .section-block.perdu .perdu-corps { padding: 14px 12px 18px; }
+}
+/* CALENDRIER-FIN */
+
+/* DATES-ANIMES-DEBUT : fiche au telephone, le bloc date prend toute la largeur, comme sur ordinateur
+   (l'echelle sous la date se tassait quand le titre et les pastilles sont courts). */
+@media (max-width: 640px) { .detail-header > .detail-info { align-self: stretch; } }
+/* DATES-ANIMES-FIN */

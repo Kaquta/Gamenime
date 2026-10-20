@@ -6,6 +6,7 @@
  * produites a chaque build, avec leur date de mise a jour.
  */
 import type { APIRoute } from "astro";
+import { moisDeLaFenetre } from "../lib/calendrier";
 
 const SITE = "https://gamenime.fr";
 const API = "https://gamenime.fr/api";
@@ -21,6 +22,8 @@ export const GET: APIRoute = async () => {
     { loc: `${SITE}/games/`, freq: "daily", prio: "0.9" },
     { loc: `${SITE}/upcoming/`, freq: "daily", prio: "0.9" },
   ];
+  // le calendrier des sorties : un mois par page, sur les 24 mois de la fenetre
+  const calendrier = moisDeLaFenetre().map((m) => ({ loc: `${SITE}/calendrier/${m}/`, freq: "daily", prio: "0.8" }));
 
   const fiches = items.map((it: { slug: string; type: string; updatedAt: string }) => ({
     // Barre oblique finale : nginx sert le dossier avec, et redirige sinon.
@@ -34,7 +37,7 @@ export const GET: APIRoute = async () => {
   const xml =
     '<?xml version="1.0" encoding="UTF-8"?>\n' +
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    [...statiques, ...fiches]
+    [...statiques, ...calendrier, ...fiches]
       .map(
         (u: any) =>
           `  <url><loc>${u.loc}</loc>` +

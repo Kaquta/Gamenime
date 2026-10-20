@@ -6,9 +6,12 @@ import "../styles/auth-user-menu.css";
 interface Props {
   title?: string;
   description?: string;
-  /** URL canonique de la page. Sans elle, toutes les pages declaraient
-   *  l'accueil comme canonique — Google aurait ignore les fiches. */
+  /** URL canonique de la page ; par defaut, l'adresse de la page elle-meme (avant le 15 octobre 2026 :
+   *  l'accueil, si bien que Google prenait Anime, Jeux, A venir et les pages annexes pour des copies de
+   *  l'accueil et ne les indexait pas). */
   canonical?: string;
+  /** Pages privees (connexion, compte, favoris...) et page 404 : « noindex, follow », sans canonique. */
+  noindex?: boolean;
   /** Image de partage : la jaquette sur une fiche, le visuel du site ailleurs. */
   image?: string;
   /** "video.tv_show" ou "video.other" sur une fiche, "website" ailleurs. */
@@ -24,12 +27,13 @@ interface Props {
 const {
   title = "GameNime",
   description = "Nouveautés animés et jeux vidéo : trailers, plateformes, dates.",
-  canonical = "https://gamenime.fr",
+  canonical = new URL(Astro.url.pathname, "https://gamenime.fr").href,
   image = "https://gamenime.fr/og-image.jpg?v=2",
   ogType = "website",
   accueil = false,
   catalogue = false,
   jetons = "",
+  noindex = false,
 } = Astro.props;
 // Design Encre · Noir et or (maquette validee le 4 octobre 2026) : les jetons
 // lus par le bloc « DESIGN-ENCRE » de global.css. L'accueil seul porte la
@@ -60,7 +64,7 @@ const gn = accueil ? "fond encre verre bleu vitre cameleon" : catalogue ? "fond 
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
-    <link rel="canonical" href={canonical} />
+    {noindex ? <meta name="robots" content="noindex, follow" /> : <link rel="canonical" href={canonical} />}
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />

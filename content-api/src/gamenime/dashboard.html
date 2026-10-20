@@ -693,6 +693,253 @@ html{scroll-behavior:smooth}
 .pub-log::-webkit-scrollbar-thumb{background:#242429;border-radius:4px}
 .pub-log:empty::before{content:"aucun journal";color:#47474f}
 </style>
+<style>
+/* === PILOTAGE : tous les modules automatiques, leurs interrupteurs, réglages et journal (patch Pilotage 1, d'après la maquette validée le 17 octobre 2026) ===
+   Classes pil-* seulement ; reprend les couleurs du dashboard : fond #0d0d0f, bords #232328, texte #f5f2ee,
+   gris #8c8c92, or #d9a978 / #ffe8c0, vert #30d16c, ambre #ff9f0a, rouge #ff453a, n8n #7b8cff. Aucun flou. */
+
+/* bandeau d'état du pilotage */
+.pil-band{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px 18px;padding:16px 20px;border-radius:18px;margin-bottom:16px;
+  border:1px solid #242429;background:linear-gradient(180deg,rgba(20,20,24,.92),rgba(11,11,14,.88))}
+.pil-band.pause{border-color:rgba(255,159,10,.4);background:#16120a}
+.pil-band-t{min-width:0}
+.pil-band>.pil-bt{grid-column:2;grid-row:1/span 2}
+.pil-band-t b{display:block;font-size:1rem;font-weight:700;color:#f5f2ee;line-height:1.35}
+.pil-band.pause .pil-band-t b{color:#ffc88c}
+.pil-band-t span{display:block;margin-top:4px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;color:#6b6b74;line-height:1.5}
+.pil-cpt{display:flex;gap:6px;flex-wrap:wrap;grid-column:1}
+.pil-cpt .gn-bg{cursor:pointer}
+.pil-bt{padding:8px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:.77rem;font-family:inherit;
+  border:1px solid transparent;transition:.16s;white-space:nowrap}
+.pil-bt:focus-visible,.pil-ic:focus-visible,.pil-sw:focus-visible,.pil-ligne:focus-visible{outline:2px solid #d9a978;outline-offset:2px}
+.pil-bt-go{background:#30d16c;color:#04120a;border-color:#30d16c}
+.pil-bt-or{background:linear-gradient(135deg,#ffe8c0,#d9a978);color:#160d04;border-color:#ffe8c0}
+.pil-bt-stop{background:transparent;color:#ff7a70;border-color:rgba(255,69,58,.45)}
+.pil-bt-stop:hover{background:rgba(255,69,58,.1)}
+.pil-bt-neutre{background:#1a1a1f;color:#d9a978;border-color:#232328}
+.pil-bt-neutre:hover{border-color:#3a3a42}
+.pil-bt:hover:not(:disabled){filter:brightness(1.07)}
+.pil-bt:disabled{background:transparent;border-color:#242429;color:#6b6b74;cursor:not-allowed;filter:none}
+
+/* filtres (reprennent .gc-tools, .gc-input, .gc-chips, .gc-chip) */
+.pil-filtres{margin-bottom:4px}
+
+/* famille de modules */
+.pil-fam{margin-bottom:6px}
+.pil-fam .sec-title{margin:22px 0 12px}
+.pil-fam .sec-title i{font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:700;color:#47474f;letter-spacing:0}
+.pil-fam-sous{font-size:.74rem;color:#6b6b74;margin:-6px 0 12px 2px}
+
+/* états : couleur du filet */
+.pil-ok{--pil-c:#30d16c}
+.pil-run{--pil-c:#d9a978}
+.pil-err{--pil-c:#ff453a}
+.pil-off{--pil-c:#3a3a42}
+.pil-wait{--pil-c:#6b6b74}
+.pil-ext{--pil-c:#7b8cff}
+
+/* A · lignes */
+.pil-liste{display:flex;flex-direction:column;gap:8px}
+.pil-ligne{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px 16px;
+  padding:12px 14px 12px 22px;border-radius:14px;background:#0d0d0f;border:1px solid #1d1d22;cursor:pointer;
+  transition:border-color .18s,background .18s;text-align:left;color:inherit;font:inherit;width:100%}
+.pil-ligne:hover{border-color:#2c2c34;background:#101013}
+.pil-ligne::before,.pil-carte::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:2px;background:var(--pil-c)}
+.pil-ligne.pil-err,.pil-carte.pil-err{border-color:rgba(255,69,58,.4);background:#140a0b}
+.pil-ligne.pil-off .pil-nom,.pil-carte.pil-off .pil-nom{color:#9b9ba3}
+.pil-tete,.pil-info{min-width:0}
+.pil-meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:3px 16px;margin-top:7px}
+.pil-meta .pil-quand{flex:1 1 auto}
+.pil-meta .pil-proch{margin-left:auto;white-space:nowrap}
+.pil-nom{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:.9rem;font-weight:700;color:#f5f2ee;line-height:1.3}
+.pil-role{font-size:.75rem;color:#8c8c92;margin-top:2px;line-height:1.45}
+.pil-alerte{font-size:.74rem;color:#ff9696;margin-top:3px;line-height:1.4}
+.pil-pt{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:7px;vertical-align:1px;background:#30d16c}
+.pil-pt.m{background:#ff9f0a}
+.pil-pt.k{background:#ff453a}
+.pil-pt.n{background:#47474f}
+.pil-pt.r{background:#d9a978;animation:gnbat 1.1s ease-in-out infinite}
+.pil-quand,.pil-proch{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;line-height:1.55;color:#6b6b74;min-width:0}
+.pil-quand b,.pil-proch b{font-weight:400;color:#9b9ba3}
+.pil-quand .r{color:#b8b3ad;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:.76rem}
+.pil-quand .p{color:#ffe8c0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;font-size:.76rem}
+.pil-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.pil-sw-z{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.pil-sou{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;color:#7b8cff;padding:3px 8px;border-radius:999px;
+  border:1px solid rgba(123,140,255,.32);background:rgba(123,140,255,.08);white-space:nowrap}
+
+/* interrupteur */
+.pil-sw{position:relative;width:38px;height:22px;flex:none;border-radius:999px;border:1px solid #33333a;background:#1a1a1f;cursor:pointer;padding:0;transition:background .18s,border-color .18s}
+.pil-sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#6b6b74;transition:transform .2s cubic-bezier(.4,0,.2,1),background .18s}
+.pil-sw[aria-checked="true"]{background:#30d16c;border-color:#30d16c}
+.pil-sw[aria-checked="true"]::after{transform:translateX(16px);background:#04120a}
+.pil-sw:disabled{opacity:.35;cursor:not-allowed}
+.pil-swl{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.68rem;color:#6b6b74;min-width:3.6em}
+.pil-swl.on{color:#5fe08f}
+
+/* boutons ronds : lancer, détails */
+.pil-ic{width:32px;height:32px;flex:none;display:grid;place-items:center;border-radius:50%;border:1px solid #2c2c34;background:#121216;color:#ffe8c0;
+  cursor:pointer;font-size:.72rem;padding:0;transition:border-color .18s,background .18s}
+.pil-ic:hover:not(:disabled){border-color:#d9a978;background:#1a1610}
+.pil-ic:disabled{color:#47474f;cursor:not-allowed}
+.pil-ic svg{width:15px;height:15px}
+.pil-ic.tourne{border-color:rgba(217,169,120,.5)}
+.pil-ic.tourne::after{content:"";width:14px;height:14px;border-radius:50%;border:2px solid rgba(217,169,120,.25);border-top-color:#d9a978;animation:pilrond .8s linear infinite}
+.pil-ic.tourne span{display:none}
+@keyframes pilrond{to{transform:rotate(360deg)}}
+
+/* B · cartes */
+.pil-grille{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pil-carte{position:relative;display:flex;flex-direction:column;gap:10px;padding:15px 15px 14px 21px;border-radius:12px;background:#0d0d0f;border:1px solid #232328;cursor:pointer;
+  transition:border-color .18s,background .18s}
+.pil-carte:hover{border-color:#2c2c34;background:#101013}
+.pil-carte-h{display:flex;align-items:flex-start;gap:10px}
+.pil-carte-h .pil-nom{flex:1;min-width:0}
+.pil-carte .pil-role{margin-top:-4px}
+.pil-gros{display:flex;align-items:baseline;gap:7px;min-height:1.9rem}
+.pil-gros b{font-size:1.55rem;font-weight:700;color:#f5f2ee;font-variant-numeric:tabular-nums;line-height:1}
+.pil-gros span{font-size:.74rem;color:#8c8c92}
+.pil-carte .pil-quand{display:block}
+.pil-carte .pil-quand span.n{display:block}
+.pil-carte-b{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:auto}
+.pil-carte-b .pil-bt{padding:7px 14px;display:inline-flex;align-items:center;gap:6px}
+.pil-carte-b .pil-bt svg{width:13px;height:13px}
+
+/* tiroir de détail */
+.pil-voile{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:1003;opacity:0;pointer-events:none;transition:opacity .25s ease}
+.pil-voile.ouvert{opacity:1;pointer-events:auto}
+.pil-tiroir{position:fixed;top:0;right:0;width:480px;max-width:100vw;height:100%;z-index:1004;background:#0f0f14;border-left:1px solid #2c2c34;
+  transform:translateX(105%);transition:transform .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.pil-tiroir.ouvert{transform:translateX(0)}
+.pil-t-tete{display:flex;align-items:flex-start;gap:12px;padding:20px 22px 14px;border-bottom:1px solid #2c2c34;
+  padding-top:max(20px,env(safe-area-inset-top,0px))}
+.pil-t-tete .pil-tete{flex:1}
+.pil-t-tete .pil-nom{font-size:1.02rem;color:#ffe8c0}
+.pil-t-tete .pil-role{white-space:normal}
+.pil-fermer{background:none;border:none;color:#8a8580;cursor:pointer;font-size:22px;line-height:1;padding:2px 4px}
+.pil-fermer:hover{color:#ffe8c0}
+.pil-t-corps{flex:1;overflow-y:auto;padding:18px 22px max(28px,env(safe-area-inset-bottom,0px))}
+.pil-bloc{margin-bottom:24px}
+.pil-bloc-t{display:flex;align-items:baseline;gap:10px;font-size:11px;color:#8a8580;letter-spacing:.6px;font-weight:700;text-transform:uppercase;margin-bottom:10px}
+.pil-bloc-t i{font-style:normal;font-weight:400;letter-spacing:0;text-transform:none;font-family:ui-monospace,"SF Mono",Menlo,monospace;color:#47474f}
+.pil-etat{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:#0b0b0e;border:1px solid #1d1d22}
+.pil-etat p{flex:1;font-size:.8rem;line-height:1.5;color:#b8b3ad}
+.pil-etat p b{color:#f5f2ee}
+.pil-kv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 14px;font-size:.8rem}
+.pil-kv dt{color:#8c8c92;max-width:11rem}
+.pil-kv dd{margin:0;color:#f5f2ee;text-align:right;font-variant-numeric:tabular-nums}
+.pil-kv dd.ko{color:#ff7a70}
+.pil-boutons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.pil-note{font-size:.74rem;line-height:1.5;color:#6b6b74;margin-top:9px}
+
+/* réglages */
+.pil-champ{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 12px;padding:10px 0;border-bottom:1px solid #18181d}
+.pil-champ:last-of-type{border-bottom:none}
+.pil-champ label{font-size:.8rem;color:#f5f2ee}
+.pil-champ small{grid-column:1/-1;font-size:.7rem;color:#6b6b74;line-height:1.45}
+.pil-saisie{display:flex;align-items:center;gap:7px}
+.pil-saisie input{width:6.2rem;padding:7px 10px;border-radius:8px;background:#000;border:1px solid #33333a;color:#f5f2ee;font:inherit;font-size:.84rem;text-align:right;font-variant-numeric:tabular-nums}
+.pil-saisie input[type="text"]{width:11.5rem;text-align:left}
+.pil-saisie input:focus{outline:none;border-color:#d9a978}
+.pil-saisie input.change{border-color:#d9a978;background:#140f08;color:#ffe8c0}
+.pil-saisie input.faux{border-color:#ff453a}
+.pil-saisie span{font-size:.74rem;color:#8c8c92;width:3.4em}
+
+/* historique des passages */
+.pil-histo{display:flex;align-items:flex-end;gap:3px;height:56px;padding:6px 0 0;border-bottom:1px solid #1d1d22}
+.pil-histo i{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:#30d16c;opacity:.85}
+.pil-histo i.m{background:#ff9f0a}
+.pil-histo i.k{background:#ff453a}
+.pil-histo i.n{background:#2c2c34;height:4px!important}
+.pil-histo-l{display:flex;justify-content:space-between;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;color:#47474f;margin-top:5px}
+.pil-passages{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.pil-passages div{display:grid;grid-template-columns:5.6rem minmax(0,1fr) auto;gap:10px;font-size:.76rem;color:#b8b3ad}
+.pil-passages span{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;color:#6b6b74}
+.pil-passages em{font-style:normal;color:#5fe08f;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem}
+.pil-passages em.m{color:#ffba4d}
+.pil-passages em.k{color:#ff7a70}
+
+/* données propres au module */
+.pil-rangs{display:flex;flex-direction:column}
+.pil-rangs div{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid #16161b;font-size:.8rem}
+.pil-rangs b{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.74rem;color:#d9a978;text-align:right}
+.pil-rangs span{color:#f5f2ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pil-rangs em{font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;color:#6b6b74}
+
+/* jauges (quotas) */
+.pil-jauge{height:6px;border-radius:999px;background:#1d1d22;overflow:hidden;margin-top:8px}
+.pil-jauge i{display:block;height:100%;border-radius:999px;background:#30d16c}
+.pil-jauge i.m{background:#ff9f0a}
+.pil-jauge i.k{background:#ff453a}
+.pil-jauge-l{display:flex;justify-content:space-between;gap:10px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;color:#6b6b74;margin-top:5px}
+
+/* services et quotas (reprennent .health-grid, .hcard) */
+.pil-serv .hcard-main{align-items:flex-start}
+.pil-serv .hcard-dot{margin-top:5px}
+.pil-serv .hcard.off .hcard-stripe,.pil-serv .hcard.off .hcard-dot{background:#3a3a42}
+.pil-serv .hcard.off .hcard-badge{background:#1d1d22;color:#8c8c92}
+.pil-serv .hcard.warn .hcard-badge{background:rgba(255,159,10,.18);color:#ffba4d}
+.pil-serv .hcard.crit .hcard-badge{background:rgba(255,69,58,.18);color:#ff7a70}
+
+/* journal */
+.pil-jour{border:1px solid #1d1d22;border-radius:14px;background:#0b0b0e;overflow:hidden}
+.pil-jour-l{display:grid;grid-template-columns:4.4rem 4.6rem minmax(0,1fr);gap:12px;align-items:baseline;padding:10px 16px;border-bottom:1px solid #141418;font-size:.8rem;line-height:1.45}
+.pil-jour-l:last-child{border-bottom:none}
+.pil-jour-l time{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;color:#6b6b74;font-variant-numeric:tabular-nums}
+.pil-jour-l .qui{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.68rem;color:#9b9ba3}
+.pil-jour-l .qui.rey{color:#ffe8c0}
+.pil-jour-l .qui.patch{color:#7b8cff}
+.pil-jour-l p{color:#d6d2cc;min-width:0}
+.pil-jour-l p b{font-weight:650;color:#f5f2ee}
+.pil-jour-l p span{color:#8c8c92}
+.pil-jour-l.err p{color:#ff9696}
+.pil-jour-l.ok p span{color:#5fe08f}
+.pil-vide{padding:18px 16px;font-size:.8rem;color:#6b6b74}
+
+/* message après un geste (même allure que .bi-toast, invisible au repos) */
+.pil-toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translate(-50%,160%);visibility:hidden;
+  background:linear-gradient(160deg,#43e28f,#22a855);color:#022417;font-size:12px;font-weight:800;padding:11px 18px;border-radius:11px;
+  z-index:1010;max-width:92vw;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.5);transition:transform .3s ease,visibility 0s linear .3s}
+.pil-toast.show{transform:translate(-50%,0);visibility:visible;transition:transform .3s ease}
+.pil-toast.err{background:linear-gradient(160deg,#ffb340,#e08a10);color:#231a04}
+
+/* boîte de confirmation */
+.pil-dlg-voile{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1006;display:grid;place-items:center;padding:20px;
+  padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.pil-dlg{width:100%;max-width:440px;border-radius:18px;background:#121216;border:1px solid #2c2c34;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.pil-dlg h3{font-size:1rem;font-weight:700;color:#f5f2ee;margin-bottom:10px;line-height:1.35;text-wrap:balance}
+.pil-dlg p{font-size:.84rem;line-height:1.55;color:#b8b3ad;margin-bottom:8px}
+.pil-dlg p b{color:#f5f2ee}
+.pil-dlg .pil-boutons{justify-content:flex-end;margin-top:18px}
+
+@media (max-width:900px){
+  .pil-grille{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .pil-band{grid-template-columns:1fr;padding:14px 16px}
+  .pil-band>.pil-bt{grid-column:1;grid-row:auto;justify-self:start}
+  .pil-ligne{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"i i" "s a";gap:10px 12px;padding:12px 14px 12px 20px}
+  .pil-ligne .pil-info{grid-area:i}
+  .pil-ligne .pil-sw-z{grid-area:s;justify-content:flex-start}
+  .pil-ligne .pil-act{grid-area:a}
+  .pil-meta .pil-proch{margin-left:0}
+  .pil-grille{grid-template-columns:1fr}
+  .pil-tiroir{width:100vw;border-left:none}
+  .pil-jour-l{grid-template-columns:3.9rem minmax(0,1fr);gap:4px 10px}
+  .pil-jour-l .qui{grid-column:2;grid-row:1}
+  .pil-jour-l p{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){
+  .pil-tiroir,.pil-voile,.pil-sw,.pil-sw::after{transition:none}
+  .pil-ic.tourne::after{animation-duration:2.4s}
+}
+.pil-anc{scroll-margin-top:calc(var(--gn-top,60px) + 60px)}
+@media (max-width:900px){.pil-anc{scroll-margin-top:calc(var(--gn-top,60px) + 106px)}}
+/* Process : le renvoi vers Pilotage */
+.proc-note{font-size:.76rem;color:#8c8c92;margin:0 2px 14px;line-height:1.55}
+.proc-note a{color:#d9a978;text-decoration:none;border-bottom:1px solid rgba(217,169,120,.35)}
+.proc-note a:hover{color:#ffe8c0}
+</style>
 <body>
 <div class="wrap">
   <div class="top">
@@ -717,6 +964,10 @@ html{scroll-behavior:smooth}
   <nav class="gn-idx" id="gn-idx">
     <div class="gn-idx-t">Dashboard</div>
     <a class="gn-ix ici" href="#page-surveillance"><span class="jauge"></span><span class="n">Surveillance</span></a>
+    <a class="gn-ix" href="#page-pilotage"><span class="jauge"></span><span class="n">Pilotage</span><span class="gn-bg" id="pil-bg-idx">&mdash;</span></a>
+    <a class="gn-ix sous" href="#pil-modules"><span class="n">Modules</span></a>
+    <a class="gn-ix sous" href="#pil-services"><span class="n">Services et quotas</span></a>
+    <a class="gn-ix sous" href="#pil-journal"><span class="n">Journal</span></a>
     <a class="gn-ix" href="#page-traffic"><span class="jauge"></span><span class="n">Audience</span></a>
     <a class="gn-ix" href="#page-admin"><span class="jauge"></span><span class="n">Administration</span></a>
     <a class="gn-ix" href="#page-publication"><span class="jauge"></span><span class="n">Publication</span><span class="gn-bg" id="pub-bg-idx">—</span></a>
@@ -741,6 +992,35 @@ html{scroll-behavior:smooth}
       <div class="empty">Chargement...</div>
     </div>
   </div>
+
+    <!-- ═══ PILOTAGE : les modules automatiques, leurs interrupteurs, réglages et journal ═══ -->
+    <section class="gn-anc" id="page-pilotage">
+      <div class="gn-st"><h2>Pilotage</h2><em>modules, services, journal</em>
+        <span class="gn-sp"></span><span class="gn-bg" id="pil-bg">&mdash;</span></div>
+      <div id="pil-zone">
+        <div class="pil-band" id="pil-band"></div>
+        <div class="pil-anc" id="pil-modules">
+          <div class="gc-tools pil-filtres"><input class="gc-input" id="pil-cherche" type="search" placeholder="Rechercher un module…" aria-label="Rechercher un module" autocomplete="off"></div>
+          <div class="gc-chips" id="pil-puces"></div>
+          <div id="pil-mods"></div>
+        </div>
+        <div class="pil-anc" id="pil-services">
+          <div class="sec-title">Services et quotas</div>
+          <div class="health-grid pil-serv" id="pil-serv"></div>
+        </div>
+        <div class="pil-anc" id="pil-journal">
+          <div class="sec-title">Journal</div>
+          <div class="gc-chips" id="pil-jpuces"></div>
+          <div class="pil-jour" id="pil-jour"></div>
+        </div>
+      </div>
+    </section>
+    <div class="pil-voile" id="pil-voile"></div>
+    <aside class="pil-tiroir" id="pil-tiroir" role="dialog" aria-modal="true" aria-labelledby="pil-t-titre" aria-hidden="true">
+      <div class="pil-t-tete" id="pil-t-tete"></div>
+      <div class="pil-t-corps" id="pil-t-corps"></div>
+    </aside>
+    <div class="pil-toast" id="pil-toast" role="status" aria-live="polite"></div>
 
   <!-- ═══ PAGE TRAFIC ═══ -->
   <div class="page" id="page-traffic">
@@ -833,45 +1113,16 @@ html{scroll-behavior:smooth}
       <div class="adm-head">
         <span class="adm-chevron">▼</span>
         <span class="adm-title">Process — Lancement manuel</span>
-        <span class="adm-count">7</span>
+        <span class="adm-count">3</span>
       </div>
       <div class="adm-body">
+        <div class="proc-note">Les cycles automatiques (Phase B, Phase C, Contrôle J-7, doublons) se lancent et se coupent maintenant depuis <a href="#page-pilotage">Pilotage</a>. Ici, les outils ponctuels.</div>
         <div class="proc-grid">
-          <div class="proc-card">
-            <div class="proc-stripe" style="background:#30d16c"></div>
-            <div class="proc-name">Phase B Anime</div>
-            <div class="proc-desc">Refetch cover, plateforme, trailer, description</div>
-            <button class="proc-launch" style="background:#30d16c" onclick="lancerProcess(this,'refetch-incomplete','Phase B Anime')">▶ Lancer</button>
-          </div>
-          <div class="proc-card">
-            <div class="proc-stripe" style="background:#30d16c"></div>
-            <div class="proc-name">Phase B Jeux</div>
-            <div class="proc-desc">Refetch cover, description, rating (RAWG/IGDB)</div>
-            <button class="proc-launch" style="background:#30d16c" onclick="lancerProcess(this,'refetch-incomplete-games','Phase B Jeux')">▶ Lancer</button>
-          </div>
           <div class="proc-card">
             <div class="proc-stripe" style="background:#e24b4a"></div>
             <div class="proc-name">Refetch YouTube (sortis)</div>
-            <div class="proc-desc">Rattrape les animes deja sortis avec YouTube seul (via Jikan)</div>
+            <div class="proc-desc">Rattrape les animes deja sortis avec YouTube seul (via AniList)</div>
             <button class="proc-launch" style="background:#e24b4a" onclick="lancerProcess(this,'refetch-youtube-released','Refetch YouTube sortis')">▶ Lancer</button>
-          </div>
-          <div class="proc-card">
-            <div class="proc-stripe" style="background:#7b8cff"></div>
-            <div class="proc-name">Phase C Anime</div>
-            <div class="proc-desc">Lookup AniList par titre (IDs manquants)</div>
-            <button class="proc-launch" style="background:#7b8cff" onclick="lancerProcess(this,'lookup-anilist-ids','Phase C Anime')">▶ Lancer</button>
-          </div>
-          <div class="proc-card">
-            <div class="proc-stripe" style="background:#ff9f0a"></div>
-            <div class="proc-name">Quality Check J-7</div>
-            <div class="proc-desc">Scan agressif des sorties imminentes</div>
-            <button class="proc-launch" style="background:#ff9f0a" onclick="lancerProcess(this,'quality-check-j7','Quality Check J-7')">▶ Lancer</button>
-          </div>
-          <div class="proc-card">
-            <div class="proc-stripe" style="background:#d96aff"></div>
-            <div class="proc-name">Auto-Merge</div>
-            <div class="proc-desc">Détecte + fusionne les doublons</div>
-            <button class="proc-launch" style="background:#d96aff" onclick="lancerMerge(this)">▶ Lancer</button>
           </div>
           <div class="proc-card">
             <div class="proc-stripe" style="background:#ff453a"></div>
@@ -1108,7 +1359,7 @@ html{scroll-behavior:smooth}
     { key: "trailer_url", label: "Trailer",     src: "trailerUrl" },
     { key: "description", label: "Description", src: "description" }
   ];
-  function biSrcNames(type) { return type === "anime" ? ["anilist", "jikan"] : ["rawg", "igdb"]; }
+  function biSrcNames(type) { return type === "anime" ? ["anilist", "kitsu"] : ["rawg", "igdb"]; }
   function biEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function biShort(s, n) { s = String(s == null ? "" : s); return s.length > n ? s.slice(0, n) + "..." : s; }
   function biYtId(u) { var m = String(u || "").match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{6,})/); return m ? m[1] : null; }
@@ -1614,7 +1865,9 @@ html{scroll-behavior:smooth}
 
     // Sante des sources externes (health check quotidien - vrais pings API)
     var srcHealth = m.sourceHealth || [];
-    var srcLabels = { rawg: "RAWG", igdb: "IGDB", anilist: "AniList", jikan: "Jikan", animeschedule: "AnimeSchedule" };
+    var srcLabels = { rawg: "RAWG", igdb: "IGDB", anilist: "AniList", kitsu: "Kitsu", animeschedule: "AnimeSchedule" };
+    // Sources sans cle : rien a verifier de notre cote, la Phase B reessaie a chaque passage.
+    var srcSansCle = { anilist: true, kitsu: true };
     srcHealth.forEach(function(s) {
       var label = srcLabels[s.source] || s.source;
       var checkAge = s.lastCheck ? (Date.now() - s.lastCheck) / 3600000 : null;
@@ -1625,7 +1878,9 @@ html{scroll-behavior:smooth}
             + (s.lastOk ? " · en panne depuis " + gnDuree(Date.now() - s.lastOk) : " · jamais vue répondre")
             + " · " + ageStr,
           cause: "L'API " + label + " ne répond plus (" + (s.errorMsg || "erreur") + "). " + (s.httpCode === 401 ? "401 = quota épuisé ou clé invalide." : (s.httpCode === 429 ? "429 = rate limit atteint." : "Vérifier la source.")),
-          fix: label === "RAWG" ? "Vérifier le quota RAWG sur rawg.io (reset le 10 du mois) ou régénérer la clé." : "Vérifier la clé/token de " + label + " et son quota." });
+          fix: label === "RAWG" ? "Vérifier le quota RAWG sur rawg.io (reset le 10 du mois) ou régénérer la clé."
+            : (srcSansCle[s.source] ? label + " ne demande pas de clé : la panne vient de chez eux. Les fiches gardent leurs données ; la Phase B réessaie à chaque passage."
+            : "Vérifier la clé/token de " + label + " et son quota.") });
       } else if (s.lookupWarn) {
         // Pas de fenetre de temps : une alerte non resolue se voit tant qu'elle
         // dure. Elle s'efface d'elle-meme cote serveur des qu'un appel IGDB
@@ -2224,16 +2479,19 @@ html{scroll-behavior:smooth}
     try {
       var res = await fetch("/dashboard/admin/find-duplicates");
       var data = await res.json();
+      if (!res.ok) { consoleLine("  ✗ " + (data.msg || data.error || ("HTTP " + res.status)), "err"); return; }
       var groups = data.groups || data.duplicates || [];
       var n = Array.isArray(groups) ? groups.length : (data.count || data.total || 0);
       if (!n) { consoleLine("  ✓ Aucun doublon détecté", "ok"); return; }
       consoleLine("  ⚠ " + n + " groupe(s) de doublons :", "warn");
       if (Array.isArray(groups)) {
-        groups.slice(0, 12).forEach(function(g) {
-          var ids = (g.ids || g.items || g.members || []);
-          var idStr = Array.isArray(ids) ? ids.map(function(x){return (typeof x==="object"?x.id:x);}).join(", ") : "";
-          consoleLine("    • " + (g.title || g.normalizedTitle || "groupe") + " → #" + idStr, "info");
+        // l'API rend winner (la fiche gardée) et toMerge (celles qu'une fusion supprimerait)
+        groups.slice(0, 25).forEach(function(g) {
+          var w = g.winner || {};
+          var autres = (g.toMerge || g.ids || g.items || g.members || []).map(function(x){ return (typeof x === "object") ? "#" + x.id + " " + (x.title || "") : "#" + x; });
+          consoleLine("    • " + (g.type === "game" ? "jeu" : "animé") + " : garde #" + (w.id != null ? w.id : "?") + " " + (w.title || g.title || "") + " → supprimerait " + autres.join(", "), "info");
         });
+        if (groups.length > 25) consoleLine("    … et " + (groups.length - 25) + " autre(s)", "info");
       }
     } catch (err) { consoleLine("  ✗ " + err.message, "err"); }
   }
@@ -2586,6 +2844,561 @@ window.addEventListener("load", function () {
     }
     setTimeout(maj, 1000);
   });
+})();
+</script>
+<script>
+/* PILOTAGE : rendu et gestes du bloc (patch Pilotage 1, d'après la maquette validée le 17 octobre 2026).
+   Source des données : window.PIL_SOURCE.lire() rend { maintenant, pause, familles, modules, services, journal } ;
+   les gestes passent par PIL_SOURCE.basculer(id, actif), .lancer(id), .regler(id, valeurs), .pause(oui).
+   PIL_SOURCE (plus bas) lit /dashboard/admin/pilotage et le relit seule ; window.pilRendre redessine après chaque lecture. */
+(function () {
+  "use strict";
+  var D = null, chargeLe = Date.now();
+  var variante = "A", filtre = "tous", texte = "", jfiltre = "tout", ouvert = null;
+  var ROUE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+  var fmtH = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit" });
+  var fmtJ = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "long" });
+  var fmtD = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" });
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var minus = function (s) { return s.charAt(0).toLowerCase() + s.slice(1); };
+  var nombre = function (n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ").replace(".", ","); };
+
+  // ─── temps
+  // l'heure du serveur à la dernière lecture (recuLe : posé par PIL_SOURCE à chaque relecture), plus le temps écoulé depuis
+  function maint() { return Date.parse(D.maintenant) + (Date.now() - (D.recuLe || chargeLe)); }
+  function jour(ms) { return Date.parse(fmtD.format(new Date(ms)) + "T00:00:00Z") / 86400000; }
+  function rel(iso) {
+    if (!iso) return "—";
+    var ms = Date.parse(iso), d = ms - maint(), min = Math.round(Math.abs(d) / 60000), h = fmtH.format(new Date(ms));
+    if (min < 1) return d < 0 ? "à l'instant" : "dans un instant";
+    if (min < 60) return (d < 0 ? "il y a " : "dans ") + min + " min";
+    if (min < 360) return (d < 0 ? "il y a " : "dans ") + Math.floor(min / 60) + " h " + String(min % 60).padStart(2, "0");
+    var dj = jour(ms) - jour(maint());
+    if (dj === 0) return (d < 0 ? "aujourd'hui à " : "à ") + h;
+    if (dj === -1) return "hier à " + h;
+    if (dj === 1) return "demain à " + h;
+    return d < 0 ? "il y a " + Math.round(-dj) + " j" : "le " + fmtJ.format(new Date(ms));
+  }
+  function duree(s) {
+    if (s == null) return "";
+    if (s < 60) return Math.max(1, Math.round(s)) + " s";
+    if (s < 3600) return Math.floor(s / 60) + " min " + String(Math.round(s % 60)).padStart(2, "0");
+    return Math.floor(s / 3600) + " h " + String(Math.round((s % 3600) / 60)).padStart(2, "0");
+  }
+
+  // ─── état affiché d'un module (la pause générale l'emporte sur les modules de l'API)
+  function etat(m) {
+    if (D.pause && m.pausable && m.etat !== "off") return { c: "off", b: '<span class="gn-bg amb">en pause</span>', t: "en pause" };
+    switch (m.etat) {
+      case "run": return { c: "run", b: '<span class="gn-bg run">en cours</span>', t: "en cours" };
+      case "err": return { c: "err", b: '<span class="gn-bg ko">erreur</span>', t: "en erreur" };
+      case "off": return { c: "off", b: '<span class="gn-bg">coupé</span>', t: "coupé" };
+      case "wait": return { c: "wait", b: '<span class="gn-bg">' + esc(m.etatTexte || "en attente") + "</span>", t: m.etatTexte || "en attente" };
+      case "ext": return { c: "ext", b: "", t: "piloté par n8n" };
+      default: return { c: "ok", b: "", t: "actif" };
+    }
+  }
+  function pt(nv) { return '<span class="pil-pt ' + (nv || "o") + '"></span>'; }
+  function quand(m, court) {
+    if (m.etat === "run" && m.encours) {
+      return '<span class="p">' + pt("r") + "en cours depuis " + esc(rel(m.encours.depuis).replace("il y a ", "")) +
+        (court || !m.encours.avance ? "" : " · " + esc(m.encours.avance)) + "</span>";
+    }
+    if (!m.dernier) return "<b>" + (m.src === "n8n" ? "aucun appel reçu pour l'instant" : "jamais lancé") + "</b>";
+    return pt(m.dernier.nv) + "<b>" + esc(rel(m.dernier.fin)) + "</b>" + (m.dernier.duree ? " · " + esc(duree(m.dernier.duree)) : "") +
+      (court ? "" : ' · <span class="r">' + esc(m.dernier.res) + "</span>");
+  }
+  function proch(m) {
+    var e = etat(m);
+    if (e.c === "off") return "<b>" + esc(e.t) + "</b>";
+    if (!m.prochain) return "";
+    return "prochain " + (m.src === "n8n" ? "≈ " : "") + "<b>" + esc(rel(m.prochain)) + "</b>";
+  }
+  function inter(m, seul) {
+    if (m.sw === null || m.sw === undefined) return '<span class="pil-sou">' + (m.src === "n8n" ? "n8n" : "serveur") + "</span>";
+    var on = !!m.sw;
+    return (seul ? "" : '<span class="pil-swl' + (on ? " on" : "") + '">' + (on ? "actif" : "coupé") + "</span>") +
+      '<button type="button" class="pil-sw" role="switch" aria-checked="' + on + '" data-act="sw" data-id="' + esc(m.id) + '" aria-label="' +
+      (on ? "Couper " : "Rallumer ") + esc(m.nom) + '"' + (D.pause ? " disabled" : "") + "></button>";
+  }
+  function btLancer(m) {
+    if (m.etat === "run") return '<button type="button" class="pil-ic tourne" disabled aria-label="Passage en cours"><span>▶</span></button>';
+    if (!m.lancer) return '<button type="button" class="pil-ic" disabled aria-label="' + esc(m.sansLancer || "Se lance depuis n8n") + '" title="' + esc(m.sansLancer || "Se lance depuis n8n") + '"><span>▶</span></button>';
+    return '<button type="button" class="pil-ic" data-act="lancer" data-id="' + esc(m.id) + '" aria-label="Lancer ' + esc(m.nom) + ' maintenant" title="Lancer maintenant"><span>▶</span></button>';
+  }
+  function btDetails(m) {
+    return '<button type="button" class="pil-ic" data-act="ouvrir" data-id="' + esc(m.id) + '" aria-label="Détails et réglages de ' + esc(m.nom) + '" title="Détails et réglages">' + ROUE + "</button>";
+  }
+
+  // ─── A · lignes, B · cartes
+  function ligne(m) {
+    var e = etat(m);
+    return '<div class="pil-ligne pil-' + e.c + '" data-id="' + esc(m.id) + '">' +
+      '<div class="pil-info"><div class="pil-nom">' + esc(m.nom) + e.b + '</div><div class="pil-role">' + esc(m.role) + "</div>" +
+      (m.alerte && !D.pause ? '<div class="pil-alerte">' + esc(m.alerte) + "</div>" : "") +
+      '<div class="pil-meta"><span class="pil-quand">' + quand(m) + '</span><span class="pil-proch">' + proch(m) + "</span></div></div>" +
+      '<div class="pil-sw-z">' + inter(m) + "</div>" +
+      '<div class="pil-act">' + btLancer(m) + btDetails(m) + "</div></div>";
+  }
+  function carte(m) {
+    var e = etat(m), run = m.etat === "run";
+    var bl = !m.lancer ? "" : '<button type="button" class="pil-bt pil-bt-go" data-act="lancer" data-id="' + esc(m.id) + '"' + (run ? " disabled" : "") + ">" + (run ? "En cours…" : "▶ Lancer") + "</button>";
+    var pr = proch(m);
+    return '<div class="pil-carte pil-' + e.c + '" data-id="' + esc(m.id) + '">' +
+      '<div class="pil-carte-h"><div class="pil-nom">' + esc(m.nom) + e.b + '</div><div class="pil-sw-z">' + inter(m) + "</div></div>" +
+      '<div class="pil-role">' + esc(m.role) + "</div>" +
+      (m.chiffre ? '<div class="pil-gros"><b>' + esc(m.chiffre.v) + "</b><span>" + esc(m.chiffre.l) + "</span></div>" : "") +
+      (m.alerte && !D.pause ? '<div class="pil-alerte">' + esc(m.alerte) + "</div>" : "") +
+      '<div class="pil-quand">' + quand(m, true) + (pr ? '<span class="n">' + pr + "</span>" : "") + "</div>" +
+      '<div class="pil-carte-b">' + bl + '<button type="button" class="pil-bt pil-bt-neutre" data-act="ouvrir" data-id="' + esc(m.id) + '">' + ROUE + "Réglages</button></div></div>";
+  }
+
+  // ─── bandeau, filtres, familles
+  function comptes() {
+    var c = { tous: 0, err: 0, run: 0, off: 0, n8n: 0, actifs: 0 };
+    D.modules.forEach(function (m) {
+      c.tous++;
+      if (m.src === "n8n") c.n8n++;
+      else if (m.etat === "off") c.off++;
+      else c.actifs++;
+      if (m.etat === "err") c.err++;
+      if (m.etat === "run") c.run++;
+    });
+    return c;
+  }
+  function correspond(m) {
+    if (filtre === "err" && m.etat !== "err") return false;
+    if (filtre === "run" && m.etat !== "run") return false;
+    if (filtre === "off" && m.etat !== "off") return false;
+    if (filtre === "n8n" && m.src !== "n8n") return false;
+    if (texte) {
+      var t = (m.nom + " " + m.role).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      if (t.indexOf(texte) < 0) return false;
+    }
+    return true;
+  }
+  function rendreBandeau() {
+    var c = comptes(), b = $("pil-band"), err = D.modules.filter(function (m) { return m.etat === "err"; });
+    b.className = "pil-band" + (D.pause ? " pause" : "");
+    var titre = D.pause ? "Tout est en pause depuis " + fmtH.format(new Date(Date.parse(D.pause.depuis))) + "."
+      : err.length ? (err.length === 1 ? "1 module demande ton attention : " + err[0].nom + "." : err.length + " modules demandent ton attention.")
+      : "Tout tourne normalement.";
+    var sous = D.pause ? "Le site reste en ligne avec les données actuelles · les envois n8n continuent"
+      : c.tous + " modules · " + c.actifs + " actifs · " + c.off + " coupé" + (c.off > 1 ? "s" : "") + " · " + c.n8n + " pilotés par n8n · relu à " + fmtH.format(new Date(maint()));
+    b.innerHTML = '<div class="pil-band-t"><b>' + esc(titre) + "</b><span>" + esc(sous) + "</span></div>" +
+      '<div class="pil-cpt">' +
+      (c.run ? '<span class="gn-bg run" data-f="run">' + c.run + " en cours</span>" : "") +
+      (c.err ? '<span class="gn-bg ko" data-f="err">' + c.err + " en erreur</span>" : "") +
+      (c.off ? '<span class="gn-bg" data-f="off">' + c.off + " coupé" + (c.off > 1 ? "s" : "") + "</span>" : "") +
+      '<span class="gn-bg ok" data-f="tous">' + c.actifs + " actifs</span></div>" +
+      (D.pause ? '<button type="button" class="pil-bt pil-bt-go" data-act="reprendre">Tout reprendre</button>'
+        : '<button type="button" class="pil-bt pil-bt-stop" data-act="pause">Tout mettre en pause</button>');
+    var bi = $("pil-bg-idx");
+    if (bi) { bi.className = "gn-bg " + (c.err ? "ko" : D.pause ? "amb" : "ok"); bi.textContent = c.err ? c.err + " erreur" : D.pause ? "pause" : "ok"; }
+    var bs = $("pil-bg");
+    if (bs) { bs.className = "gn-bg " + (c.err ? "ko" : D.pause ? "amb" : c.run ? "run" : "ok"); bs.textContent = c.err ? c.err + " en erreur" : D.pause ? "en pause" : c.run ? c.run + " en cours" : "tout tourne"; }
+  }
+  function rendreFiltres() {
+    var c = comptes();
+    var puce = function (f, l, n, crit) {
+      return '<button type="button" class="gc-chip' + (filtre === f ? " on" : "") + (crit && n ? " crit" : "") + '" data-f="' + f + '">' + l + " <b>" + n + "</b></button>";
+    };
+    $("pil-puces").innerHTML = puce("tous", "Tous", c.tous) + puce("err", "En erreur", c.err, true) + puce("run", "En cours", c.run) + puce("off", "Coupés", c.off) + puce("n8n", "Pilotés par n8n", c.n8n);
+  }
+  function rendreModules() {
+    var h = "", vus = 0;
+    D.familles.forEach(function (f) {
+      var l = D.modules.filter(function (m) { return m.fam === f.id && correspond(m); });
+      if (!l.length) return;
+      vus += l.length;
+      h += '<div class="pil-fam"><div class="sec-title">' + esc(f.nom) + " <i>" + l.length + "</i></div>" +
+        '<div class="pil-fam-sous">' + esc(f.sous) + "</div>" +
+        (variante === "A" ? '<div class="pil-liste">' + l.map(ligne).join("") + "</div>" : '<div class="pil-grille">' + l.map(carte).join("") + "</div>") + "</div>";
+    });
+    $("pil-mods").innerHTML = vus ? h : '<div class="pil-vide">Aucun module ne correspond.</div>';
+  }
+  function rendreServices() {
+    var lib = { ok: "OK", warn: "LIMITE", crit: "PANNE", off: "COUPÉ" };
+    $("pil-serv").innerHTML = D.services.map(function (s) {
+      var j = "";
+      if (s.jauge) {
+        var p = Math.min(100, Math.round((100 * s.jauge.v) / s.jauge.max)), c = p >= 90 ? "k" : p >= 70 ? "m" : "";
+        j = '<div class="pil-jauge"><i class="' + c + '" style="width:' + p + '%"></i></div><div class="pil-jauge-l"><span>' + esc(s.jauge.l) + "</span><span>" + nombre(s.jauge.v) + " / " + nombre(s.jauge.max) + "</span></div>";
+      }
+      return '<div class="hcard ' + s.etat + '"><div class="hcard-stripe"></div><div class="hcard-main"><div class="hcard-dot"></div>' +
+        '<div class="hcard-info"><div class="hcard-name">' + esc(s.nom) + '</div><div class="hcard-detail">' + esc(s.detail) + "</div>" + j + "</div>" +
+        '<div class="hcard-badge">' + lib[s.etat] + "</div></div></div>";
+    }).join("");
+  }
+  function rendreJournal() {
+    var l = D.journal.filter(function (e) {
+      return jfiltre === "tout" || (jfiltre === "rey" && e.qui === "Rey") || (jfiltre === "err" && (e.nv === "err" || e.nv === "warn"));
+    });
+    $("pil-jpuces").innerHTML = [["tout", "Tout"], ["rey", "Tes actions"], ["err", "Erreurs"]].map(function (x) {
+      return '<button type="button" class="gc-chip' + (jfiltre === x[0] ? " on" : "") + '" data-j="' + x[0] + '">' + x[1] + "</button>";
+    }).join("");
+    $("pil-jour").innerHTML = l.length ? l.map(function (e) {
+      var ms = Date.parse(e.t), dj = jour(ms) - jour(maint());
+      var t = (dj === 0 ? "" : dj === -1 ? "hier " : fmtJ.format(new Date(ms)) + " ") + fmtH.format(new Date(ms));
+      var q = e.qui === "Rey" ? "rey" : e.qui === "patch" ? "patch" : "";
+      return '<div class="pil-jour-l ' + esc(e.nv) + '"><time>' + esc(t) + '</time><span class="qui ' + q + '">' + esc(e.qui === "Rey" ? "Rey" : e.qui) + "</span><p>" + e.txt + "</p></div>";
+    }).join("") : '<div class="pil-vide">Rien pour ce filtre.</div>';
+  }
+  function rendre() {
+    rendreBandeau(); rendreFiltres(); rendreModules(); rendreServices(); rendreJournal();
+    if (ouvert) remplirTiroir(ouvert, true);
+  }
+
+  // ─── tiroir de détail
+  function mod(id) { return D.modules.filter(function (m) { return m.id === id; })[0]; }
+  function histo(m) {
+    var l = m.histo || [];
+    if (!l.length) return "";
+    var max = Math.max.apply(null, l.map(function (x) { return x.duree || 1; }));
+    var bars = l.map(function (x) {
+      var c = x.nv === "o" ? "" : x.nv;
+      var ht = x.nv === "n" ? 4 : Math.max(8, Math.round((50 * (x.duree || 1)) / max));
+      return '<i class="' + c + '" style="height:' + ht + 'px" title="' + (x.nv === "o" ? "réussi" : x.nv === "m" ? "incomplet" : x.nv === "k" ? "erreur" : "rien à faire") + " · " + esc(duree(x.duree)) + '"></i>';
+    }).join("");
+    var nb = { o: 0, m: 0, k: 0, n: 0 };
+    l.forEach(function (x) { nb[x.nv]++; });
+    var res = [nb.o + " réussi" + (nb.o > 1 ? "s" : ""), nb.m ? nb.m + " incomplet" + (nb.m > 1 ? "s" : "") : "", nb.k ? nb.k + " en erreur" : ""].filter(Boolean).join(" · ");
+    return '<div class="pil-bloc"><div class="pil-bloc-t">Historique <i>' + l.length + " passage" + (l.length > 1 ? "s" : "") + "</i></div>" +
+      '<div class="pil-histo">' + bars + '</div><div class="pil-histo-l"><span>' + esc(res) + "</span><span>hauteur : durée</span></div></div>";
+  }
+  function remplirTiroir(id, garderSaisie) {
+    var m = mod(id), e = etat(m), c = $("pil-t-corps");
+    var saisies = {};
+    if (garderSaisie) c.querySelectorAll("input[data-cle]").forEach(function (i) { saisies[i.dataset.cle] = i.value; });
+    $("pil-t-tete").innerHTML = '<div class="pil-tete"><div class="pil-nom" id="pil-t-titre">' + esc(m.nom) + e.b + '</div><div class="pil-role">' + esc(m.role) + "</div></div>" +
+      '<button type="button" class="pil-fermer" data-act="fermer" aria-label="Fermer">×</button>';
+    var h = "";
+    // état
+    if (m.sw === null || m.sw === undefined) {
+      h += '<div class="pil-bloc"><div class="pil-bloc-t">État</div><div class="pil-etat"><p><b>' + esc(m.pilote ? m.pilote.t : "Piloté par n8n.") + "</b> " +
+        esc(m.pilote ? m.pilote.d : "Son rythme se règle dans n8n ; ici, ce qu'il a fait et quand.") + "</p></div></div>";
+    } else {
+      var on = !!m.sw;
+      h += '<div class="pil-bloc"><div class="pil-bloc-t">État</div><div class="pil-etat"><p><b>' + esc(D.pause && on ? "En pause (pause générale)" : on ? (m.etat === "err" ? "Actif, dernier passage en erreur" : "Actif") : "Coupé") + ".</b> " +
+        esc(on ? "Si tu le coupes, " + minus(m.coupe || "Il ne passe plus.") : m.rallume || "Rallumé, il repart au prochain passage.") + "</p>" + inter(m, true) + "</div></div>";
+    }
+    // rythme et lancement
+    var kv = [["Rythme", m.rythme], ["Dernier passage", m.dernier ? rel(m.dernier.fin) + (m.dernier.duree ? " · " + duree(m.dernier.duree) : "") : "jamais"]];
+    if (m.etat === "run" && m.encours) kv.push(["En cours", "depuis " + rel(m.encours.depuis).replace("il y a ", "") + (m.encours.avance ? " · " + m.encours.avance : "")]);
+    kv.push(["Prochain passage", e.c === "off" ? e.t : m.prochain ? (m.src === "n8n" ? "≈ " : "") + rel(m.prochain) : "—"]);
+    h += '<div class="pil-bloc"><div class="pil-bloc-t">Rythme</div><dl class="pil-kv">' + kv.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>";
+    var bts = "";
+    if (m.lancer) bts += '<button type="button" class="pil-bt pil-bt-go" data-act="lancer" data-id="' + esc(m.id) + '"' + (m.etat === "run" ? " disabled" : "") + ">" + (m.etat === "run" ? "Passage en cours…" : "▶ " + esc(m.lancerLib || "Lancer maintenant")) + "</button>";
+    if (m.lien) bts += '<a class="pil-bt pil-bt-neutre" href="' + esc(m.lien.h) + '" data-act="fermer">' + esc(m.lien.l) + "</a>";
+    if (bts) h += '<div class="pil-boutons">' + bts + "</div>";
+    if (m.lancer && m.etat !== "run") h += '<p class="pil-note">Un passage lancé à la main compte comme un passage normal : le suivant garde son heure.</p>';
+    h += "</div>";
+    // dernier passage
+    if (m.details || m.alerte || m.jauges) {
+      h += '<div class="pil-bloc"><div class="pil-bloc-t">Dernier passage' + (m.dernier ? " <i>" + esc(rel(m.dernier.fin)) + "</i>" : "") + "</div>";
+      if (m.alerte && !D.pause) h += '<div class="pil-alerte" style="margin:0 0 10px">' + esc(m.alerte) + "</div>";
+      if (m.details) h += '<dl class="pil-kv">' + m.details.map(function (x) { return "<dt>" + esc(x[0]) + "</dt><dd>" + esc(x[1]) + "</dd>"; }).join("") + "</dl>";
+      (m.jauges || []).forEach(function (j) {
+        var p = Math.min(100, Math.round((100 * j.v) / j.max));
+        h += '<div class="pil-jauge" style="margin-top:14px"><i style="width:' + p + '%"></i></div><div class="pil-jauge-l"><span>' + esc(j.l) + "</span><span>" + nombre(j.v) + " / " + nombre(j.max) + "</span></div>";
+      });
+      h += "</div>";
+    }
+    // réglages
+    if (m.reglages && m.reglages.length) {
+      h += '<div class="pil-bloc"><div class="pil-bloc-t">Réglages <i>appliqués au prochain passage</i></div><form id="pil-form" novalidate>';
+      m.reglages.forEach(function (r) {
+        var v = saisies[r.cle] !== undefined ? saisies[r.cle] : String(r.v).replace(".", ",");
+        var num = typeof r.v === "number";
+        var borne = num ? "défaut " + String(r.defaut).replace(".", ",") + " · de " + nombre(r.min).replace(".", ",") + " à " + nombre(r.max).replace(".", ",") : "défaut " + r.defaut;
+        h += '<div class="pil-champ"><label for="pil-r-' + esc(r.cle) + '">' + esc(r.lib) + '</label><div class="pil-saisie"><input id="pil-r-' + esc(r.cle) + '" data-cle="' + esc(r.cle) + '" type="' + (num ? "text" : "text") + '"' +
+          (num ? ' inputmode="decimal" style="width:6.2rem;text-align:right"' : "") + ' value="' + esc(v) + '" autocomplete="off"><span>' + esc(r.unite) + "</span></div>" +
+          "<small>" + esc((r.aide ? r.aide + " " : "") + borne) + "</small></div>";
+      });
+      h += '<div class="pil-boutons"><button type="submit" class="pil-bt pil-bt-or" id="pil-enr" disabled>Enregistrer</button>' +
+        '<button type="button" class="pil-bt pil-bt-neutre" data-act="defaut">Valeurs par défaut</button></div>' +
+        '<p class="pil-note">Chaque changement est noté dans le journal, avec l\'ancienne valeur.</p></form></div>';
+    }
+    h += histo(m);
+    // données propres
+    if (m.donnees) {
+      h += '<div class="pil-bloc"><div class="pil-bloc-t">' + esc(m.donnees.t) + '</div><div class="pil-rangs">' + m.donnees.l.map(function (x) {
+        return "<div><b>" + esc(x[0]) + "</b><span>" + esc(x[1]) + "</span><em>" + esc(x[2]) + "</em></div>";
+      }).join("") + "</div></div>";
+    }
+    c.innerHTML = h;
+    verifierForm();
+  }
+  function ouvrir(id) {
+    ouvert = id;
+    remplirTiroir(id);
+    $("pil-voile").classList.add("ouvert");
+    var t = $("pil-tiroir");
+    t.classList.add("ouvert");
+    t.setAttribute("aria-hidden", "false");
+    setTimeout(function () { var f = t.querySelector(".pil-fermer"); if (f) f.focus(); }, 60);
+  }
+  function fermer() {
+    ouvert = null;
+    $("pil-voile").classList.remove("ouvert");
+    var t = $("pil-tiroir");
+    t.classList.remove("ouvert");
+    t.setAttribute("aria-hidden", "true");
+  }
+  function lireSaisie(r, brut) {
+    if (typeof r.v !== "number") return { ok: String(brut).trim().length > 0, v: String(brut).trim() };
+    var v = Number(String(brut).replace(/\s| /g, "").replace(",", "."));
+    return { ok: Number.isFinite(v) && v >= r.min && v <= r.max, v: v };
+  }
+  function verifierForm() {
+    var f = $("pil-form");
+    if (!f || !ouvert) return;
+    var m = mod(ouvert), change = false, faux = false;
+    f.querySelectorAll("input[data-cle]").forEach(function (i) {
+      var r = m.reglages.filter(function (x) { return x.cle === i.dataset.cle; })[0], l = lireSaisie(r, i.value);
+      var diff = l.ok && l.v !== r.v;
+      i.classList.toggle("change", diff);
+      i.classList.toggle("faux", !l.ok);
+      if (diff) change = true;
+      if (!l.ok) faux = true;
+    });
+    $("pil-enr").disabled = !change || faux;
+  }
+
+  // ─── boîte de confirmation (le dashboard n'utilise pas confirm())
+  function dialogue(o) {
+    var v = document.createElement("div");
+    v.className = "pil-dlg-voile";
+    v.innerHTML = '<div class="pil-dlg" role="alertdialog" aria-modal="true" aria-labelledby="pil-dlg-t"><h3 id="pil-dlg-t">' + esc(o.titre) + "</h3>" + o.texte +
+      '<div class="pil-boutons"><button type="button" class="pil-bt pil-bt-neutre" data-r="non">Annuler</button><button type="button" class="pil-bt ' + o.cls + '" data-r="oui">' + esc(o.action) + "</button></div></div>";
+    document.body.appendChild(v);
+    var fin = function (oui) { document.removeEventListener("keydown", touche); v.remove(); if (oui) o.faire(); };
+    var touche = function (ev) { if (ev.key === "Escape") fin(false); };
+    document.addEventListener("keydown", touche);
+    v.addEventListener("click", function (ev) {
+      if (ev.target === v) return fin(false);
+      var b = ev.target.closest("[data-r]");
+      if (b) fin(b.dataset.r === "oui");
+    });
+    v.querySelector('[data-r="oui"]').focus();
+  }
+  function toast(t, err) {
+    var x = $("pil-toast");
+    x.textContent = t;
+    x.className = "pil-toast" + (err ? " err" : "") + " show";
+    clearTimeout(toast.h);
+    toast.h = setTimeout(function () { x.className = "pil-toast" + (err ? " err" : ""); }, 3200);
+  }
+
+  // ─── gestes
+  function echec(e) {
+    toast((e && e.message) || "Le serveur n'a pas répondu.", true);
+    if (D) rendre();
+  }
+  function basculer(id) {
+    var m = mod(id), on = !!m.sw;
+    dialogue({
+      titre: (on ? "Couper « " : "Rallumer « ") + m.nom + " » ?",
+      texte: "<p>" + esc(on ? m.coupe || "Il ne passe plus." : m.rallume || "Il repart au prochain passage.") + "</p>" +
+        (on && m.etat === "run" ? "<p>Le passage en cours va jusqu'au bout, puis plus rien.</p>" : "") +
+        "<p>" + (on ? "Tu le rallumes d'un clic, au même endroit." : "Tu peux aussi le lancer tout de suite avec ▶.") + "</p>",
+      action: on ? "Couper" : "Rallumer", cls: on ? "pil-bt-stop" : "pil-bt-go",
+      faire: function () {
+        window.PIL_SOURCE.basculer(id, !on).then(function () { toast((on ? "Coupé : " : "Rallumé : ") + m.nom); rendre(); }, echec);
+      },
+    });
+  }
+  function lancer(id) {
+    var m = mod(id);
+    var go = function () {
+      window.PIL_SOURCE.lancer(id, function () { rendre(); toast("Passage terminé : " + m.nom); }).then(function () { toast("Passage lancé : " + m.nom); rendre(); }, echec);
+    };
+    var coupe = !m.sw && m.sw !== null && m.sw !== undefined;
+    if (m.confirmer) {
+      dialogue({ titre: m.confirmer.titre, texte: "<p>" + esc(m.confirmer.texte) + "</p>" + (coupe ? "<p>Il est coupé : un seul passage, puis il reste coupé.</p>" : "") +
+        (D.pause ? "<p>Tout est en pause : la pause continue pour le reste.</p>" : ""), action: m.confirmer.action, cls: "pil-bt-stop", faire: go });
+    } else if (coupe) {
+      dialogue({ titre: "« " + m.nom + " » est coupé. Lancer un passage quand même ?", texte: "<p>Un seul passage, puis il reste coupé." + (m.lancerNote ? " " + esc(m.lancerNote) : "") + "</p>",
+        action: "Lancer un passage", cls: "pil-bt-go", faire: go });
+    } else if (D.pause) {
+      dialogue({ titre: "Tout est en pause. Lancer « " + m.nom + " » quand même ?", texte: "<p>Un seul passage ; la pause continue pour le reste.</p>", action: "Lancer un passage", cls: "pil-bt-go", faire: go });
+    } else go();
+  }
+  function pause(oui) {
+    var c = comptes(), arretes = D.modules.filter(function (m) { return m.pausable && m.etat !== "off"; }).length;
+    if (!oui) return window.PIL_SOURCE.pause(false).then(function () { toast("Tout reprend"); rendre(); }, echec);
+    dialogue({
+      titre: "Tout mettre en pause ?",
+      texte: "<p>Les <b>" + arretes + " modules actifs</b> de l'API s'arrêtent" + (c.run ? " après leur passage en cours (" + c.run + " en cours)" : "") + ". Le site reste en ligne, avec les données d'aujourd'hui.</p>" +
+        "<p>Les envois de n8n continuent : ils se coupent dans n8n. Les modules que tu as coupés restent coupés à la reprise.</p>",
+      action: "Tout mettre en pause", cls: "pil-bt-stop",
+      faire: function () { window.PIL_SOURCE.pause(true).then(function () { toast("Tout est en pause"); rendre(); }, echec); },
+    });
+  }
+
+  // ─── écouteurs (délégation)
+  function brancher() {
+    document.addEventListener("click", function (ev) {
+      var a = ev.target.closest("[data-act]");
+      if (a && a.closest("#pil-zone,#pil-tiroir")) {
+        var act = a.dataset.act, id = a.dataset.id;
+        if (act === "sw") { ev.stopPropagation(); return basculer(id); }
+        if (act === "lancer") { ev.stopPropagation(); return lancer(id); }
+        if (act === "ouvrir") { ev.stopPropagation(); return ouvrir(id); }
+        if (act === "fermer") return fermer();
+        if (act === "pause") return pause(true);
+        if (act === "reprendre") return pause(false);
+        if (act === "defaut") {
+          var m = mod(ouvert);
+          $("pil-form").querySelectorAll("input[data-cle]").forEach(function (i) {
+            var r = m.reglages.filter(function (x) { return x.cle === i.dataset.cle; })[0];
+            i.value = String(r.defaut).replace(".", ",");
+          });
+          return verifierForm();
+        }
+      }
+      var p = ev.target.closest("[data-f]");
+      if (p && p.closest("#pil-zone")) { filtre = p.dataset.f; rendreFiltres(); rendreModules(); return; }
+      var j = ev.target.closest("[data-j]");
+      if (j) { jfiltre = j.dataset.j; rendreJournal(); return; }
+      var l = ev.target.closest(".pil-ligne,.pil-carte");
+      if (l && !ev.target.closest("button,a,input")) ouvrir(l.dataset.id);
+    });
+    $("pil-cherche").addEventListener("input", function (ev) {
+      texte = ev.target.value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+      rendreModules();
+    });
+    $("pil-voile").addEventListener("click", fermer);
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && ouvert && !document.querySelector(".pil-dlg-voile")) fermer(); });
+    $("pil-tiroir").addEventListener("input", function (ev) { if (ev.target.matches("input[data-cle]")) verifierForm(); });
+    $("pil-tiroir").addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var m = mod(ouvert), vals = {}, avant = [];
+      $("pil-form").querySelectorAll("input[data-cle]").forEach(function (i) {
+        var r = m.reglages.filter(function (x) { return x.cle === i.dataset.cle; })[0], l = lireSaisie(r, i.value);
+        if (l.ok && l.v !== r.v) { vals[r.cle] = l.v; avant.push(r.lib + " : " + String(r.v).replace(".", ",") + " → " + String(l.v).replace(".", ",")); }
+      });
+      window.PIL_SOURCE.regler(ouvert, vals).then(function () { toast("Enregistré : " + avant.join(" · ")); remplirTiroir(ouvert); rendreJournal(); }, echec);
+    });
+  }
+
+  window.pilVariante = function (v) { variante = v; rendreModules(); };
+  window.pilRendre = function () { if (D) rendre(); };
+  window.pilDemarrer = function () {
+    window.PIL_SOURCE.lire().then(function (d) {
+      D = d;
+      brancher();
+      rendre();
+      setInterval(function () { if (!document.hidden) { rendreBandeau(); rendreModules(); rendreJournal(); } }, 30000);
+    }, function (e) {
+      // l'API ne répond pas (redémarrage…) : le bandeau le dit, nouvel essai dans 20 s
+      var b = $("pil-band");
+      b.className = "pil-band pause";
+      b.innerHTML = '<div class="pil-band-t"><b>Pilotage indisponible pour l\'instant.</b><span>' + esc((e && e.message) || "pas de réponse") + " · nouvel essai dans 20 s</span></div>";
+      setTimeout(window.pilDemarrer, 20000);
+    });
+  };
+})();
+</script>
+<script>
+/* PILOTAGE : la source des données (patch Pilotage 1). GET /dashboard/admin/pilotage (nginx ajoute la clé, derrière le
+   mot de passe du staging) ; relu toutes les 15 s quand la page est visible, toutes les 3 s pendant un passage. Les gestes
+   partent en POST sur /dashboard/admin/pilotage/{basculer,lancer,pause}. Les données sont fondues dans le même objet,
+   que le rendu (pilotage.js) garde : un geste ou une relecture le met à jour, puis window.pilRendre redessine. */
+window.PIL_SOURCE = (function () {
+  "use strict";
+  var ADRESSE = "/dashboard/admin/pilotage";
+  var D = null, minuteur = null, enLecture = null;
+  var attentes = {};
+  function lireReponse(r) {
+    return r.text().then(function (t) {
+      var j = null;
+      try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+      if (!r.ok) throw new Error((j && j.msg) || (r.status === 401 ? "accès refusé (clé)" : "le serveur a répondu " + r.status));
+      if (!j) throw new Error("réponse illisible");
+      return j;
+    });
+  }
+  function trouver(id) { return D ? D.modules.filter(function (m) { return m.id === id; })[0] : null; }
+  // les passages lancés à la main : « terminé » dès que le module ne tourne plus (ou qu'un nouveau passage est noté)
+  function verifierAttentes() {
+    Object.keys(attentes).forEach(function (id) {
+      var a = attentes[id], m = trouver(id);
+      if (!m) { delete attentes[id]; return; }
+      a.lectures++;
+      if (m.etat === "run") { a.vu = true; return; }
+      var neuf = m.dernier && m.dernier.fin !== a.avant;
+      if (a.vu || neuf || a.lectures >= 4 || Date.now() - a.depuis > 3 * 3600000) {
+        delete attentes[id];
+        setTimeout(a.fini, 0);
+      }
+    });
+  }
+  function fondre(n) {
+    n.recuLe = Date.now(); // « maintenant » du serveur, reçu à cet instant
+    if (!D) D = n;
+    else Object.keys(n).forEach(function (k) { D[k] = n[k]; });
+    verifierAttentes();
+    return D;
+  }
+  function lire() {
+    if (enLecture) return enLecture;
+    enLecture = fetch(ADRESSE, { cache: "no-store", credentials: "same-origin" }).then(lireReponse).then(fondre);
+    var fin = function () { enLecture = null; };
+    enLecture.then(fin, fin);
+    return enLecture;
+  }
+  function vite() {
+    return Object.keys(attentes).length > 0 || (D && D.modules.some(function (m) { return m.etat === "run"; }));
+  }
+  function boucle() {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function () {
+      if (document.hidden) return boucle();
+      lire().then(function () { if (window.pilRendre) window.pilRendre(); }, function () {}).then(boucle);
+    }, vite() ? 3000 : 15000);
+  }
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden || !D) return;
+    lire().then(function () { if (window.pilRendre) window.pilRendre(); }, function () {}).then(boucle);
+  });
+  function envoyer(chemin, corps) {
+    return fetch(ADRESSE + chemin, {
+      method: "POST", credentials: "same-origin", cache: "no-store",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps),
+    }).then(lireReponse);
+  }
+  return {
+    lire: function () { return lire().then(function (d) { boucle(); return d; }); },
+    basculer: function (id, actif) { return envoyer("/basculer", { id: id, actif: actif }).then(lire); },
+    lancer: function (id, fini) {
+      var m = trouver(id);
+      attentes[id] = { fini: fini, depuis: Date.now(), avant: m && m.dernier ? m.dernier.fin : null, vu: false, lectures: 0 };
+      return envoyer("/lancer", { id: id }).then(lire).then(function () { boucle(); }, function (e) { delete attentes[id]; throw e; });
+    },
+    regler: function () { return Promise.reject(new Error("Les réglages arrivent avec le prochain patch.")); },
+    pause: function (oui) { return envoyer("/pause", { oui: oui }).then(lire); },
+  };
+})();
+</script>
+<script>
+/* PILOTAGE : démarrage du bloc, et l'index qui s'allume à la lecture de la section (écrite en dur, comme Publication :
+   le script de la piste B ne l'observe pas). */
+(function () {
+  "use strict";
+  var sec = document.getElementById("page-pilotage");
+  if (sec && window.IntersectionObserver) {
+    new IntersectionObserver(function (es) {
+      es.forEach(function (ev) {
+        if (!ev.isIntersecting) return;
+        document.querySelectorAll("#gn-idx .gn-ix").forEach(function (x) { x.classList.remove("ici"); });
+        var a = document.querySelector('#gn-idx .gn-ix[href="#page-pilotage"]');
+        if (a) a.classList.add("ici");
+      });
+    }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 }).observe(sec);
+  }
+  if (window.pilDemarrer) window.pilDemarrer();
 })();
 </script>
 </body>

@@ -1,0 +1,28 @@
+---
+/**
+ * Page 404 : servie par nginx (error_page 404) pour toute adresse inconnue, avec le code 404. Avant le 15 octobre
+ * 2026, une adresse inconnue rendait l'accueil en 200 : Google y voyait une copie de l'accueil (« soft 404 »).
+ * Design des pages Connexion et Preferences (Vitre neutre, boutons « braise ») et panneau du catalogue ; cachet
+ * 迷子 (« perdu »). noindex.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroHeader from "../components/HeroHeader.astro";
+import Footer from "../components/Footer.astro";
+---
+
+<BaseLayout title="Page introuvable | GameNime" description="Cette page n'existe pas ou n'existe plus." noindex jetons="catalogue braise">
+  <HeroHeader activeTab="none" />
+  <section class="section-block container perdu">
+    <div class="section-head">
+      <h2>Page introuvable</h2>
+    </div>
+    <div class="perdu-corps">
+      <p>Cette page n'existe pas, ou plus. Une fiche a peut-être changé d'adresse : retrouve-la par la recherche de l'accueil, ou dans le calendrier des sorties.</p>
+      <p class="perdu-liens">
+        <a href="/">Accueil</a>
+        <a href="/calendrier/">Calendrier des sorties</a>
+      </p>
+    </div>
+  </section>
+  <Footer />
+</BaseLayout>

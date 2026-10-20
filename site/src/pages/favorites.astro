@@ -4,7 +4,7 @@ import HeroHeader from "../components/HeroHeader.astro";
 import Footer from "../components/Footer.astro";
 ---
 
-<BaseLayout title="Mes favoris — GameNime">
+<BaseLayout noindex title="Mes favoris — GameNime">
   <HeroHeader />
 
   <div class="favorites-page container">
@@ -46,6 +46,21 @@ import Footer from "../components/Footer.astro";
     return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
   }
 
+  // La date d'un favori, comme sur la fiche (dateLabel, lib/fiche.ts) : au mois ou a l'annee, jamais de jour invente
+  // (« Prévu octobre 2026 », pas « 01 octobre 2026 ») ; sans date, « Date à annoncer » (20 octobre 2026).
+  var MOIS_FAV = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  function dateFavori(fav) {
+    var v = fav.releaseDate;
+    if (!v) return "Date à annoncer";
+    var p = String(v).split("-");
+    if (fav.releasePrecision === "year") return "Prévu " + p[0];
+    if (fav.releasePrecision === "month") {
+      var m = parseInt(p[1], 10) - 1;
+      if (m >= 0 && m < 12) return "Prévu " + MOIS_FAV[m] + " " + p[0];
+    }
+    return formatDate(v);
+  }
+
   function simplifyPlatform(p) {
     if (!p) return "";
     var s = p
@@ -66,9 +81,11 @@ import Footer from "../components/Footer.astro";
     return unique.join(", ");
   }
 
+  // Titre, image et plateforme viennent des donnees (IGDB, AniList) : affiches comme du texte.
+  function esc(v) { return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
   function renderFavCard(fav) {
-    var info = simplifyPlatform(fav.platform) || fav.genre || "";
-    var cover = fav.cover ? '<img src="' + fav.cover + '" alt="' + fav.title + '" loading="lazy" />' : '<div class="fav-card__placeholder">Aucune image</div>';
+    var info = simplifyPlatform(fav.platform) || (fav.cinemaFr ? "Au cinéma" : "") || fav.genre || "";
+    var cover = fav.cover ? '<img src="' + esc(fav.cover) + '" alt="' + esc(fav.title) + '" loading="lazy" />' : '<div class="fav-card__placeholder">Aucune image</div>';
     var typeBadge = fav.itemType === "anime" ? '<span class="fav-card__type fav-card__type--anime">Anime</span>' : '<span class="fav-card__type fav-card__type--game">Jeu</span>';
 
     return '<article class="fav-card" data-fav-type="' + fav.itemType + '" data-fav-id="' + fav.itemId + '">' +
@@ -76,9 +93,9 @@ import Footer from "../components/Footer.astro";
       '<button class="fav-card__remove" data-type="' + fav.itemType + '" data-id="' + fav.itemId + '" aria-label="Retirer des favoris" title="Retirer des favoris">✕</button>' +
       typeBadge +
       '<div class="fav-card__body">' +
-        '<h3 class="fav-card__title">' + fav.title + '</h3>' +
-        '<p class="fav-card__date">' + formatDate(fav.releaseDate) + '</p>' +
-        '<p class="fav-card__info">' + info + '</p>' +
+        '<h3 class="fav-card__title">' + esc(fav.title) + '</h3>' +
+        '<p class="fav-card__date">' + esc(dateFavori(fav)) + '</p>' +
+        '<p class="fav-card__info">' + esc(info) + '</p>' +
       '</div>' +
     '</article>';
   }

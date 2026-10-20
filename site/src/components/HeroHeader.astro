@@ -1,7 +1,7 @@
 ---
 import AuthUserMenu from "./AuthUserMenu.astro";
 interface Props {
-  activeTab?: "home" | "anime" | "games" | "upcoming" | "none";
+  activeTab?: "home" | "anime" | "games" | "upcoming" | "calendar" | "none";
   /** Connexion, Inscription : la marque mene a l'accueil (les onglets y sont masques). */
   lienAccueil?: boolean;
 }
@@ -35,11 +35,12 @@ const { activeTab = "home", lienAccueil = false } = Astro.props;
     <div class="tabs-track">
       <span class="tab-indicator" aria-hidden="true"></span>
       <a class={activeTab === "home" ? "tab active" : "tab"} href="/">Accueil</a>
-      <a class={activeTab === "anime" ? "tab active" : "tab"} href="/anime">Anime</a>
-      <a class={activeTab === "games" ? "tab active" : "tab"} href="/games">Jeux</a>
-      <a class={activeTab === "upcoming" ? "tab active" : "tab"} href="/upcoming">À venir</a>
+      <a class={activeTab === "anime" ? "tab active" : "tab"} href="/anime/">Anime</a>
+      <a class={activeTab === "games" ? "tab active" : "tab"} href="/games/">Jeux</a>
+      <a class={activeTab === "upcoming" ? "tab active" : "tab"} href="/upcoming/">À venir</a>
+      <a class={activeTab === "calendar" ? "tab active" : "tab"} href="/calendrier/">Calendrier</a>
     </div>
-    {activeTab !== "home" && activeTab !== "none" && (
+    {activeTab !== "home" && activeTab !== "none" && activeTab !== "calendar" && (
       <>
         <span class="tabs-seam" aria-hidden="true"></span>
         <button type="button" class="tabs-filter" id="filterToggle" aria-label="Filtres" aria-expanded="false" aria-controls="filterPanel">

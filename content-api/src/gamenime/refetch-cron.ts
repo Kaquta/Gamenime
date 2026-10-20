@@ -6,10 +6,17 @@ import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { resoudreDistributeurYouTube } from "./youtube-verify.js";
 import { sanitizePlatform, normalizeTitleStrict } from "./core.js";
+import { passageSeriesEnCours, configSeriesEnCours } from "./series-en-cours.js";
+import { avancer, planifier } from "./pilotage.js";
+import { tourAniList, aniListRefuse, verdictDate, precisionDe, planifierDatesAnimes } from "./dates-animes.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000;
 const REFETCH_BATCH_SIZE = 200;
 const REFETCH_DELAY_MS = 800;
+/** L'API d'AnimeSchedule (ANIMESCHEDULE_API_URL : seulement pour les essais). */
+const AS_API = (process.env.ANIMESCHEDULE_API_URL || "https://animeschedule.net/api/v3").replace(/\/+$/, "");
+/** L'adresse d'AniList (ANILIST_URL : seulement pour les essais). */
+const ANILIST_URL = process.env.ANILIST_URL || "https://graphql.anilist.co";
 
 interface IncompleteItem {
   id: number;
@@ -26,27 +33,35 @@ interface IncompleteItem {
 
 interface SourceData {
   cover?: string | null;
-  titleNative?: string | null;   // titre japonais : AniList, Jikan et AnimeSchedule l'ont tous les trois
+  titleNative?: string | null;   // titre japonais : AniList, Kitsu et AnimeSchedule l'ont tous les trois
   platform?: string | null;
   trailerUrl?: string | null;
   description: string | null;
   format?: string | null;
   releaseDate?: string | null;        // "YYYY-MM-DD" (jour=01 si precision month/year)
   releasePrecision?: "day" | "month" | "year" | null;  // precision reelle selon la source
+  statut?: string | null;             // AniList : NOT_YET_RELEASED, RELEASING, FINISHED, CANCELLED, HIATUS
 }
 
 export async function fetchAniList(anilistId: number): Promise<SourceData | null> {
   if (!anilistId) return null;
 
-  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { title { native } format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
+  const query = `query ($id: Int) { Media(id: $id, type: ANIME) { status title { native } format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
 
   try {
-    const res = await fetch("https://graphql.anilist.co", {
+    // une requete AniList a la fois pour toute l'API (dates-animes.ts : 2,1 s entre deux, sous la limite d'AniList) ;
+    // un refus (429) suspend les suivantes le temps demande, et la lecture rend null : rien n'est change
+    await tourAniList();
+    const res = await fetch(ANILIST_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables: { id: anilistId } }),
     });
 
+    if (res.status === 429) {
+      aniListRefuse(res.headers.get("retry-after"));
+      return null;
+    }
     if (!res.ok) return null;
     const data = await res.json() as any;
     const media = data?.data?.Media;
@@ -102,73 +117,144 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
         releasePrecision = "year";
       }
     }
-    return { cover, titleNative, platform, trailerUrl, description, format, releaseDate, releasePrecision };
+    const statut: string | null = typeof media.status === "string" ? media.status : null;
+    return { cover, titleNative, platform, trailerUrl, description, format, releaseDate, releasePrecision, statut };
   } catch (e) {
     return null;
   }
 }
 
-export async function fetchJikan(malId: number): Promise<SourceData | null> {
-  if (!malId) return null;
+// ─────────────────────────────────────────────────────────────────────────
+// Kitsu : remplace Jikan, dont l'API publique a fermé le 1er octobre 2026
+// ─────────────────────────────────────────────────────────────────────────
+// API publique, sans clé. La fiche est retrouvée par l'identifiant
+// MyAnimeList (AniList le donne : idMal), sinon par l'identifiant AniList.
+// Kitsu ne comble que deux trous d'AniList : le titre japonais et la
+// bande-annonce. Le reste ne vient jamais de lui :
+//   - jaquette : celle d'AniList ;
+//   - date : Kitsu ne dit pas si elle est connue au jour, au mois ou à
+//     l'année près (AniList et AnimeSchedule, si) ;
+//   - plateformes : ses listes sont américaines et plus pauvres que les
+//     nôtres (relevé du 12 octobre 2026 : 8 animes sur 8) ;
+//   - texte : souvent celui de MyAnimeList. Les synopsis affichés seront
+//     écrits par Ollama ; Kitsu leur sert de documentation (synopsis.ts).
+// Ces deux champs ne sont remplis qu'une fois (jamais remplacés ensuite) :
+//   - les appelants ne consultent Kitsu que si AniList a répondu sans les
+//     avoir (une panne ou un 429 d'AniList ne doit pas figer la valeur de
+//     Kitsu) ;
+//   - une bande-annonce de Kitsu n'est gardée que si YouTube la dit encore
+//     visible et intégrable (oEmbed, sans clé) : Kitsu garde souvent des
+//     vidéos supprimées ou privées.
+// Kitsu en panne : après 3 erreurs passagères d'affilée (délai, réseau, 429,
+// 502 à 504), plus d'appel pendant 30 min : un passage de la Phase B ne doit
+// pas attendre 200 fois le délai. Une erreur propre à une fiche ne compte pas.
+// KITSU_API_URL, YOUTUBE_OEMBED_URL : pour les tests seulement (faux serveurs).
+const KITSU_API = process.env.KITSU_API_URL || "https://kitsu.io/api/edge";
+const YOUTUBE_OEMBED = process.env.YOUTUBE_OEMBED_URL || "https://www.youtube.com/oembed";
+const KITSU_TIMEOUT_MS = 10000;
+const KITSU_ERREURS_MAX = 3;
+const KITSU_PAUSE_MS = 30 * 60 * 1000;
+let kitsuErreurs = 0;
+let kitsuPauseJusqua = 0;
 
-  try {
-    // /full contient streaming[] directement (Disney+, Hulu, ADN...) en UN seul
-    // appel, plus stable que la fiche + /streaming separes (qui declenchaient un 429).
-    let json: any = null;
-    for (let attempt = 0; attempt < 3 && !json; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, 1200));
-      try {
-        const res = await fetch("https://api.jikan.moe/v4/anime/" + malId + "/full");
-        if (res.ok) json = await res.json() as any;
-      } catch { /* retry Jikan instable */ }
-    }
-    if (!json) return null;
-    const data = json?.data;
-    if (!data) return null;
-
-    const cover = data.images?.jpg?.large_image_url ?? data.images?.jpg?.image_url ?? null;
-    const titleNative: string | null = data.title_japanese ?? null;
-
-    const platforms: string[] = [];
-    if (Array.isArray(data.streaming)) {
-      for (const s of data.streaming) {
-        if (s?.name) platforms.push(s.name);
-      }
-    }
-    const platform = platforms.length > 0 ? platforms.join(", ") : null;
-
-    let trailerUrl: string | null = null;
-    if (data.trailer?.youtube_id) {
-      trailerUrl = "https://www.youtube.com/watch?v=" + data.trailer.youtube_id;
-    }
-
-    const description = stripDescriptionTags(data.synopsis);
-    // Jikan : ATTENTION prop.from invente day:1/month:1 quand il ne connait que l'annee/mois.
-    // La VRAIE precision est dans aired.string : "2027"=year, "Jul 2026"=month, "Jul 2, 2026"=day.
-    let releaseDate: string | null = null;
-    let releasePrecision: "day" | "month" | "year" | null = null;
-    const from = data.aired?.prop?.from;
-    const airedStr = String(data.aired?.string || "");
-    if (from && from.year) {
-      const pad2 = (n: number) => String(n).padStart(2, "0");
-      // "Jul 2, 2026" (mois jour, annee) => day precis
-      if (/^[A-Za-z]{3,}\s+\d{1,2},\s+\d{4}/.test(airedStr)) {
-        releaseDate = from.year + "-" + pad2(from.month) + "-" + pad2(from.day);
-        releasePrecision = "day";
-      // "Jul 2026" (mois annee, sans jour) => month
-      } else if (/^[A-Za-z]{3,}\s+\d{4}/.test(airedStr)) {
-        releaseDate = from.year + "-" + pad2(from.month) + "-01";
-        releasePrecision = "month";
-      // "2027" ou autre (annee seule) => year
-      } else {
-        releaseDate = from.year + "-01-01";
-        releasePrecision = "year";
-      }
-    }
-    return { cover, titleNative, platform, trailerUrl, description, releaseDate, releasePrecision };
-  } catch (e) {
-    return null;
+function kitsuErreur(): null {
+  kitsuErreurs++;
+  if (kitsuErreurs >= KITSU_ERREURS_MAX) {
+    kitsuErreurs = 0;
+    kitsuPauseJusqua = Date.now() + KITSU_PAUSE_MS;
   }
+  return null;
+}
+
+/** La vidéo YouTube est-elle encore publique et intégrable ? (oEmbed : 200 oui ; 401, 403, 404 non). Dans le doute : non. */
+export async function videoYouTubeVisible(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(YOUTUBE_OEMBED + "?format=json&url=" + encodeURIComponent(url), {
+      headers: { "User-Agent": "GameNime/1.0 (+https://gamenime.fr)" },
+      signal: AbortSignal.timeout(KITSU_TIMEOUT_MS),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Ce que Kitsu apporte d'une fiche (attributs JSON:API d'un « anime »). */
+export function kitsuVersSource(a: any): SourceData {
+  const ja = typeof a?.titles?.ja_jp === "string" ? a.titles.ja_jp.trim().slice(0, 250) : "";
+  const yt = typeof a?.youtubeVideoId === "string" ? a.youtubeVideoId.trim() : "";
+  return {
+    cover: null,
+    titleNative: ja || null,
+    platform: null,
+    trailerUrl: /^[A-Za-z0-9_-]{11}$/.test(yt) ? "https://www.youtube.com/watch?v=" + yt : null,
+    description: null,
+    format: null,
+    releaseDate: null,
+    releasePrecision: null,
+  };
+}
+
+/**
+ * Fiche Kitsu d'un anime ; null si Kitsu ne la connaît pas ou ne répond pas. Ne lève jamais d'erreur.
+ * avecBandeAnnonce : false quand la bande-annonce ne servira pas (pas d'appel à YouTube pour rien).
+ */
+export async function fetchKitsu(malId: number | null, anilistId: number | null, avecBandeAnnonce = true): Promise<SourceData | null> {
+  if (Date.now() < kitsuPauseJusqua) return null;
+  const essais: Array<[string, number]> = [];
+  if (malId) essais.push(["myanimelist/anime", malId]);
+  if (anilistId) essais.push(["anilist/anime", anilistId]);
+  for (const [site, id] of essais) {
+    let res: Response;
+    let json: any = null;
+    try {
+      res = await fetch(
+        KITSU_API + "/mappings?filter[externalSite]=" + site + "&filter[externalId]=" + id + "&include=item",
+        {
+          headers: { Accept: "application/vnd.api+json", "User-Agent": "GameNime/1.0 (+https://gamenime.fr)" },
+          signal: AbortSignal.timeout(KITSU_TIMEOUT_MS),
+        }
+      );
+    } catch {
+      return kitsuErreur();
+    }
+    // Kitsu en panne ou qui refuse : inutile d'essayer l'autre identifiant
+    if (!res.ok) return [429, 502, 503, 504].includes(res.status) ? kitsuErreur() : null;
+    try {
+      json = await res.json();
+    } catch (e: any) {
+      // réponse illisible (propre à cette fiche) ou coupée en route (panne passagère)
+      return e?.name === "SyntaxError" ? null : kitsuErreur();
+    }
+    kitsuErreurs = 0;
+    const ref = json?.data?.[0]?.relationships?.item?.data;
+    if (!ref || ref.type !== "anime" || ref.id == null) continue;
+    const fiche = Array.isArray(json?.included)
+      ? json.included.find((x: any) => x?.type === "anime" && String(x?.id) === String(ref.id))
+      : null;
+    if (!fiche?.attributes) continue;
+    const source = kitsuVersSource(fiche.attributes);
+    if (!avecBandeAnnonce) source.trailerUrl = null;
+    else if (source.trailerUrl && !(await videoYouTubeVisible(source.trailerUrl))) source.trailerUrl = null;
+    return source;
+  }
+  return null;
+}
+
+/**
+ * Kitsu est-il utile pour cet item ? Seulement si AniList a répondu (ou si l'item
+ * n'a pas d'identifiant AniList) et qu'il manque encore le titre japonais ou la
+ * bande-annonce demandés. Une panne d'AniList ne doit pas faire écrire, pour
+ * toujours, la valeur de Kitsu dans un champ qu'AniList aurait rempli.
+ */
+export function kitsuUtile(
+  item: { anilist_id: number | null; mal_id: number | null },
+  aniList: SourceData | null,
+  manque: { titreJaponais: boolean; bandeAnnonce: boolean }
+): boolean {
+  if (!item.mal_id && !item.anilist_id) return false;
+  if (item.anilist_id && !aniList) return false;
+  return (manque.titreJaponais && !aniList?.titleNative) || (manque.bandeAnnonce && !aniList?.trailerUrl);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -187,7 +273,7 @@ export async function lookupAnimeScheduleRoute(
 ): Promise<string | null> {
   if (!titre || !apiToken) return null;
   try {
-    const url = "https://animeschedule.net/api/v3/anime?q=" + encodeURIComponent(titre);
+    const url = AS_API + "/anime?q=" + encodeURIComponent(titre);
     const res = await fetch(url, { headers: { Authorization: "Bearer " + apiToken } });
     if (!res.ok) return null;
     const txt = await res.text();
@@ -235,7 +321,7 @@ async function notifierRoutes(scanned: number, matched: number, erreur: string |
           title: titre,
           description: desc,
           color: erreur ? 15158332 : 3066993,
-          footer: { text: "GameNime · Cron quotidien" },
+          footer: { text: "GameNime · Toutes les 6 h" },
           timestamp: new Date().toISOString(),
         }],
       }),
@@ -349,11 +435,94 @@ export async function applyFranchiseFloorsCycle(app: any): Promise<{
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Rattachement des routes PAR IDENTIFIANT (15 octobre 2026)
+// ─────────────────────────────────────────────────────────────────────────
+// « Cette semaine » ne montre un épisode du planning AnimeSchedule que si la route de l'anime est en base. Par le
+// titre seul, des séries connues restaient sans route : au relevé du 15 octobre, 10 épisodes de la semaine sur 75
+// (JoJo Steel Ball Run 2nd Stage, Overgeared, Link Click 3...). AnimeSchedule cherche aussi par identifiant (filtres
+// anilist-ids et mal-ids de /anime) et chaque fiche porte ses liens AniList et MyAnimeList : la route est posée quand
+// la fiche porte bien l'identifiant de l'anime, qu'une seule fiche le porte, et que la route n'est portée par aucun
+// autre anime. Une route déjà posée n'est jamais remplacée. Le titre ne sert plus qu'aux animes sans identifiant.
+const ROUTES_PAR_REQUETE = 18; // une page d'AnimeSchedule
+const ROUTES_PAUSE_MS = 400;
+const ROUTES_TITRE_MAX = 50;
+
+type Identifiant = "anilist" | "mal";
+
+/** L'identifiant d'un lien de fiche AnimeSchedule : « anilist.co/anime/21 » (AniList), « myanimelist.net/anime/21 » (MAL). */
+export function identifiantDuLien(lien: unknown, genre: Identifiant): number | null {
+  const re = genre === "anilist" ? /anilist\.co\/anime\/(\d+)/i : /myanimelist\.net\/anime\/(\d+)/i;
+  const m = re.exec(String(lien ?? ""));
+  return m ? Number(m[1]) : null;
+}
+
+async function lireAnimeSchedule(chemin: string, jeton: string): Promise<any> {
+  const r = await fetch(AS_API + chemin, {
+    headers: { Authorization: "Bearer " + jeton, Accept: "application/json" },
+    signal: AbortSignal.timeout(30000),
+  });
+  // une recherche sans aucune fiche répond 404 (relevé du 15 octobre) : c'est une liste vide, pas une panne
+  if (r.status === 404) return { page: 1, totalAmount: 0, anime: [] };
+  if (r.status === 429) throw new Error("AnimeSchedule : trop de requetes (429)");
+  if (!r.ok) throw new Error(`AnimeSchedule : HTTP ${r.status}`);
+  return r.json();
+}
+
+/**
+ * Les routes AnimeSchedule d'une liste d'identifiants : identifiant -> routes des fiches qui portent ce lien.
+ * 18 identifiants par requête (mt=any : l'un ou l'autre) ; page suivante si AnimeSchedule en annonce davantage.
+ * Une erreur (429, panne) arrête la lecture : les lots déjà lus sont rendus avec l'erreur. Un lot à moitié lu (erreur
+ * sur sa page 2, ou plus de 3 pages) n'est pas rendu : un identifiant pourrait avoir une 2e fiche dans la page manquante.
+ */
+export async function routesParIdentifiant(
+  genre: Identifiant,
+  ids: number[],
+  jeton: string,
+  pause = ROUTES_PAUSE_MS
+): Promise<{ routes: Map<number, string[]>; requetes: number; erreur: string | null }> {
+  const param = genre === "anilist" ? "anilist-ids" : "mal-ids";
+  const champ = genre === "anilist" ? "aniList" : "mal";
+  const routes = new Map<number, string[]>();
+  let requetes = 0;
+  const uniques = [...new Set(ids.filter((x) => Number.isInteger(x) && x > 0))];
+  for (let i = 0; i < uniques.length; i += ROUTES_PAR_REQUETE) {
+    const lot = uniques.slice(i, i + ROUTES_PAR_REQUETE);
+    const voulus = new Set(lot);
+    const duLot = new Map<number, string[]>();
+    let complet = false;
+    try {
+      for (let page = 1; page <= 3; page++) {
+        if (requetes) await new Promise((r) => setTimeout(r, pause));
+        requetes++;
+        const d = await lireAnimeSchedule(`/anime?mt=any&page=${page}&${lot.map((x) => `${param}=${x}`).join("&")}`, jeton);
+        const liste: any[] = Array.isArray(d) ? d : Array.isArray(d?.anime) ? d.anime : [];
+        for (const a of liste) {
+          const id = identifiantDuLien(a?.websites?.[champ], genre);
+          const route = typeof a?.route === "string" ? a.route.trim() : "";
+          if (!id || !route || !voulus.has(id)) continue;
+          const l = duLot.get(id) ?? [];
+          if (!l.includes(route)) l.push(route);
+          duLot.set(id, l);
+        }
+        const total = Number(d?.totalAmount ?? liste.length);
+        if (liste.length === 0 || !Number.isFinite(total) || page * ROUTES_PAR_REQUETE >= total) {
+          complet = true;
+          break;
+        }
+      }
+    } catch (e: any) {
+      return { routes, requetes, erreur: String(e?.message ?? e) };
+    }
+    if (complet) for (const [id, l] of duLot) routes.set(id, l);
+  }
+  return { routes, requetes, erreur: null };
+}
+
 export async function matchAnimeRoutesCycle(app: FastifyInstance): Promise<{
   scanned: number;
   matched: number;
 }> {
-  const DRY_RUN = false;
   const token = process.env.ANIMESCHEDULE_TOKEN || "";
   const pool = (app as any).pool;
   if (!pool || !token) {
@@ -362,35 +531,84 @@ export async function matchAnimeRoutesCycle(app: FastifyInstance): Promise<{
   }
   const debut = Date.now();
   const conn = await pool.getConnection();
-  let scanned = 0, matched = 0;
+  let scanned = 0, matched = 0, parId = 0, parTitre = 0, conflits = 0, doubles = 0, requetes = 0;
+  let arret: string | null = null;
   try {
-    const items: any[] = await conn.query(
-      "SELECT id, title, YEAR(release_date) AS annee FROM anime_items " +
+    const sans: any[] = await conn.query(
+      "SELECT CAST(id AS UNSIGNED) AS id, title, YEAR(release_date) AS annee, " +
+      "CAST(IFNULL(anilist_id, 0) AS UNSIGNED) AS al, CAST(IFNULL(mal_id, 0) AS UNSIGNED) AS mal FROM anime_items " +
       "WHERE (anime_schedule_route IS NULL OR anime_schedule_route = '') " +
       "AND title IS NOT NULL AND title != '' " +
-      "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "ORDER BY popularity DESC"
     );
-    scanned = items.length;
-    for (const it of items) {
-      const route = await lookupAnimeScheduleRoute(it.title, it.annee || null, token);
-      if (route) {
-        matched++;
-        if (DRY_RUN) {
-          app.log.info({ id: it.id, title: it.title, route }, "[DRY_RUN] route trouvee");
-        } else {
-          await conn.query("UPDATE anime_items SET anime_schedule_route = ? WHERE id = ?", [route, it.id]);
-          app.log.info({ id: it.id, title: it.title, route }, "route AnimeSchedule rattachee");
+    scanned = sans.length;
+    const prises = new Set<string>(
+      (await conn.query("SELECT anime_schedule_route AS r FROM anime_items WHERE anime_schedule_route IS NOT NULL AND anime_schedule_route != ''"))
+        .map((x: any) => String(x.r))
+    );
+    // pose la route si personne ne la porte ; jamais par-dessus une route déjà posée (même entre deux lectures).
+    // updated_at gardé, comme les autres cycles internes : le tableau de bord y lit le dernier envoi des workflows.
+    const poser = async (it: any, route: string, via: string): Promise<boolean> => {
+      if (prises.has(route)) {
+        conflits++;
+        app.log.warn({ id: Number(it.id), title: it.title, route, via }, "route AnimeSchedule deja portee par un autre anime : rien n'est pose");
+        return false;
+      }
+      const r: any = await conn.query(
+        "UPDATE anime_items SET anime_schedule_route = ?, updated_at = updated_at WHERE id = ? AND (anime_schedule_route IS NULL OR anime_schedule_route = '')",
+        [route, it.id]
+      );
+      if (Number(r?.affectedRows ?? 0) !== 1) return false;
+      prises.add(route);
+      matched++;
+      app.log.info({ id: Number(it.id), title: it.title, route, via }, "route AnimeSchedule rattachee");
+      return true;
+    };
+    const restants = new Map<number, any>(sans.map((x) => [Number(x.id), x]));
+
+    // 1. par identifiant : AniList, puis MyAnimeList pour ceux qui restent
+    for (const genre of ["anilist", "mal"] as const) {
+      const col = genre === "anilist" ? "al" : "mal";
+      const vises = [...restants.values()].filter((x) => Number(x[col]) > 0);
+      if (!vises.length) continue;
+      const res = await routesParIdentifiant(genre, vises.map((x) => Number(x[col])), token);
+      requetes += res.requetes;
+      if (res.erreur) arret = res.erreur;
+      for (const it of vises) {
+        const rs = res.routes.get(Number(it[col])) ?? [];
+        if (rs.length > 1) {
+          doubles++;
+          restants.delete(Number(it.id));
+          app.log.warn({ id: Number(it.id), title: it.title, routes: rs }, "plusieurs fiches AnimeSchedule pour cet identifiant : rien n'est pose");
+          continue;
+        }
+        if (rs.length === 1 && await poser(it, rs[0], genre === "anilist" ? `AniList ${Number(it.al)}` : `MAL ${Number(it.mal)}`)) {
+          parId++;
+          restants.delete(Number(it.id));
         }
       }
-      await new Promise((r) => setTimeout(r, 400));
+      if (arret) break;
     }
-    app.log.info({ scanned, matched, dryRun: DRY_RUN }, "Match routes cycle: termine");
-    trackLastRun("match-anime-routes", { scanned, matched, dryRun: DRY_RUN }, Date.now() - debut);
+
+    // 2. par titre (ancienne règle) : seulement les animes sans aucun identifiant
+    if (!arret) {
+      const sansId = [...restants.values()].filter((x) => !(Number(x.al) > 0) && !(Number(x.mal) > 0)).slice(0, ROUTES_TITRE_MAX);
+      for (const it of sansId) {
+        if (requetes) await new Promise((r) => setTimeout(r, ROUTES_PAUSE_MS));
+        requetes++;
+        const route = await lookupAnimeScheduleRoute(it.title, it.annee || null, token);
+        if (route && await poser(it, route, "titre")) parTitre++;
+      }
+    }
+
+    if (arret) app.log.warn({ scanned, matched, err: arret }, "Match routes cycle: interrompu, reprise au prochain passage");
+    app.log.info({ scanned, matched, parId, parTitre, conflits, doubles, requetes }, "Match routes cycle: termine");
+    trackLastRun("match-anime-routes", { scanned, matched, parId, parTitre, conflits, doubles, requetes, ...(arret ? { error: arret } : {}) }, Date.now() - debut);
     if (matched > 0) {
       pushActivity({
         type: "routes",
         message: `${matched} route${matched > 1 ? "s" : ""} AnimeSchedule rattachée${matched > 1 ? "s" : ""}`,
-        detail: `${scanned} anime${scanned > 1 ? "s" : ""} scanné${scanned > 1 ? "s" : ""} sans route`,
+        detail: `${parId} par identifiant, ${parTitre} par titre ; ${scanned} anime${scanned > 1 ? "s" : ""} sans route`,
         level: "info",
       });
     }
@@ -415,7 +633,7 @@ export async function fetchAnimeSchedule(route: string, apiToken: string): Promi
   if (!route) return null;
 
   try {
-    const res = await fetch("https://animeschedule.net/api/v3/anime/" + encodeURIComponent(route), {
+    const res = await fetch(AS_API + "/anime/" + encodeURIComponent(route), {
       headers: { "Authorization": "Bearer " + apiToken },
     });
     if (!res.ok) return null;
@@ -506,14 +724,16 @@ export function isPlatformWeak(p: string | null | undefined): boolean {
 }
 export function mergeSources(
   aniList: SourceData | null,
-  jikan: SourceData | null,
+  kitsu: SourceData | null,
   animeSchedule: SourceData | null
 ): SourceData {
-  const sources = [aniList, jikan, animeSchedule].filter(s => s !== null) as SourceData[];
+  const sources = [aniList, kitsu, animeSchedule].filter(s => s !== null) as SourceData[];
   // AnimeSchedule est volontairement limitee a la date et, en dernier recours, a la
   // plateforme : ses covers sont des hotlinks (cf. isHotlinkCover) et son vocabulaire
   // de format n'est pas normalise sur l'enum AniList.
-  const primary = [aniList, jikan].filter(s => s !== null) as SourceData[];
+  // Kitsu ne donne que le titre japonais et la bande-annonce (cf. kitsuVersSource) :
+  // pour le reste, primary se resume a AniList.
+  const primary = [aniList, kitsu].filter(s => s !== null) as SourceData[];
   // Date : preferer la source avec la MEILLEURE precision (day > month > year).
   // AniList prioritaire a precision egale (ordre du tableau : aniList d'abord).
   const precRank: Record<string, number> = { day: 3, month: 2, year: 1 };
@@ -527,9 +747,9 @@ export function mergeSources(
       }
     }
   }
-  // Plateformes : FUSIONNER toutes les sources (pas juste la premiere).
-  // AniList a souvent que "YouTube", Jikan a les vraies (Disney+, Hulu, ADN...).
-  // On combine tout en dedupliquant.
+  // Plateformes : FUSIONNER toutes les sources (pas juste la premiere), en
+  // dedupliquant. Depuis le retrait de Jikan, seul AniList en donne ici ; les
+  // plateformes francaises viennent des modules presse, plateformes et Tavily.
   const platformSet = new Set<string>();
   const addPlatforms = (raw: string | null | undefined) => {
     if (!raw) return;
@@ -544,8 +764,7 @@ export function mergeSources(
   // Perimetre de cette source : la date de sortie, et elle seule.
   return {
     cover: primary.find(s => s.cover)?.cover ?? null,
-    // Premiere source qui repond : AniList couvre le plus (387), Jikan (308)
-    // et AnimeSchedule (323) prennent le relais.
+    // Premiere source qui repond : AniList, puis Kitsu.
     titleNative: primary.find(s => s.titleNative)?.titleNative ?? null,
     platform: mergedPlatform,
     trailerUrl: primary.find(s => s.trailerUrl)?.trailerUrl ?? null,
@@ -554,6 +773,30 @@ export function mergeSources(
     releaseDate: bestDate,
     releasePrecision: bestPrecision,
   };
+}
+
+/**
+ * La date d'un anime apres lecture des sources (19 octobre 2026, dates-animes.ts) : AniList fait reference. Sans
+ * reponse d'AniList (panne, 429), la date ne change pas ; AnimeSchedule ne fait que preciser le jour dans la periode
+ * d'AniList (plus de vieux jour qui passe devant un report). Un anime « Date a annoncer » ou sans date n'est pas
+ * touche ici : le passage « Dates des animes » s'en charge (et previent ses abonnes). Sans identifiant AniList : la
+ * meilleure precision des sources, comme avant.
+ */
+function nouvelleDate(item: any, aniList: SourceData | null, animeSchedule: SourceData | null, merged: SourceData): { date: string; precision: "day" | "month" | "year" } | null {
+  if (!item.anilist_id) {
+    if (!merged.releaseDate || !merged.releasePrecision) return null;
+    return merged.releaseDate !== item.release_date || merged.releasePrecision !== item.release_precision
+      ? { date: merged.releaseDate, precision: merged.releasePrecision }
+      : null;
+  }
+  if (!aniList || Number(item.date_a_annoncer) === 1 || !item.release_date) return null;
+  const v = verdictDate(
+    { date: aniList.releaseDate ?? null, precision: aniList.releasePrecision ?? null, statut: aniList.statut ?? null },
+    animeSchedule?.releasePrecision === "day" ? animeSchedule.releaseDate ?? null : null,
+    { date: item.release_date, precision: precisionDe(item.release_precision) },
+    new Date().toISOString().slice(0, 10)
+  );
+  return v.quoi === "ecrire" ? { date: v.date, precision: v.precision } : null;
 }
 
 export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
@@ -576,8 +819,10 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
   const changes: Array<{ id: number; title: string; field: string; oldValue: any; newValue: any }> = [];
 
   try {
+    // « Date à annoncer » : sa précision vide n'est pas un manque (sa date revient par le passage « Dates des animés ») ;
+    // un annulé chez AniList (retiré du site) n'est plus relu ; il revient si AniList le relance (20 octobre 2026)
     const items: IncompleteItem[] = await conn.query(
-      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) < 150 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR title_native IS NULL OR title_native = '' OR release_precision IS NULL OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND release_date >= CURDATE() - INTERVAL 365 DAY ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
+      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision, date_a_annoncer FROM anime_items WHERE (platform IS NULL OR platform = '' OR TRIM(platform) = 'YouTube' OR cover IS NULL OR cover = '' OR trailer_url IS NULL OR trailer_url = '' OR description IS NULL OR description = '' OR LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) < 150 OR cover LIKE '%myanimelist.net%' OR cover LIKE '%animeschedule.net%' OR format IS NULL OR format = '' OR title_native IS NULL OR title_native = '' OR (release_precision IS NULL AND date_a_annoncer = 0) OR release_precision <> 'day') AND (anilist_id IS NOT NULL OR mal_id IS NOT NULL OR anime_schedule_route IS NOT NULL) AND (release_date >= CURDATE() - INTERVAL 365 DAY OR date_a_annoncer = 1) AND IFNULL(statut_anilist, '') <> 'CANCELLED' ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
     );
 
     scanned = items.length;
@@ -585,16 +830,18 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
     for (const item of items) {
       try {
-        const [aniList, jikan, animeSchedule] = await Promise.all([
+        const [aniList, animeSchedule] = await Promise.all([
           item.anilist_id ? fetchAniList(item.anilist_id) : null,
-          item.mal_id ? fetchJikan(item.mal_id) : null,
           item.anime_schedule_route && animeScheduleToken
             ? fetchAnimeSchedule(item.anime_schedule_route, animeScheduleToken)
             : null,
         ]);
+        // Kitsu ensuite, seulement s'il peut combler un trou qu'AniList a laisse
+        const kitsu = kitsuUtile(item, aniList, { titreJaponais: !(item as any).title_native, bandeAnnonce: !item.trailer_url })
+          ? await fetchKitsu(item.mal_id, item.anilist_id, !item.trailer_url && !aniList?.trailerUrl)
+          : null;
 
-        const merged = mergeSources(aniList, jikan, animeSchedule);
-    app.log.info({ jikanPlatform: jikan?.platform, aniListPlatform: aniList?.platform, mergedPlatform: merged.platform, itemPlatform: item.platform }, "DEBUG platform merge");
+        const merged = mergeSources(aniList, kitsu, animeSchedule);
 
         const updates: string[] = [];
         const params: any[] = [];
@@ -650,30 +897,24 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
           itemChanges.push({ field: "format", oldValue: item.format, newValue: merged.format });
         }
 
-        // TITRE NATIF (lossless append) : les trois sources l'ont — AniList dans
-        // title.native, Jikan dans title_japanese, AnimeSchedule dans names.native.
-        // merged applique deja l'ordre de repli, on remplit si la colonne est vide.
+        // TITRE NATIF (lossless append) : AniList dans title.native, Kitsu dans
+        // titles.ja_jp. merged applique deja l'ordre de repli, on remplit si la
+        // colonne est vide.
         const nativeIsMissing = !(item as any).title_native || (item as any).title_native === "";
         if (nativeIsMissing && merged.titleNative) {
           updates.push("title_native = ?");
           params.push(merged.titleNative);
           itemChanges.push({ field: "title_native", oldValue: (item as any).title_native, newValue: merged.titleNative });
         }
-        // DATE : objectif = converger vers precision 'day'. Ne JAMAIS regresser.
-        // Update si precision MEILLEURE (day>month>year) ou date differente a precision egale.
-        // Etat Clean : la SOURCE fait autorite. Adopte sa date des qu'elle differe
-        // (precision OU jour), dans les 2 sens. Corrige les faux 'day' (ex: 2027-01-01
-        // day -> year quand la source ne connait que l'annee).
-        if (merged.releaseDate && merged.releasePrecision) {
-          const dateChanged = merged.releaseDate !== (item as any).release_date;
-          const precChanged = merged.releasePrecision !== (item as any).release_precision;
-          if (dateChanged || precChanged) {
-            updates.push("release_date = ?");
-            params.push(merged.releaseDate);
-            updates.push("release_precision = ?");
-            params.push(merged.releasePrecision);
-            itemChanges.push({ field: "release_date", oldValue: (item as any).release_date + " (" + ((item as any).release_precision || "?") + ")", newValue: merged.releaseDate + " (" + merged.releasePrecision + ")" });
-          }
+        // DATE (19 octobre 2026) : AniList fait reference (nouvelleDate, dates-animes.ts). Une source qui ne repond pas
+        // ne fait plus redescendre une date, et un vieux jour d'AnimeSchedule ne passe plus devant un report.
+        const nd = nouvelleDate(item, aniList, animeSchedule, merged);
+        if (nd) {
+          updates.push("release_date = ?");
+          params.push(nd.date);
+          updates.push("release_precision = ?");
+          params.push(nd.precision);
+          itemChanges.push({ field: "release_date", oldValue: (item as any).release_date + " (" + ((item as any).release_precision || "?") + ")", newValue: nd.date + " (" + nd.precision + ")" });
         }
 
         if (updates.length > 0) {
@@ -708,36 +949,47 @@ export async function refetchIncompleteCycle(app: FastifyInstance): Promise<{
 
 export function startRefetchCron(app: FastifyInstance): NodeJS.Timeout {
   app.log.info({ intervalMs: REFETCH_INTERVAL_MS, batchSize: REFETCH_BATCH_SIZE }, "Refetch cron demarre");
+  // Pilotage (pilotage.ts, 17 octobre 2026) : les quatre cycles passent par le planificateur commun (interrupteur,
+  // lancement à la main, pause, historique), avec les mêmes délais et les mêmes rythmes qu'avant.
+  planifier({
+    id: "phase-b-animes", premierMs: 5 * 60 * 1000, rythmeMs: REFETCH_INTERVAL_MS, suivi: "refetch-cron", processAdmin: "refetch-incomplete",
+    passage: async () => {
+      await refetchIncompleteCycle(app);
+    },
+  });
+  // Dates des animes (dates-animes.ts, 19 octobre 2026) : AniList fait reference ; 40 min apres le demarrage, puis chaque heure
+  planifierDatesAnimes(app);
 
-  setTimeout(() => {
-    refetchIncompleteCycle(app).catch(e => app.log.error({ err: e?.message }, "Refetch cycle error"));
-  }, 5 * 60 * 1000);
-
-  // Rattachement des routes AnimeSchedule (session 33).
-  // Rythme quotidien, pas horaire : il ne traite que les nouveaux entrants,
-  // et chaque item coute un appel API avec 400 ms d'attente. Une saison
-  // d'anime apporte quelques dizaines de titres tous les trois mois.
-  const ROUTES_INTERVAL_MS = 24 * 60 * 60 * 1000;
-  setTimeout(() => {
-    matchAnimeRoutesCycle(app).catch(e => app.log.error({ err: e?.message }, "Match routes cycle error"));
-  }, 12 * 60 * 1000);
-  setInterval(() => {
-    matchAnimeRoutesCycle(app).catch(e => app.log.error({ err: e?.message }, "Match routes cycle error"));
-  }, ROUTES_INTERVAL_MS);
+  // « Cette semaine » (15 octobre 2026) : d'abord les séries en cours très suivies (Détective Conan...), puis le
+  // rattachement des routes AnimeSchedule, par identifiant (une poignée de requêtes : 18 animes par requête).
+  // 1 min et 3 min après le démarrage, puis toutes les 6 h ; une série entrée en base avance le passage des routes.
+  const SEMAINE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+  planifier({
+    id: "series-en-cours", premierMs: 60 * 1000, rythmeMs: SEMAINE_INTERVAL_MS, suivi: "series-en-cours", actifParDefaut: configSeriesEnCours().actif,
+    passage: async () => {
+      const b = await passageSeriesEnCours(app);
+      // comme avant (les deux dans le même passage) : la route AnimeSchedule d'une série nouvelle dans la minute
+      if (b.nouvelles.length) avancer("routes-as", 60 * 1000);
+    },
+  });
+  planifier({
+    id: "routes-as", premierMs: 3 * 60 * 1000, rythmeMs: SEMAINE_INTERVAL_MS, suivi: "match-anime-routes", processAdmin: "match-anime-routes",
+    passage: async () => {
+      await matchAnimeRoutesCycle(app);
+    },
+  });
 
   // Planchers de franchise : un nouveau Call of Duty entre avec la popularite
   // qu'IGDB lui donne (20 pour le dernier) et resterait invisible jusqu'a un
   // appel manuel. Decale de 18 min pour ne pas concourir avec les autres cycles.
-  setTimeout(() => {
-    applyFranchiseFloorsCycle(app).catch(e => app.log.error({ err: e?.message }, "Franchise floors error"));
-  }, 18 * 60 * 1000);
-  setInterval(() => {
-    applyFranchiseFloorsCycle(app).catch(e => app.log.error({ err: e?.message }, "Franchise floors error"));
-  }, ROUTES_INTERVAL_MS);
-
-  return setInterval(() => {
-    refetchIncompleteCycle(app).catch(e => app.log.error({ err: e?.message }, "Refetch cycle error"));
-  }, REFETCH_INTERVAL_MS);
+  const PLANCHERS_INTERVAL_MS = 24 * 60 * 60 * 1000;
+  planifier({
+    id: "planchers", premierMs: 18 * 60 * 1000, rythmeMs: PLANCHERS_INTERVAL_MS, suivi: "franchise-floors", processAdmin: "apply-franchise-floors",
+    passage: async () => {
+      await applyFranchiseFloorsCycle(app);
+    },
+  });
+  return setTimeout(() => {}, 0);
 }
 
 // SESSION 18: Refetch UN seul item anime par ID (pour le bouton "Réparer" admin)
@@ -750,21 +1002,24 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
   const conn = await pool.getConnection();
   try {
     const rows: IncompleteItem[] = await conn.query(
-      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision FROM anime_items WHERE id = ? LIMIT 1",
+      "SELECT id, title, title_native, anilist_id, mal_id, anime_schedule_route, cover, platform, trailer_url, description, format, DATE_FORMAT(release_date, '%Y-%m-%d') AS release_date, release_precision, date_a_annoncer FROM anime_items WHERE id = ? LIMIT 1",
       [id]
     );
     if (!rows || rows.length === 0) {
       return { ok: true, found: false, enriched: false, fields: [] };
     }
     const item = rows[0];
-    const [aniList, jikan, animeSchedule] = await Promise.all([
+    const [aniList, animeSchedule] = await Promise.all([
       item.anilist_id ? fetchAniList(item.anilist_id) : null,
-      item.mal_id ? fetchJikan(item.mal_id) : null,
       item.anime_schedule_route && animeScheduleToken
         ? fetchAnimeSchedule(item.anime_schedule_route, animeScheduleToken)
         : null,
     ]);
-    const merged = mergeSources(aniList, jikan, animeSchedule);
+    // Ici, Kitsu ne sert qu'a la bande-annonce (ce bouton ne remplit pas le titre japonais)
+    const kitsu = kitsuUtile(item, aniList, { titreJaponais: false, bandeAnnonce: !item.trailer_url })
+      ? await fetchKitsu(item.mal_id, item.anilist_id)
+      : null;
+    const merged = mergeSources(aniList, kitsu, animeSchedule);
     const updates: string[] = [];
     const params: any[] = [];
     const fields: string[] = [];
@@ -800,16 +1055,12 @@ export async function refetchOneAnimeItem(app: FastifyInstance, id: number): Pro
     if (formatIsMissing && merged.format) {
       updates.push("format = ?"); params.push(merged.format); fields.push("format");
     }
-    // DATE : objectif = converger vers precision 'day'. Ne JAMAIS regresser.
-    // Etat Clean : la SOURCE fait autorite. Adopte sa date des qu'elle differe (2 sens).
-    if (merged.releaseDate && merged.releasePrecision) {
-      const dateChanged = merged.releaseDate !== (item as any).release_date;
-      const precChanged = merged.releasePrecision !== (item as any).release_precision;
-      if (dateChanged || precChanged) {
-        updates.push("release_date = ?"); params.push(merged.releaseDate);
-        updates.push("release_precision = ?"); params.push(merged.releasePrecision);
-        fields.push("date:" + merged.releaseDate + "(" + merged.releasePrecision + ")");
-      }
+    // DATE (19 octobre 2026) : AniList fait reference (nouvelleDate, dates-animes.ts)
+    const nd = nouvelleDate(item, aniList, animeSchedule, merged);
+    if (nd) {
+      updates.push("release_date = ?"); params.push(nd.date);
+      updates.push("release_precision = ?"); params.push(nd.precision);
+      fields.push("date:" + nd.date + "(" + nd.precision + ")");
     }
     if (updates.length > 0) {
       params.push(item.id);

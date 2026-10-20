@@ -142,23 +142,15 @@ export const MISSING_VALUE_SENTINELS = Object.freeze(["", "unknown", "null", "[]
  * (e.g. "PC (Microsoft Windows)") is normalized via PLATFORM_ALIASES.
  */
 export const VALID_PLATFORMS = Object.freeze([
-  // Streaming anime
+  // Streaming anime : plateformes disponibles en Europe seulement
   "Crunchyroll",
   "Netflix",
-  "Muse Asia",
-  "Ani-One Asia",
-  "Ani-One",
-  "Medialink",
-  "Bilibili TV",
-  "Tencent Video",
-  "iQ",
   "Amazon Prime Video",
   "HIDIVE",
   "Disney+",
+  "HBO Max",
   "Hulu",
-  "Wakanim",
   "ADN",
-  "Funimation",
   // Gaming - canonical short forms
   "PC",
   "PlayStation",
@@ -199,17 +191,19 @@ export const VALID_PLATFORMS = Object.freeze([
  *   "Nintendo Switch"         → "Nintendo"
  *   "Disney Plus"             → "Disney+"
  *   "Prime Video"             → "Amazon Prime Video"
- *   "iQIYI"                   → "iQ"
- *   "Bilibili"                → "Bilibili TV"
+ *   "Max"                     → "HBO Max"
+ *   "Animation Digital Network" → "ADN"
  */
 export const PLATFORM_ALIASES: Readonly<Record<string, string>> = Object.freeze({
   // PC: always alias to short form (long form looks bad in modal detail too)
   "PC (Microsoft Windows)": "PC",
   // Streaming aliases (real renames, not version collapsing)
-  "Bilibili": "Bilibili TV",
   "Disney Plus": "Disney+",
   "Prime Video": "Amazon Prime Video",
-  "iQIYI": "iQ",
+  "Max": "HBO Max",
+  "Animation Digital Network": "ADN",
+  "Anime Digital Network": "ADN",
+  "Anime Digital Networks": "ADN",
   // NOTE: Xbox/PlayStation/Nintendo versions are kept as-is in DB.
   // The frontend simplifyPlatform() collapses them on cards for compact display,
   // while the modal shows the full version for detail.

@@ -8,6 +8,8 @@
 import type { FastifyInstance } from "fastify";
 import { getTwitchToken, fetchWithTimeout, igdbFetch } from "./twitch.js";
 import { getLastRun } from "./dashboard.js";
+import { startControleDonnees } from "./controle-donnees.js";
+import { planifier, surveillance } from "./pilotage.js";
 
 type Pool = any;
 
@@ -22,20 +24,7 @@ interface PingResult {
 
 // ── Twitch token pour IGDB (meme flow que refetch-games-cron) ──
 
-// ── Ping RAWG ──
-async function pingRawg(): Promise<PingResult> {
-  const key = process.env.RAWG_API_KEY || "";
-  const t0 = Date.now();
-  if (!key) return { status: "DOWN", httpCode: null, errorMsg: "RAWG_API_KEY absente", responseMs: null };
-  try {
-    const res = await fetchWithTimeout(`https://api.rawg.io/api/games?key=${key}&page_size=1`);
-    const ms = Date.now() - t0;
-    if (res.ok) return { status: "UP", httpCode: res.status, errorMsg: null, responseMs: ms };
-    return { status: "DOWN", httpCode: res.status, errorMsg: `HTTP ${res.status}`, responseMs: ms };
-  } catch (e: any) {
-    return { status: "DOWN", httpCode: null, errorMsg: e?.name === "AbortError" ? "timeout" : String(e?.message || e), responseMs: Date.now() - t0 };
-  }
-}
+// RAWG n'est plus controle : retire au profit d'IGDB (igdb-jeux.ts, 13 octobre 2026).
 
 // ── Ping IGDB (via Twitch) ──
 async function pingIgdb(): Promise<PingResult> {
@@ -82,11 +71,13 @@ async function pingAnilist(): Promise<PingResult> {
   }
 }
 
-// ── Ping Jikan (pas de cle) ──
-async function pingJikan(): Promise<PingResult> {
+// ── Ping Kitsu (pas de cle) : il remplace Jikan, ferme le 1er octobre 2026 ──
+async function pingKitsu(): Promise<PingResult> {
   const t0 = Date.now();
   try {
-    const res = await fetchWithTimeout("https://api.jikan.moe/v4/anime/1");
+    const res = await fetchWithTimeout("https://kitsu.io/api/edge/anime/1", {
+      headers: { Accept: "application/vnd.api+json", "User-Agent": "GameNime/1.0 (+https://gamenime.fr)" },
+    });
     const ms = Date.now() - t0;
     if (res.ok) return { status: "UP", httpCode: res.status, errorMsg: null, responseMs: ms };
     return { status: "DOWN", httpCode: res.status, errorMsg: `HTTP ${res.status}`, responseMs: ms };
@@ -125,10 +116,9 @@ async function saveResult(pool: Pool, source: string, r: PingResult) {
 // ── Lancer tous les pings ──
 export async function runHealthCheck(app: FastifyInstance, pool: Pool, only?: string): Promise<void> {
   const checks: Array<[string, () => Promise<PingResult>]> = [
-    ["rawg", pingRawg],
     ["igdb", pingIgdb],
     ["anilist", pingAnilist],
-    ["jikan", pingJikan],
+    ["kitsu", pingKitsu],
     ["animeschedule", pingAnimeSchedule],
   ];
   const list = only ? checks.filter(function(c) { return c[0] === only; }) : checks;
@@ -210,20 +200,30 @@ async function alerterSources(
 // Un cron mort et un cron sans travail se ressemblent dans les logs.
 // trackLastRun est appele a CHAQUE passage, meme a zero rattachement :
 // son absence prolongee signale donc un vrai arret, pas une accalmie.
-const CYCLES_SURVEILLES: Array<{ cle: string; nom: string; toleranceH: number }> = [
-  { cle: "match-anime-routes", nom: "Routes AnimeSchedule", toleranceH: 48 },
-  { cle: "refetch-cron", nom: "Refetch Phase B", toleranceH: 6 },
+// Pilotage (17 octobre 2026) : un cycle coupé, en pause ou arrêté avec celui dont il dépend n'est pas surveillé ; son
+// dernier passage vient du Pilotage (gardé en base : il survit aux redémarrages de l'API).
+const CYCLES_SURVEILLES: Array<{ module: string; nom: string; toleranceH: number }> = [
+  { module: "routes-as", nom: "Routes AnimeSchedule", toleranceH: 48 },
+  { module: "phase-b-animes", nom: "Refetch Phase B", toleranceH: 6 },
+  // Jeux IGDB (igdb-jeux.ts) : un passage toutes les 3 h
+  { module: "igdb-jeux", nom: "Jeux IGDB (listes et notes)", toleranceH: 8 },
+  // Steam (steam-jeux.ts, arrêté avec les jeux IGDB) : un passage toutes les 2 h
+  { module: "steam", nom: "Steam (dates PC des jeux)", toleranceH: 6 },
+  // Contrôle des données des animés (controle-donnees.ts) : chaque jour à 5 h 30 UTC
+  { module: "controle-donnees", nom: "Contrôle des données (animés)", toleranceH: 30 },
 ];
 
 async function verifierCyclesInternes(app: FastifyInstance): Promise<void> {
   const muets: string[] = [];
   for (const c of CYCLES_SURVEILLES) {
-    const run = getLastRun(c.cle);
-    if (!run) {
-      muets.push(`**${c.nom}** — aucun passage enregistré depuis le démarrage`);
+    const s = surveillance(c.module);
+    if (!s.suivi) continue;
+    if (!s.reference) {
+      // juste apres un demarrage, un cycle n'a pas encore eu le temps de passer (premiers passages : 50 min au plus)
+      if (process.uptime() > 3600) muets.push(`**${c.nom}** — aucun passage enregistré depuis le démarrage`);
       continue;
     }
-    const heures = (Date.now() - run.ts) / 3600000;
+    const heures = (Date.now() - s.reference) / 3600000;
     if (heures > c.toleranceH) {
       muets.push(`**${c.nom}** — silencieux depuis ${Math.round(heures)} h (seuil ${c.toleranceH} h)`);
     }
@@ -259,17 +259,17 @@ export function startHealthCheckCron(app: FastifyInstance, pool: Pool): NodeJS.T
   // Session 33 : passage de 1x/jour a 4x/jour. Avec un seul controle a minuit,
   // une source tombee a 3h restait affichee "UP" pendant vingt heures — c'est
   // exactement ce qui s'est passe avec la coupure de l'API AniList.
+  // Pilotage (17 octobre 2026) : mêmes heures qu'avant (0 h, 6 h, 12 h et 18 h UTC, l'heure du conteneur) ; un créneau
+  // manqué pendant un arrêt de l'API est rattrapé 2 min après le démarrage.
   const HEURES = [0, 6, 12, 18];
-  let dernierCreneau = -1;
-  app.log.info({ heures: HEURES }, "Health check cron demarre (toutes les 6h)");
-  return setInterval(async () => {
-    const now = new Date();
-    const h = now.getHours();
-    const creneau = now.getDate() * 100 + h;
-    if (HEURES.indexOf(h) !== -1 && dernierCreneau !== creneau) {
-      dernierCreneau = creneau;
-      app.log.info({ heure: h }, "Health check declenche");
+  // Le contrôle quotidien des données des animés (16 octobre 2026) : lancé ici, avec la surveillance de l'API
+  startControleDonnees(app);
+  planifier({
+    id: "sante", premierMs: 2 * 60 * 1000, heuresUtc: HEURES,
+    passage: async () => {
       await runHealthCheck(app, pool);
-    }
-  }, 60 * 1000);
+    },
+  });
+  app.log.info({ heures: HEURES }, "Health check cron demarre (toutes les 6h)");
+  return setTimeout(() => {}, 0);
 }

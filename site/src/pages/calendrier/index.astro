@@ -1,0 +1,10 @@
+---
+/** /calendrier/ : le calendrier des sorties, au mois en cours (onglet « Calendrier »). */
+import CalendrierPage from "../../components/CalendrierPage.astro";
+import { leMois, moisCourant, moisDeLaFenetre, comptesParMois } from "../../lib/calendrier";
+
+const fenetre = moisDeLaFenetre();
+const mois = await leMois(moisCourant());
+const comptes = await comptesParMois(fenetre);
+---
+<CalendrierPage mois={mois} fenetre={fenetre} comptes={comptes} courant />

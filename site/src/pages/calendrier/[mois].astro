@@ -1,0 +1,15 @@
+---
+/** /calendrier/AAAA-MM/ : un mois du calendrier des sorties, pour chacun des 24 mois de la fenetre. */
+import CalendrierPage from "../../components/CalendrierPage.astro";
+import { leMois, moisDeLaFenetre, comptesParMois } from "../../lib/calendrier";
+
+export function getStaticPaths() {
+  return moisDeLaFenetre().map((mois) => ({ params: { mois } }));
+}
+
+const { mois: cle } = Astro.params;
+const fenetre = moisDeLaFenetre();
+const mois = await leMois(cle as string);
+const comptes = await comptesParMois(fenetre);
+---
+<CalendrierPage mois={mois} fenetre={fenetre} comptes={comptes} />

@@ -16,7 +16,7 @@ import Footer from "../components/Footer.astro";
   </div>
 
   <div id="homeSearchResults" class="container" style="display:none;">
-    <section class="section-block">
+    <section class="section-block container">
       <div class="section-head"><h2>Résultats</h2></div>
       <div class="items-row" id="homeSearchRow"></div>
     </section>
@@ -74,129 +74,11 @@ import Footer from "../components/Footer.astro";
 </BaseLayout>
 
 <script>
-import { getAnimeItems, getGameItems, displayTitle } from "../lib/api";
-// Meme rendu que le catalogue : renderSearchCard avait son propre corps de
-// carte, plus pauvre (deux paragraphes au lieu du bloc date, des pastilles
-// de plateformes et du badge). Un seul gabarit evite qu'ils redivergent.
-import { dateBox, platChips, hypePill } from "../lib/fiche";
-import type { ContentItem } from "../lib/api";
-
-function formatDate(v) {
-  if (!v) return "Date inconnue";
-  var d = new Date(v);
-  if (Number.isNaN(d.getTime())) return v;
-  return new Intl.DateTimeFormat("fr-FR", { day: "2-digit", month: "long", year: "numeric" }).format(d);
-}
-
-function getStatusLabel(item) {
-  if (!item.releaseDate) return "À surveiller";
-  if (item.releasePrecision === "year") return "À venir";
-  var now = new Date(); now.setHours(0,0,0,0);
-  var rel = new Date(item.releaseDate); rel.setHours(0,0,0,0);
-  var diff = Math.round((rel.getTime() - now.getTime()) / 86400000);
-  if (diff === 0) return "Aujourd'hui";
-  if (diff > 0) return "À venir";
-  // Calcule depuis la date plutot que lu en base : is_recently_released
-  // n'etait ecrit qu'a l'ingestion et jamais recalcule, donc un item entre
-  // comme "a venir" restait a 0 apres sa sortie (Sekiro, sorti le jour meme,
-  // affichait "Sorti" au lieu de "Recent").
-  if (diff >= -30) return "Récent";
-  return "Sorti";
-}
-
-function ytId(url) {
-  if (!url) return null;
-  var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-  return m ? m[1] : null;
-}
-
-function parseScreenshots(item) {
-  if (!item.screenshots) return [];
-  try { var arr = JSON.parse(item.screenshots); return Array.isArray(arr) ? arr : []; }
-  catch(e) { return []; }
-}
-function simplifyPlatform(p) {
-  // La base garde le detail ("PlayStation 5", "Xbox Series X|S").
-  // Certaines lignes melangent generique et precis :
-  //   "PC, PlayStation, Xbox, PlayStation 5, Xbox Series X|S"
-  // Regle : des qu'une version precise existe pour une famille,
-  // le generique de cette famille disparait.
-  if (!p) return "";
-  var LABELS = {
-    "playstation 6": "PS6",
-    "playstation 5": "PS5",
-    "playstation 4": "PS4",
-    "playstation 3": "PS3",
-    "xbox series x|s": "Xbox X|S",
-    "xbox series s/x": "Xbox X|S",
-    "xbox series": "Xbox X|S",
-    "xbox one": "Xbox One",
-    "nintendo switch 2": "Switch 2",
-    "nintendo switch": "Switch",
-    "pc (microsoft windows)": "PC",
-    "apple macintosh": "Mac"
-  };
-  var FAMILIES = [
-    { generic: "playstation", precise: /^playstation \d/ },
-    { generic: "xbox", precise: /^xbox (series|one)/ },
-    { generic: "nintendo", precise: /^nintendo (switch|3ds|ds|wii)/ }
-  ];
-  var parts = String(p).split(",").map(function (x) { return x.trim(); }).filter(Boolean);
-  var lower = parts.map(function (x) { return x.toLowerCase(); });
-  var out = [];
-  for (var i = 0; i < parts.length; i++) {
-    var fam = null;
-    for (var f = 0; f < FAMILIES.length; f++) {
-      if (lower[i] === FAMILIES[f].generic) { fam = FAMILIES[f]; break; }
-    }
-    if (fam) {
-      var precisExiste = false;
-      for (var k = 0; k < lower.length; k++) {
-        if (fam.precise.test(lower[k])) { precisExiste = true; break; }
-      }
-      if (precisExiste) continue;
-    }
-    var label = LABELS[lower[i]] || parts[i];
-    if (out.indexOf(label) === -1) out.push(label);
-  }
-  return out.join(", ");
-}
-function getHypeLabel(item) {
-  if (!item) return null;
-  var score = Number(item.popularity || 0);
-  if (score < 70) return null;
-  var today = new Date().toISOString().slice(0, 10);
-  if (item.releaseDate && item.releaseDate <= today) return "Populaire";
-  if (item.releaseDate && item.releaseDate > today) return "Très attendu";
-  return null;
-}
-
-function renderSearchCard(item, domain) {
-  var status = getStatusLabel(item);
-  var media = item.cover ? "<img src=\"" + item.cover + "\" alt=\"" + displayTitle(item) + "\" loading=\"lazy\" />" : "<div class=\"item-placeholder\">Aucune image</div>";
-  var info = (typeof simplifyPlatform === "function" ? simplifyPlatform(item.platform) : item.platform) || item.genre || "Information à venir";
-  var hasTrailer = item.trailerUrl && ytId(item.trailerUrl);
-  var videoId = hasTrailer ? ytId(item.trailerUrl) : null;
-  var screens = parseScreenshots(item);
-  var screensAttr = !hasTrailer && screens.length ? " data-screens='" + JSON.stringify(screens) + "'" : "";
-  var hype = typeof getHypeLabel === "function" ? getHypeLabel(item) : null;
-  var hypeBadge = "";
-  if (hype === "Populaire") hypeBadge = "<span class=\"item-badge popular\">Populaire</span>";
-  else if (hype === "Très attendu") hypeBadge = "<span class=\"item-badge anticipated\">Très attendu</span>";
-  return "<article class=\"item-card" + (hasTrailer ? " has-trailer" : "") + "\"" +
-    " data-id=\"" + item.id + "\" data-domain=\"" + domain + "\" data-type=\"" + (domain === "games" ? "game" : "anime") + "\" data-release-date=\"" + (item.releaseDate || "") + "\"" +
-    (videoId ? " data-yt=\"" + videoId + "\"" : "") + screensAttr + ">" +
-    "<div class=\"item-media\">" + media + "</div>" +
-    "<div class=\"item-hover-video\"></div>" +
-    (hasTrailer ? "<div class=\"trailer-band top\" data-band-id=\"" + item.id + "\" data-band-domain=\"" + domain + "\"></div><div class=\"trailer-band bottom\" data-band-id=\"" + item.id + "\" data-band-domain=\"" + domain + "\"></div>" : "") +
-    "<div class=\"item-hover-slides\"></div>" +
-    "<div class=\"item-overlay\"></div>" +
-    "<button class=\"fav-heart\" data-fav-id=\"" + item.id + "\" data-fav-type=\"" + domain + "\" aria-label=\"Favori\">♡</button>" +
-    "<div class=\"item-body\">" +
-    "<h3>" + displayTitle(item) + "</h3>" +
-    dateBox(item) + platChips(item, domain) + hypePill(item, domain) +
-    "</div></article>";
-}
+// Les resultats de la recherche sont les cartes des pages Anime et Jeux :
+// renderCard (lib/fiche), avec le lien vers la fiche, data-slug (l'adresse
+// suit la fiche ouverte) et le badge. renderSearchCard avait sa propre copie
+// de la carte, restee dans l'ancien design.
+import { renderCard } from "../lib/fiche";
 
 var input = document.getElementById("homeSearch");
 var btn = document.getElementById("homeSearchBtn");
@@ -216,7 +98,7 @@ async function doSearch() {
     var all = (data.items || []).map(function(i) {
       return Object.assign({}, i, { _d: i.type === 'game' ? 'games' : 'anime' });
     });
-    row.innerHTML = all.length ? all.map(function(i) { return renderSearchCard(i, i._d); }).join('') : '<p class="section-empty">Aucun résultat.</p>';
+    row.innerHTML = all.length ? all.map(function(i) { return renderCard(i, i._d); }).join('') : '<p class="section-empty">Aucun résultat.</p>';
   } catch(e) { row.innerHTML = '<p class="section-empty">Erreur.</p>'; }
 }
 

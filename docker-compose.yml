@@ -42,7 +42,13 @@ services:
       SYNOPSIS_ENABLED: "0"
       SYNOPSIS_WINDOW: "0-24"
       SYNOPSIS_MAX_PER_RUN: "10"
-      SERPER_API_KEY: ${SERPER_API_KEY}
+      PRESSE_ENABLED: "1"
+      PRESSE_JOURS: "10"
+      TMDB_ENABLED: "0"
+      PLATEFORMES_ENABLED: "1"
+      TAVILY_ENABLED: "0"
+      TAVILY_API_KEY: ${TAVILY_API_KEY}
+      STEAM_API_KEY: ${STEAM_API_KEY}
     volumes:
       # Le rapport et le journal du build, en lecture seule : l'API les affiche,
       # elle ne les ecrit jamais.
@@ -64,7 +70,6 @@ services:
       - N8N_PORT=5678
       - N8N_PATH=/n8n/
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - ANIME_API_KEY=${ANIME_API_KEY}
       - GAMES_API_KEY=${GAMES_API_KEY}
       - ANIMESCHEDULE_TOKEN=${ANIMESCHEDULE_TOKEN}

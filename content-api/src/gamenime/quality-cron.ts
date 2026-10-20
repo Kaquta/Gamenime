@@ -4,7 +4,7 @@
  * Tous les jours à 8h UTC, scanne les items dont la release_date est dans
  * 7 jours ou moins. Pour chaque item incomplet (cover hotlink, sans platform,
  * sans description, sans trailer), force un re-fetch agressif via AniList/
- * Jikan/AnimeSchedule. Les items qui restent incomplets après le re-fetch
+ * Kitsu/AnimeSchedule. Les items qui restent incomplets après le re-fetch
  * sont retournés à l'appelant (workflow n8n Discord).
  *
  * Endpoint exposé : POST /admin/quality-check-j7?daysAhead=7
@@ -16,13 +16,15 @@ import { trackLastRun, pushActivity } from "./dashboard.js";
 import { sanitizePlatform } from "./core.js";
 import {
   fetchAniList,
-  fetchJikan,
+  fetchKitsu,
+  kitsuUtile,
   fetchAnimeSchedule,
   mergeSources,
   isHotlinkProtectedCover,
   isAniListCover,
 } from "./refetch-cron.js";
 import { lookupAniListByTitle } from "./lookup-cron.js";
+import { planifier } from "./pilotage.js";
 
 const QUALITY_DELAY_MS = 800;
 
@@ -75,6 +77,8 @@ export async function qualityCheckCycle(
         "DATEDIFF(release_date, CURDATE()) AS days_until_release " +
       "FROM anime_items " +
       "WHERE release_date IS NOT NULL " +
+        // annulé chez AniList : retiré du site (dates-animes.ts), ni relu ni signalé (20 octobre 2026)
+        "AND IFNULL(statut_anilist, '') <> 'CANCELLED' " +
         "AND release_date >= CURDATE() " +
         "AND release_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY) " +
         "AND (cover IS NULL OR cover = '' " +
@@ -113,15 +117,18 @@ export async function qualityCheckCycle(
             app.log.warn({ id: item.id, err: (lookupErr as any)?.message }, "QualityCheck: lookup orphelin echoue");
           }
         }
-        const [aniList, jikan, animeSchedule] = await Promise.all([
+        const [aniList, animeSchedule] = await Promise.all([
           item.anilist_id ? fetchAniList(item.anilist_id) : null,
-          item.mal_id ? fetchJikan(item.mal_id) : null,
           item.anime_schedule_route && animeScheduleToken
             ? fetchAnimeSchedule(item.anime_schedule_route, animeScheduleToken)
             : null,
         ]);
+        // Ici, Kitsu ne sert qu'a la bande-annonce, et seulement si AniList a repondu sans en avoir
+        const kitsu = kitsuUtile(item, aniList, { titreJaponais: false, bandeAnnonce: !item.trailer_url })
+          ? await fetchKitsu(item.mal_id, item.anilist_id)
+          : null;
 
-        const merged = mergeSources(aniList, jikan, animeSchedule);
+        const merged = mergeSources(aniList, kitsu, animeSchedule);
 
         const updates: string[] = [];
         const params: any[] = [];
@@ -238,34 +245,12 @@ export async function adminQualityCheckHandler(
 export function startQualityCron(app: FastifyInstance): NodeJS.Timeout {
   app.log.info("Quality check cron demarre (J-7 quotidien 8h UTC)");
 
-  function msUntilNext8h(): number {
-    const now = new Date();
-    const next = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      8, 0, 0, 0
-    ));
-    if (next.getTime() <= now.getTime()) {
-      next.setUTCDate(next.getUTCDate() + 1);
-    }
-    return next.getTime() - now.getTime();
-  }
-
-  const firstRunDelay = 5 * 60 * 1000;
-  setTimeout(() => {
-    qualityCheckCycle(app, { daysAhead: 7 }).catch(
-      (e) => app.log.error({ err: e?.message }, "Quality check error")
-    );
-    setTimeout(scheduleDaily8h, msUntilNext8h());
-  }, firstRunDelay);
-
-  function scheduleDaily8h() {
-    qualityCheckCycle(app, { daysAhead: 7 }).catch(
-      (e) => app.log.error({ err: e?.message }, "Quality check error")
-    );
-    setTimeout(scheduleDaily8h, 24 * 60 * 60 * 1000);
-  }
-
+  // Pilotage (pilotage.ts) : chaque jour à 8 h UTC, et 5 min après le démarrage s'il n'a pas tourné depuis le dernier
+  planifier({
+    id: "quality-j7", premierMs: 5 * 60 * 1000, heuresUtc: [8], suivi: "quality-cron", processAdmin: "quality-check-j7",
+    passage: async () => {
+      await qualityCheckCycle(app, { daysAhead: 7 });
+    },
+  });
   return setTimeout(() => {}, 0);
 }

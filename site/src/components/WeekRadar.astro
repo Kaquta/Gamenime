@@ -125,7 +125,8 @@ function relatif(iso) {
 // Un episode vu comme un item de catalogue. titleEnglish et popularity sont
 // bien renvoyes par /feed/week : sans eux la carte afficherait le titre romaji,
 // alors que tout le reste du site montre l'anglais.
-// accLibelle et accEpisode sont lus par renderCardSemaine.
+// accLibelle et accEpisode sont lus par renderCardSemaine. badge : celui que
+// l'API donne a l'anime (« populaire » / « tres-attendu », lib/fiche hypePill).
 function versItem(e, jour) {
   const plates = String(e.platform || "").split(",").map((x) => x.trim()).filter(Boolean);
   return {
@@ -136,6 +137,7 @@ function versItem(e, jour) {
     cover: coverHD(e.cover),
     platform: e.platform || null,
     popularity: e.popularity || 0,
+    badge: e.badge || null,
     releaseDate: dateParis(e.airingAt),
     releaseDatetime: e.airingAt,
     releasePrecision: "day",

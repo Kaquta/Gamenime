@@ -6,14 +6,18 @@
  * indexer — quatre pages pour un catalogue de plus de mille titres. Chaque
  * fiche a desormais son adresse, avec son HTML complet des le premier octet.
  *
- * Le rendu reutilise fiche.ts, le meme module que le modal : pas de second
- * gabarit a maintenir, donc pas de divergence possible.
+ * La fiche est celle du modal (lib/fiche : ficheHtml), en mode « page » :
+ * titre h1, bande-annonce et description cote a cote. Le HTML livre est rendu
+ * au build (pour Google) ; a l'ouverture, la page se recharge avec les donnees
+ * en direct (rafraichirFiche) : apres un F5, on retrouve le modal a jour.
+ * Design du site (Vitre · Cameleon, jeton « fiche » : bloc FICHE-VITRE de
+ * global.css) ; la page prend la couleur de la jaquette (lib/teinte).
  */
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import HeroHeader from "../../components/HeroHeader.astro";
 import Footer from "../../components/Footer.astro";
 import { displayTitle } from "../../lib/api";
-import { detailDateBlock, detailPlatforms, dateLabel, formatPegi, getHypeLabel, ytId } from "../../lib/fiche";
+import { dateLabel, ficheHtml } from "../../lib/fiche";
 
 export async function getStaticPaths() {
   // Declaree ici : Astro appelle getStaticPaths avant d'evaluer le reste
@@ -40,9 +44,7 @@ const synopsis = String(item.description || "").replace(/\[[A-Z]+:[^\]]*\]/g, ""
 const meta = synopsis ? `${dateLabel(item)}. ${synopsis.slice(0, 150)}…` : `${titre} — date de sortie et plateformes.`;
 const alt = [item.titleNative, item.title].filter((t, i, a) => t && t !== titre && a.indexOf(t) === i);
 const genres = String(item.genre || "").split(",").map((g) => g.trim()).filter(Boolean);
-const pegi = formatPegi(item.rating);
-const hype = getHypeLabel(item);
-const videoId = item.trailerUrl ? ytId(item.trailerUrl) : null;
+const domaine = "games";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -52,7 +54,11 @@ const jsonLd = {
   url,
   ...(item.cover ? { image: item.cover } : {}),
   ...(synopsis ? { description: synopsis.slice(0, 500) } : {}),
-  ...(item.releaseDate ? { startDate: item.releaseDate } : {}),
+  // la date donnee a Google (20 octobre 2026) : au mois (« 2027-10 ») ou a l'annee (« 2027 ») quand le jour n'est pas
+  // connu, jamais un 1er invente (format ISO 8601 a precision reduite)
+  ...(item.releaseDate
+    ? { startDate: item.releasePrecision === "year" ? String(item.releaseDate).slice(0, 4) : item.releasePrecision === "month" ? String(item.releaseDate).slice(0, 7) : item.releaseDate }
+    : {}),
   ...(genres.length ? { genre: genres } : {}),
   
 };
@@ -64,6 +70,7 @@ const jsonLd = {
   canonical={url}
   image={item.cover || "https://gamenime.fr/og-image.jpg?v=2"}
   ogType="video.other"
+  jetons="fiche"
 >
   <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} is:inline />
 
@@ -74,49 +81,8 @@ const jsonLd = {
       <a href="/">Accueil</a><span>›</span><a href="/games">Jeux</a><span>›</span>{titre}
     </nav>
 
-    <article class="fiche-sheet">
-      <div class="detail-header">
-        <div class="detail-cover">
-          {item.cover && <img src={item.cover} alt={titre} width="160" height="213" />}
-        </div>
-        <div class="detail-info">
-          <h1>{titre}</h1>
-          {alt.length > 0 && (
-            <div class="alt-titles">
-              {alt.map((t, i) => (
-                <>
-                  {i > 0 && <span class="alt-sep">·</span>}
-                  <span class={i === 0 && item.titleNative ? "alt-nat" : ""}>{t}</span>
-                </>
-              ))}
-            </div>
-          )}
-          <Fragment set:html={detailDateBlock(item)} />
-          <div class="detail-section-label">Où y jouer</div>
-          <Fragment set:html={detailPlatforms(item)} />
-          <div class="detail-genres">
-            {genres.map((g) => <span class="genre-tag">{g}</span>)}
-            {pegi && <span class="pegi-tag">{pegi}</span>}
-            {hype === "Populaire" && <span class="popular-tag">Populaire</span>}
-            {hype === "Très attendu" && <span class="anticipated-tag">Très attendu</span>}
-          </div>
-        </div>
-      </div>
-
-      {videoId && (
-        <a class="fiche-trailer" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer">
-          <img src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`} alt={`Bande-annonce de ${titre}`} loading="lazy" width="480" height="270" />
-          <span class="fiche-play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg></span>
-          <span class="fiche-trailer-lab">Voir la bande-annonce</span>
-        </a>
-      )}
-
-      {synopsis && (
-        <div class="detail-description">
-          <h2>Description</h2>
-          <p>{synopsis}</p>
-        </div>
-      )}
+    <article class="fiche-sheet" data-domain={domaine} data-id={String(item.id)}>
+      <div class="fiche-vive" set:html={ficheHtml(item, domaine, "page")}></div>
 
       <p class="fiche-retour">
         <a href="/games">← Tous les jeux</a> · <a href="/upcoming">Prochaines sorties</a>
@@ -127,64 +93,100 @@ const jsonLd = {
   <Footer />
 </BaseLayout>
 
+<script>
+  // Votes, galerie et bande-annonce ; puis les donnees en direct (le HTML livre date du build).
+  import { brancherFiche, rafraichirFiche } from "../../lib/fiche";
+  import { teinteImage, teinter } from "../../lib/teinte";
+  const fiche = document.querySelector(".fiche-sheet") as HTMLElement | null;
+  const zone = fiche ? (fiche.querySelector(".fiche-vive") as HTMLElement | null) : null;
+  // La couleur de la jaquette sur toute la page (Cameleon) : deja connue (memoire du navigateur, partagee
+  // avec les autres pages), posee d'emblee ; calculee apres coup, en fondu depuis le neutre.
+  const jaquette = fiche ? (fiche.querySelector(".detail-cover img") as HTMLImageElement | null) : null;
+  const src = jaquette ? jaquette.getAttribute("src") : null;
+  if (src) {
+    const racine = document.documentElement;
+    let tout = true;
+    teinteImage(src, (h) => {
+      if (h === null) return;
+      if (!tout) racine.classList.add("ep-pret");
+      teinter(racine, h);
+    });
+    tout = false;
+  }
+  if (fiche && zone) {
+    const dom = fiche.dataset.domain || "games";
+    const id = fiche.dataset.id || "";
+    brancherFiche(zone, dom, id);
+    rafraichirFiche(zone, dom, id);
+  }
+</script>
+
 <style>
   .fiche-fil {
     display: flex; align-items: center; gap: 7px;
-    padding: 10px 0 14px; font-size: .76rem;
-    color: rgba(226,197,170,.5); flex-wrap: wrap;
+    padding: 10px 0 14px; font-size: .76rem; flex-wrap: wrap;
   }
-  .fiche-fil a { color: #ffb066; text-decoration: none; }
+  .fiche-fil a { text-decoration: none; }
   .fiche-fil a:hover { text-decoration: underline; }
   .fiche-fil span { opacity: .5; }
 
+  /* La fiche du modal, posee dans la page : memes blocs. Son HTML vient de
+     ficheHtml (set:html) : les selecteurs internes passent donc par :global().
+     Les matieres et les couleurs (panneau de verre, accent de la jaquette)
+     sont dans le bloc FICHE-VITRE de global.css. */
   .fiche-sheet {
-    padding: 20px; border-radius: 20px;
-    background: linear-gradient(180deg, rgba(52,22,14,.62), rgba(26,11,7,.58));
-    border: 1px solid rgba(255,165,98,.22);
-    margin-bottom: 28px;
+    padding: 24px; margin-bottom: 28px;
   }
-  .fiche-sheet .detail-info h1 {
-    margin: 0 0 8px; font-size: 1.8rem;
-    color: #F0F1F4; line-height: 1.2;
+  .fiche-sheet :global(.detail-info h1) {
+    margin: 0 0 8px; font-size: 1.8rem; line-height: 1.2;
   }
-  .fiche-sheet .detail-cover img {
-    width: 100%; height: auto; display: block; border-radius: 14px;
+  /* Bande-annonce a gauche, description a droite (la zone vide d'avant). */
+  .fiche-sheet :global(.fiche-duo) {
+    display: grid; grid-template-columns: minmax(0, 480px) minmax(0, 1fr);
+    gap: 26px; align-items: start; margin: 0 0 20px;
+  }
+  .fiche-sheet :global(.fiche-duo.seule) { grid-template-columns: minmax(0, 1fr); }
+  .fiche-sheet :global(.fiche-duo .detail-trailer),
+  .fiche-sheet :global(.fiche-duo .detail-gallery),
+  .fiche-sheet :global(.fiche-duo .detail-description) { margin-bottom: 0; }
+  .fiche-sheet :global(.detail-description h2) {
+    margin: 0 0 10px; font-size: 1.3rem;
   }
 
   /* Vignette plutot qu'iframe : YouTube chargerait plusieurs centaines de
-     kilo-octets a l'ouverture, et Google mesure la vitesse des pages. */
-  .fiche-trailer {
-    position: relative; display: block; max-width: 480px;
-    margin: 20px 0; border-radius: 14px; overflow: hidden;
-    border: 1px solid rgba(255,165,98,.11);
+     kilo-octets a l'ouverture, et Google mesure la vitesse des pages. Au clic,
+     la video se lance a la meme place (brancherFiche). */
+  .fiche-sheet :global(.fiche-trailer) {
+    position: relative; display: block; aspect-ratio: 16 / 9;
+    border-radius: 14px; overflow: hidden;
   }
-  .fiche-trailer img { width: 100%; height: auto; display: block; }
-  .fiche-play {
+  .fiche-sheet :global(.fiche-trailer img) { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .fiche-sheet :global(.fiche-play) {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%,-50%);
     width: 58px; height: 58px; border-radius: 50%;
     display: grid; place-items: center;
-    background: linear-gradient(180deg, rgba(255,132,41,.95), rgba(205,74,20,.92));
-    box-shadow: 0 6px 22px -4px rgba(255,140,58,.7);
     transition: transform 180ms ease;
   }
-  .fiche-trailer:hover .fiche-play { transform: translate(-50%,-50%) scale(1.08); }
-  .fiche-play svg { width: 24px; height: 24px; fill: #2a1105; margin-left: 3px; }
-  .fiche-trailer-lab {
+  .fiche-sheet :global(.fiche-trailer:hover .fiche-play) { transform: translate(-50%,-50%) scale(1.08); }
+  .fiche-sheet :global(.fiche-play svg) { width: 24px; height: 24px; margin-left: 3px; }
+  .fiche-sheet :global(.fiche-trailer-lab) {
     position: absolute; bottom: 11px; left: 13px;
-    font-size: .72rem; font-weight: 700; color: #f2dcc6;
-    background: rgba(0,0,0,.55); padding: 4px 10px; border-radius: 7px;
+    font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 7px;
   }
 
-  .fiche-sheet .detail-description h2 {
-    font-size: 1.05rem; font-weight: 800;
-    color: #F0F1F4; margin: 20px 0 10px;
+  @media (max-width: 760px) {
+    .fiche-sheet { padding: 18px 16px; }
+    .fiche-sheet :global(.fiche-duo) { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  }
+  @media (max-width: 640px) {
+    .fiche-sheet :global(.detail-info h1) { font-size: 1.42rem; margin: 0 0 6px; }
   }
   .fiche-retour {
-    margin: 24px 0 0; padding-top: 16px;
-    border-top: 1px solid rgba(255,165,98,.11);
+    margin: 4px 0 0; padding-top: 16px;
+    border-top: 1px solid transparent;
     font-size: .84rem;
   }
-  .fiche-retour a { color: #ffb066; text-decoration: none; }
+  .fiche-retour a { text-decoration: none; }
   .fiche-retour a:hover { text-decoration: underline; }
 </style>

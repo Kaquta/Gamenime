@@ -1,29 +1,28 @@
 /**
  * GameNime Phase B GAMES — Cron interne re-fetch des games incomplets
- * Symétrique à refetch-cron.ts (anime) mais pour games via RAWG + IGDB.
+ * Symétrique à refetch-cron.ts (anime), pour les jeux via IGDB seul.
  *
- * Sources externes :
- *   - RAWG (via rawg_id) → cover, description, rating (metacritic), platforms
- *   - IGDB (via igdb_id) → cover haute qualité, description (TODO: requires API key)
+ * Source externe : IGDB (via igdb_id) → cover haute qualité, plateformes, description, note,
+ * type (DLC), bande-annonce, date. RAWG est retiré (13 octobre 2026, igdb-jeux.ts) : les jeux
+ * sans igdb_id sont rattachés par le passage de igdb-jeux, toutes les 3 h.
  *
- * Cycle : toutes les heures, batch 100, delay 800ms entre items (rate limit RAWG).
+ * Cycle : toutes les heures, batch 100, delay 800ms entre items.
  */
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
-import { igdbLog, setIgdbWarnPool, igdbFetch } from "./twitch.js";
-import { normalizeTitleStrict as gnNormalizeTitleStrict, sanitizePlatform as gnSanitizePlatform, matchWindowDays as gnMatchWindowDays } from "./core.js";
+import { setIgdbWarnPool, igdbFetch } from "./twitch.js";
+import { sanitizePlatform as gnSanitizePlatform } from "./core.js";
+import { choisirDateIgdb, configIgdbJeux, lierJeuxVerrouille } from "./igdb-jeux.js";
+import { clearFeedCache } from "./routes.js";
+import { planifier } from "./pilotage.js";
 
 const REFETCH_INTERVAL_MS = 60 * 60 * 1000; // 1h
 const REFETCH_BATCH_SIZE = 100;
 const REFETCH_DELAY_MS = 800;
-// Appariement des orphelins : filet de rattrapage, pas temps-reel.
-// De nouveaux gros titres sans ID n'arrivent pas toutes les heures -> 3h.
-const ORPHAN_MATCH_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3h
 
 interface IncompleteGame {
   id: number;
   title: string;
-  rawg_id: number | null;
   igdb_id: number | null;
   cover: string | null;
   platform: string | null;
@@ -40,144 +39,13 @@ interface SourceData {
   description?: string | null;
   ratingScore?: number | null;
   gameType?: string | null;
-  slug?: string | null;
   releaseDate?: string | null;        // "YYYY-MM-DD" (jour=01 si precision month/year)
   releasePrecision?: "day" | "month" | "year" | null;  // precision reelle selon la source
 }
 
 /**
- * RAWG : récupère un game via son ID.
- * https://api.rawg.io/api/games/{id}?key=API_KEY
+ * IGDB : recupere via Twitch OAuth + IGDB API (jeton Twitch partage, twitch.ts).
  */
-export async function fetchRawg(rawgId: number): Promise<SourceData | null> {
-  if (!rawgId) return null;
-  const apiKey = process.env.RAWG_API_KEY || "";
-  if (!apiKey) return null;
-  try {
-    const res = await fetch(`https://api.rawg.io/api/games/${rawgId}?key=${apiKey}`);
-    if (!res.ok) return null;
-    const data = await res.json() as any;
-    const cover = data?.background_image ?? null;
-    const description = data?.description_raw ?? data?.description ?? null;
-    const ratingMetacritic = data?.metacritic ?? null;
-    // RAWG platforms : array of { platform: { name } }
-    const platforms = Array.isArray(data?.platforms)
-      ? data.platforms.map((p: any) => p?.platform?.name).filter(Boolean)
-      : [];
-    const platform = platforms.length > 0 ? platforms.join(", ") : null;
-    // RAWG : "released" = YYYY-MM-DD, "tba" = date non annoncee. RAWG n'expose
-    // AUCUNE precision : un jeu "prevu 2027" y apparait souvent au 31/12. On ne
-    // peut donc pas certifier le jour -> precision "day" seulement si la date
-    // n'est pas un placeholder (31/12 ou 01/01), sinon "year". IGDB (qui a le
-    // champ human) prime de toute facon dans mergeSources a precision egale.
-    let releaseDate: string | null = null;
-    let releasePrecision: "day" | "month" | "year" | null = null;
-    if (!data?.tba && typeof data?.released === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data.released)) {
-      releaseDate = data.released;
-      const mmdd = data.released.slice(5);
-      releasePrecision = (mmdd === "12-31" || mmdd === "01-01") ? "year" : "day";
-      if (releasePrecision === "year") releaseDate = data.released.slice(0, 4) + "-01-01";
-    }
-    return {
-      cover,
-      platform,
-      description: description ? String(description).substring(0, 2000) : null,
-      ratingScore: ratingMetacritic,
-      slug: data?.slug ?? null,
-      releaseDate,
-      releasePrecision,
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * IGDB : recupere via Twitch OAuth + IGDB API
- * Token Twitch cache ~60 jours (re-fetch automatique a l expiration)
- */
-
-/**
- * Cherche un jeu IGDB par son SLUG RAWG (ancre fiable, pas de match par titre).
- * Securites : exactement UN resultat + slug strictement identique, sinon null.
- * Mieux vaut un champ vide qu une donnee fausse.
- */
-export async function lookupIgdbBySlug(slug: string): Promise<number | null> {
-  if (!slug) return null;
-  const safe = slug.replace(/["\\]/g, "");
-  try {
-    const res = await igdbFetch("https://api.igdb.com/v4/games", {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: `fields id, slug; where slug = "${safe}"; limit 2;`,
-    });
-    if (!res.ok) { igdbLog("warn", "slug_http", { slug, status: res.status }); return null; }
-    const data = await res.json() as any;
-    if (!Array.isArray(data) || data.length !== 1) { igdbLog("info", "slug_absent", { slug, trouves: Array.isArray(data) ? data.length : -1 }); return null; }
-    if (data[0]?.slug !== slug) { igdbLog("info", "slug_different", { slug, recu: data[0]?.slug }); return null; }
-    return Number(data[0].id) || null;
-  } catch (e) {
-    igdbLog("warn", "slug_exception", { slug, err: (e as any)?.message });
-    return null;
-  }
-}
-
-// Repli quand le slug RAWG ne correspond a aucun slug IGDB : IGDB suffixe les
-// siens pour desambiguer (ex. "tomak-save-the-earth-regeneration--1" quand un
-// autre jeu porte un titre proche). On recherche alors par titre.
-// Garde-fous : titre normalise STRICTEMENT identique, et un seul candidat.
-// Zero candidat = inconnu, deux ou plus = ambigu — dans les deux cas on
-// n'ecrit rien. Un champ vide vaut mieux qu'une plateforme fausse.
-export async function lookupIgdbByTitle(
-  title: string,
-  releaseDate?: string | null,
-  releasePrecision?: string | null,
-): Promise<number | null> {
-  if (!title) return null;
-  const safe = String(title).replace(/["\\]/g, "");
-  try {
-    const res = await igdbFetch("https://api.igdb.com/v4/games", {
-      method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body: `search "${safe}"; fields id, name, first_release_date; limit 20;`,
-    });
-    if (!res.ok) { igdbLog("warn", "titre_http", { title, status: res.status }); return null; }
-    const data = await res.json() as any;
-    if (!Array.isArray(data) || data.length === 0) { igdbLog("info", "titre_aucun_resultat", { title }); return null; }
-    const wanted = gnNormalizeTitleStrict(title);
-    if (!wanted) return null;
-    let exact = data.filter((g: any) => gnNormalizeTitleStrict(String(g?.name || "")) === wanted);
-    // Filtre par fenetre de dates dynamique (largeur selon precision, detection placeholder 12-31/01-01).
-    // Applique seulement si une date de reference existe ET s'il reste plusieurs candidats a departager.
-    // Filtre par fenetre de dates : s'applique des qu'il y a AU MOINS un candidat
-    // exact (pas seulement plusieurs). Sinon un candidat unique hors periode passait
-    // sans controle (cas Dusk : entree 2026 vs seul "Dusk" IGDB date 2018).
-    if (releaseDate && exact.length >= 1) {
-      const refMs = new Date(releaseDate + "T00:00:00Z").getTime();
-      const tolMs = gnMatchWindowDays(releaseDate, releasePrecision as any) * 86400000;
-      const withDate = exact.filter((g: any) => g.first_release_date);
-      const windowed = withDate.filter((g: any) =>
-        Math.abs(g.first_release_date * 1000 - refMs) <= tolMs
-      );
-      //  - Au moins un candidat DANS la fenetre -> on resserre dessus.
-      //  - Des candidats ONT une date mais AUCUN dans la fenetre -> ces dates disent
-      //    "hors periode" : REJET (exact=[]) -> "ambigu ou absent", zero ecriture (Dusk).
-      //  - Aucun candidat n'a de date IGDB -> donnee manquante, on garde tel quel.
-      if (windowed.length > 0) {
-        exact = windowed;
-      } else if (withDate.length > 0) {
-        exact = [];
-      }
-    }
-    if (exact.length !== 1) { igdbLog("info", "titre_ambigu_ou_absent", { title, candidats_exacts: exact.length, resultats: data.length }); return null; }
-    igdbLog("info", "titre_rattache", { title, igdbId: exact[0].id });
-    return Number(exact[0].id) || null;
-  } catch (e) {
-    igdbLog("warn", "titre_exception", { title, err: (e as any)?.message });
-    return null;
-  }
-}
-
 export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
   if (!igdbId) return null;
   try {
@@ -234,58 +102,17 @@ export async function fetchIgdb(igdbId: number): Promise<SourceData | null> {
 }
 
 
-// Parse le champ "human" d'IGDB pour deduire la VRAIE precision :
-// "2027"=year, "Q1 2027"=year, "Feb 2027"=month, "Feb 18, 2027"=day.
-// IGDB stocke un placeholder au 31/12 quand il ne connait que l'annee : sans ce
-// parsing on presenterait "31 decembre 2027" comme une date ferme (mensonge).
-function parseDateIgdb(human: string, ts: number | null): { date: string | null; precision: "day" | "month" | "year" | null } {
-  if (!ts) return { date: null, precision: null };
-  const d = new Date(ts * 1000);
-  const pad2 = (n: number) => String(n).padStart(2, "0");
-  const y = d.getUTCFullYear(), m = d.getUTCMonth() + 1, day = d.getUTCDate();
-  const h = String(human || "").trim();
-  if (/^[A-Za-z]{3,}\s+\d{1,2},\s+\d{4}/.test(h)) {
-    return { date: y + "-" + pad2(m) + "-" + pad2(day), precision: "day" };
-  }
-  if (/^[A-Za-z]{3,}\s+\d{4}/.test(h)) {
-    return { date: y + "-" + pad2(m) + "-01", precision: "month" };
-  }
-  return { date: y + "-01-01", precision: "year" };
-}
-
-// Choisit la meilleure date parmi les release_dates IGDB : la plus PRECOCE encore
-// a venir (evite la date asiatique passee, cf. Aion 2 : KR nov 2025 vs EU sep 2026).
-// Si toutes sont passees, prend la plus recente.
-function choisirDateIgdb(rds: any[]): { date: string | null; precision: "day" | "month" | "year" | null } {
-  if (!Array.isArray(rds) || rds.length === 0) return { date: null, precision: null };
-  const now = Math.floor(Date.now() / 1000);
-  const valides = rds.filter(r => r?.date);
-  if (valides.length === 0) return { date: null, precision: null };
-  const futures = valides.filter(r => r.date > now).sort((a, b) => a.date - b.date);
-  const choix = futures[0] || valides.sort((a, b) => b.date - a.date)[0];
-  return parseDateIgdb(choix.human, choix.date);
-}
-
-function mergeSources(rawg: SourceData | null, igdb: SourceData | null): SourceData {
-  const sources = [rawg, igdb].filter(s => s !== null) as SourceData[];
+// IGDB seul (RAWG retire) : la fiche IGDB telle quelle, champs absents a null.
+function mergeSources(igdb: SourceData | null): SourceData {
   return {
-    cover: sources.find(s => s.cover)?.cover ?? null,
-    platform: sources.find(s => s.platform)?.platform ?? null,
-    description: sources.find(s => s.description)?.description ?? null,
-    ratingScore: sources.find(s => s.ratingScore != null)?.ratingScore ?? null,
-    gameType: sources.find(s => s.gameType)?.gameType ?? null,
-    trailerUrl: sources.find(s => s.trailerUrl)?.trailerUrl ?? null,
-    ...(() => {
-      // Date : preferer la source avec la MEILLEURE precision (day > month > year).
-      // IGDB prime a precision egale (il a le champ human, RAWG ne l'a pas).
-      const rang: Record<string, number> = { day: 3, month: 2, year: 1 };
-      let best: SourceData | null = null;
-      for (const s of [igdb, rawg]) {
-        if (!s?.releaseDate || !s?.releasePrecision) continue;
-        if (!best || rang[s.releasePrecision] > rang[best.releasePrecision!]) best = s;
-      }
-      return { releaseDate: best?.releaseDate ?? null, releasePrecision: best?.releasePrecision ?? null };
-    })(),
+    cover: igdb?.cover ?? null,
+    platform: igdb?.platform ?? null,
+    description: igdb?.description ?? null,
+    ratingScore: igdb?.ratingScore ?? null,
+    gameType: igdb?.gameType ?? null,
+    trailerUrl: igdb?.trailerUrl ?? null,
+    releaseDate: igdb?.releaseDate && igdb?.releasePrecision ? igdb.releaseDate : null,
+    releasePrecision: igdb?.releaseDate && igdb?.releasePrecision ? igdb.releasePrecision : null,
   };
 }
 
@@ -308,7 +135,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
   try {
     const items: IncompleteGame[] = await conn.query(
-      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
+      "SELECT id, title, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
       "FROM game_items " +
       // Criteres calibres (session 27, repris de gnAuditGame) : seuls cover,
       // plateforme et description sont de vrais manques. rating_score NULL est
@@ -317,7 +144,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
       // la file, noyant les 3 items reellement sans plateforme.
       // Les covers rawg/igdb sont les VRAIES covers, pas des hotlinks.
       "WHERE (cover IS NULL OR cover = '' OR platform IS NULL OR platform = '' OR description IS NULL OR LENGTH(TRIM(description)) < 10) " +
-      "AND (rawg_id IS NOT NULL OR igdb_id IS NOT NULL) " +
+      "AND igdb_id IS NOT NULL AND igdb_id > 0 " +
       // Anti-boucle modulee par l'urgence : un jeu qui sort dans moins de 30 jours
       // est reessaye chaque jour, les autres tous les 7 jours. Sans ca, un echec
       // passager (fiche source absente, token expire) sur un item proche de sa
@@ -335,23 +162,8 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
     for (const item of items) {
       try {
-        const [rawg, igdb] = await Promise.all([
-          item.rawg_id ? fetchRawg(item.rawg_id) : null,
-          item.igdb_id ? fetchIgdb(item.igdb_id) : null,
-        ]);
-        let merged = mergeSources(rawg, igdb);
-        // FALLBACK IGDB par slug : RAWG a repondu mais laisse la plateforme vide,
-        // et le jeu n a pas d igdb_id -> le rattacher via son slug RAWG (ancre fiable).
-        // Aucun appel RAWG supplementaire (le slug vient de la reponse deja recue).
-        if (!item.igdb_id && !merged.platform && rawg?.slug) {
-          const foundId = await lookupIgdbBySlug(rawg.slug) || await lookupIgdbByTitle(item.title);
-          if (foundId) {
-            app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
-            await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
-            const igdbData = await fetchIgdb(foundId);
-            if (igdbData) merged = mergeSources(rawg, igdbData);
-          }
-        }
+        const igdb = item.igdb_id ? await fetchIgdb(item.igdb_id) : null;
+        const merged = mergeSources(igdb);
 
         const updates: string[] = [];
         const params: any[] = [];
@@ -359,7 +171,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
         // ETAT CLEAN cover : 
         //   - Si cover vide → remplir
-        //   - Si cover RAWG/IGDB → REFRESH (URLs peuvent mourir, on force la fraicheur)
+        //   - Si cover RAWG/IGDB → REFRESH (URLs peuvent mourir ; une cover RAWG devient la jaquette IGDB)
         //   - Sinon (cover externe ou inconnue) → ne pas toucher
         const coverIsEmpty = !item.cover || item.cover === "";
         const coverFromTrustedCdn = item.cover && (item.cover.includes("media.rawg.io") || item.cover.includes("images.igdb.com"));
@@ -383,11 +195,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
           params.push(merged.description);
           itemChanges.push({ field: "description", oldValue: item.description, newValue: merged.description.substring(0, 80) + "..." });
         }
-        if (item.rating_score == null && merged.ratingScore != null) {
-          updates.push("rating_score = ?");
-          params.push(merged.ratingScore);
-          itemChanges.push({ field: "rating_score", oldValue: item.rating_score, newValue: merged.ratingScore });
-        }
+        // La note n'est plus ecrite ici : igdb-jeux la prend chez IGDB a partir de 5 votes (une seule regle).
         // game_type (lossless - on remplit si vide)
         if ((item.game_type == null || item.game_type === "") && merged.gameType) {
           updates.push("game_type = ?");
@@ -397,7 +205,7 @@ export async function refetchIncompleteGamesCycle(app: FastifyInstance): Promise
 
         // Marquer TOUJOURS last_refetch_at (meme si rien a enrichir) :
         // un jeu de base (game_type null legitime) est ainsi verifie une fois
-        // puis laisse tranquille 7 jours -> casse la boucle infinie sur RAWG.
+        // puis laisse tranquille 7 jours -> casse la boucle infinie.
         if (updates.length > 0) {
           updates.push("last_refetch_at = NOW()");
           params.push(item.id);
@@ -443,28 +251,15 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
   const conn = await pool.getConnection();
   try {
     const rows: IncompleteGame[] = await conn.query(
-      "SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision FROM game_items WHERE id = ? LIMIT 1",
+      "SELECT id, title, igdb_id, cover, platform, trailer_url, description, rating_score, game_type, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision FROM game_items WHERE id = ? LIMIT 1",
       [id]
     );
     if (!rows || rows.length === 0) {
       return { ok: true, found: false, enriched: false, fields: [] };
     }
     const item = rows[0];
-    const [rawg, igdb] = await Promise.all([
-      item.rawg_id ? fetchRawg(item.rawg_id) : null,
-      item.igdb_id ? fetchIgdb(item.igdb_id) : null,
-    ]);
-    let merged = mergeSources(rawg, igdb);
-    // FALLBACK IGDB par slug (meme logique que le cron).
-    if (!item.igdb_id && !merged.platform && rawg?.slug) {
-      const foundId = await lookupIgdbBySlug(rawg.slug) || await lookupIgdbByTitle(item.title);
-      if (foundId) {
-        app.log.info({ id: item.id, title: item.title, slug: rawg.slug, igdbId: foundId }, "IGDB rattache par slug");
-        await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [foundId, item.id]);
-        const igdbData = await fetchIgdb(foundId);
-        if (igdbData) merged = mergeSources(rawg, igdbData);
-      }
-    }
+    const igdb = item.igdb_id ? await fetchIgdb(item.igdb_id) : null;
+    const merged = mergeSources(igdb);
     const updates: string[] = [];
     const params: any[] = [];
     const fields: string[] = [];
@@ -482,9 +277,7 @@ export async function refetchOneGameItem(app: FastifyInstance, id: number): Prom
     if (descIsMissing && merged.description) {
       updates.push("description = ?"); params.push(merged.description); fields.push("description");
     }
-    if (item.rating_score == null && merged.ratingScore != null) {
-      updates.push("rating_score = ?"); params.push(merged.ratingScore); fields.push("rating");
-    }
+    // Note : igdb-jeux (IGDB, 5 votes au moins), pas ici.
     if ((item.game_type == null || item.game_type === "") && merged.gameType) {
       updates.push("game_type = ?"); params.push(merged.gameType); fields.push("type");
     }
@@ -539,86 +332,63 @@ export async function adminRefetchGamesHandler(req: any, reply: any) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Appariement des jeux ORPHELINS (sans aucun ID source).
-// Un jeu sans rawg_id NI igdb_id echappe a toute la dedup par ID et n'est
-// jamais enrichi (le refetch principal exige un ID de depart). On tente de
-// lui attribuer un igdb_id par appariement titre + fenetre de dates dynamique
-// (largeur selon release_precision, detection placeholder 12-31/01-01).
-// Une fois l'igdb_id pose, le jeu bascule sous le match-par-ID (filet fort).
-// LECTURE SEULE pour l'instant : logue sans ecrire (DRY_RUN=true).
+// Appariement des jeux sans igdb_id (bouton admin /admin/match-orphan-games).
+// Le passage de igdb-jeux le fait deja toutes les 3 h ; meme regle : titre
+// (chiffres romains, sous-titres, acces anticipe), un identifiant IGDB deja
+// porte par un autre jeu : la copie est fusionnee dans cette fiche (14 octobre).
+// Sous le meme verrou que le passage : jamais deux rattachements en meme temps.
 // ─────────────────────────────────────────────────────────────────────────
 export async function matchOrphanGamesCycle(app: FastifyInstance): Promise<{
+  ok: boolean;
   scanned: number;
   matched: number;
   changes: Array<{ id: number; title: string; igdbId: number }>;
+  doublons: Array<{ id: number; title: string; igdbId: number; autre: { id: number; titre: string } }>;
+  /** Doublons fusionnés (la copie supprimée, la fiche qui porte l'identifiant IGDB gardée). */
+  fusions: Array<{ id: number; title: string; igdbId: number; gardee: { id: number; titre: string } }>;
+  /** Identifiant IGDB déplacé vers la fiche au titre le plus juste (rien de supprimé). */
+  transferts: Array<{ igdbId: number; de: { id: number; titre: string }; vers: { id: number; titre: string } }>;
+  erreur?: string;
+  msg?: string;
+  occupe?: boolean;
 }> {
-  const DRY_RUN = false; // ECRITURE ACTIVE (valide sur 90 apparies : Dusk-like rejetes, Parallel->bon, 0 sans-date)
   const pool = (app as any).pool;
   if (!pool) {
     app.log.error("Match orphans cycle: pool DB introuvable");
-    return { scanned: 0, matched: 0, changes: [] };
+    return { ok: false, scanned: 0, matched: 0, changes: [], doublons: [], fusions: [], transferts: [], erreur: "pool DB introuvable", msg: "pool DB introuvable" };
   }
-  const conn = await pool.getConnection();
-  let scanned = 0, matched = 0;
-  const changes: Array<{ id: number; title: string; igdbId: number }> = [];
   try {
-    const items: any[] = await conn.query(
-      "SELECT id, title, rawg_id, DATE_FORMAT(release_date,'%Y-%m-%d') AS release_date, release_precision " +
-      "FROM game_items " +
-      // Elargi : tout jeu sans igdb_id, qu'il ait un rawg_id ou non. Les items
-      // rawg_seul n'etaient jamais rattaches, donc jamais dedoublonnes par ID
-      // face aux items IGDB (cas Exodus 984070 / 973389).
-      "WHERE igdb_id IS NULL " +
-      "AND title IS NOT NULL AND title != '' " +
-      "ORDER BY popularity DESC LIMIT " + REFETCH_BATCH_SIZE
-    );
-    scanned = items.length;
-    app.log.info({ scanned, dryRun: DRY_RUN }, "Match orphans cycle: jeux sans ID scannes");
-    for (const item of items) {
-      // Slug d'abord quand un rawg_id existe : ancre exacte, pas de quota IGDB search.
-      let igdbId: number | null = null;
-      if (item.rawg_id) {
-        const rawg = await fetchRawg(Number(item.rawg_id));
-        if (rawg?.slug) igdbId = await lookupIgdbBySlug(rawg.slug);
-      }
-      if (!igdbId) igdbId = await lookupIgdbByTitle(item.title, item.release_date, item.release_precision);
-      if (igdbId) {
-        matched++;
-        changes.push({ id: item.id, title: item.title, igdbId });
-        if (DRY_RUN) {
-          app.log.info({ id: item.id, title: item.title, igdbId }, "[DRY_RUN] apparierait");
-        } else {
-          await conn.query("UPDATE game_items SET igdb_id = ? WHERE id = ?", [igdbId, item.id]);
-          app.log.info({ id: item.id, title: item.title, igdbId }, "orphelin rattache par titre");
-        }
-      }
-      await new Promise(r => setTimeout(r, REFETCH_DELAY_MS));
-    }
-    app.log.info({ scanned, matched, dryRun: DRY_RUN }, "Match orphans cycle: termine");
+    // une fiche rattachée ou fusionnée (copie supprimée) : le cache des flux est vidé
+    const r = await lierJeuxVerrouille({ pool, log: app.log, rafraichir: clearFeedCache }, configIgdbJeux());
+    app.log.info({ scanned: r.cherches, matched: r.lies.length, doublons: r.doublons.length, fusions: r.fusions.length, transferts: r.transferts.length, erreur: r.erreur, occupe: r.occupe }, "Match orphans cycle: termine");
+    return {
+      ok: !r.erreur && !r.occupe,
+      scanned: r.cherches,
+      matched: r.lies.length,
+      changes: r.lies.map((x) => ({ id: x.id, title: x.titre, igdbId: x.igdb })),
+      doublons: r.doublons.map((x) => ({ id: x.id, title: x.titre, igdbId: x.igdb, autre: x.autre })),
+      fusions: r.fusions.map((x) => ({ id: x.perdant.id, title: x.perdant.titre, igdbId: x.igdb, gardee: x.gagnant })),
+      transferts: r.transferts.map((x) => ({ igdbId: x.igdb, de: x.de, vers: x.vers })),
+      ...(r.erreur ? { erreur: r.erreur, msg: "IGDB : " + r.erreur } : {}),
+      ...(r.occupe ? { occupe: true, msg: "un passage des jeux IGDB tourne deja, reessaie dans quelques minutes" } : {}),
+    };
   } catch (e: any) {
     app.log.error({ err: e?.message }, "Match orphans cycle: erreur");
-  } finally {
-    conn.release();
+    const m = String(e?.message || e).slice(0, 200);
+    return { ok: false, scanned: 0, matched: 0, changes: [], doublons: [], fusions: [], transferts: [], erreur: m, msg: m };
   }
-  return { scanned, matched, changes };
 }
 
 export function startRefetchGamesCron(app: FastifyInstance) {
   app.post("/admin/refetch-incomplete-games", adminRefetchGamesHandler);
   setIgdbWarnPool((app as any).pool);
-  setTimeout(() => {
-    refetchIncompleteGamesCycle(app).catch(e => app.log.error(e, "First Games refetch cycle failed"));
-  }, 15 * 60 * 1000); // First run after 15 min (let Phase B anime run first)
-  setInterval(() => {
-    refetchIncompleteGamesCycle(app).catch(e => app.log.error(e, "Games refetch cycle failed"));
-  }, REFETCH_INTERVAL_MS);
-  // Appariement des jeux orphelins (sans aucun ID) : premier run a 30 min, puis toutes les 3h.
-  // Attribue un igdb_id par titre + fenetre dynamique -> le jeu bascule sous le match-par-ID.
-  setTimeout(() => {
-    matchOrphanGamesCycle(app).catch(e => app.log.error(e, "First orphan match cycle failed"));
-  }, 30 * 60 * 1000);
-  setInterval(() => {
-    matchOrphanGamesCycle(app).catch(e => app.log.error(e, "Orphan match cycle failed"));
-  }, ORPHAN_MATCH_INTERVAL_MS);
-  app.log.info({ intervalMs: REFETCH_INTERVAL_MS, batchSize: REFETCH_BATCH_SIZE, orphanMatchMs: ORPHAN_MATCH_INTERVAL_MS }, "Refetch Games cron demarre");
+  // Pilotage (pilotage.ts) : premier passage 15 min après le démarrage (après la Phase B des animés), puis toutes les heures
+  planifier({
+    id: "phase-b-jeux", premierMs: 15 * 60 * 1000, rythmeMs: REFETCH_INTERVAL_MS, suivi: "refetch-games-cron", processAdmin: "refetch-incomplete-games",
+    passage: async () => {
+      await refetchIncompleteGamesCycle(app);
+    },
+  });
+  // Les jeux sans igdb_id sont rattaches par le passage de igdb-jeux (toutes les 3 h).
+  app.log.info({ intervalMs: REFETCH_INTERVAL_MS, batchSize: REFETCH_BATCH_SIZE }, "Refetch Games cron demarre");
 }

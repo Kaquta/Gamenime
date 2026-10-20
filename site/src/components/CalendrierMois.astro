@@ -1,0 +1,206 @@
+---
+/**
+ * CalendrierMois — un mois du calendrier des sorties (onglet « Calendrier », 15 octobre 2026).
+ *
+ * Ordinateur : la grille du mois, du lundi au dimanche ; dans chaque jour, ses sorties (jaquette, titre,
+ * type et plateformes), les plus populaires d'abord, quatre au plus puis « +N » qui ouvre le jour.
+ * Telephone : le meme HTML en agenda, un jour par ligne, les jours sans sortie masques.
+ * Filtre Tout / Anime / Jeux (garde d'une page a l'autre) ; aujourd'hui marque au chargement.
+ * Chaque sortie est un vrai lien <a href> ecrit au build : toutes les fiches sont reliees.
+ * Design des pages Anime et Jeux (jeton « catalogue », panneau de verre) : bloc CALENDRIER de global.css.
+ */
+import type { Mois, Sortie } from "../lib/calendrier";
+import { JOURS_COURTS, libelleMois, libelleCourt, deMois } from "../lib/calendrier";
+
+interface Props {
+  mois: Mois;
+  fenetre: string[];
+  comptes: Record<string, number>;
+  /** /calendrier/ : la page du mois en cours (le script y suit le mois reel si le build date d'hier) */
+  courant?: boolean;
+}
+const { mois, fenetre, comptes, courant = false } = Astro.props;
+
+const i = fenetre.indexOf(mois.cle);
+const avant = i > 0 ? fenetre[i - 1] : null;
+const apres = i >= 0 && i < fenetre.length - 1 ? fenetre[i + 1] : null;
+const annees = [...new Set(fenetre.map((k) => k.slice(0, 4)))];
+const total = mois.nAnime + mois.nJeux;
+
+const meta = (s: Sortie) => {
+  const t = s.type === "game" ? "Jeu" : s.film ? "Film" : "Anime";
+  return s.plateformes ? `${t} · ${s.plateformes}` : t;
+};
+---
+
+<section class="section-block container cal" data-source="calendrier" data-mois={mois.cle} data-debut={`${mois.cle}-01`}
+  data-fin={mois.semaines.flat().filter((j) => j.dansMois).at(-1)?.date} data-premier={fenetre[0]} data-dernier={fenetre[fenetre.length - 1]}
+  data-courant={courant ? "1" : undefined}>
+  <div class="section-head">
+    <h2>Calendrier des sorties</h2>
+    <div class="cal-filtres" role="group" aria-label="Afficher">
+      <button type="button" class="cal-filtre on" data-filtre="tout" aria-pressed="true">Tout <span class="kn">{total}</span></button>
+      <button type="button" class="cal-filtre" data-filtre="anime" aria-pressed="false">Anime <span class="kn">{mois.nAnime}</span></button>
+      <button type="button" class="cal-filtre" data-filtre="game" aria-pressed="false">Jeux <span class="kn">{mois.nJeux}</span></button>
+    </div>
+  </div>
+
+  <div class="cal-corps">
+    <div class="cal-barre">
+      {avant ? <a class="cal-fleche" href={`/calendrier/${avant}/`} aria-label={libelleMois(avant)} rel="prev">‹</a>
+             : <span class="cal-fleche off" aria-hidden="true">‹</span>}
+      <h3 class="cal-titre-mois">{mois.libelle}</h3>
+      {apres ? <a class="cal-fleche" href={`/calendrier/${apres}/`} aria-label={libelleMois(apres)} rel="next">›</a>
+             : <span class="cal-fleche off" aria-hidden="true">›</span>}
+    </div>
+
+    <nav class="cal-annees" aria-label="Mois du calendrier">
+      {annees.map((a) => (
+        <div class="cal-annee">
+          <span class="cal-an">{a}</span>
+          {fenetre.filter((k) => k.startsWith(a)).map((k) => (
+            <a class={`cal-m${k === mois.cle ? " on" : ""}${comptes[k] ? "" : " vide"}`} href={`/calendrier/${k}/`}
+              data-mois={k} aria-current={k === mois.cle ? "page" : undefined} title={`${libelleMois(k)} : ${comptes[k] || 0} sorties`}>{libelleCourt(k)}</a>
+          ))}
+        </div>
+      ))}
+    </nav>
+
+    <ol class="cal-tete" aria-hidden="true">
+      {JOURS_COURTS.map((j) => <li>{j}</li>)}
+    </ol>
+    <ol class="cal-grille">
+      {mois.semaines.flat().map((j) => (
+        <li class={`cal-jour${j.dansMois ? "" : " hors"}${j.sorties.length ? "" : " sans"}`} data-date={j.date}>
+          <div class="cal-date"><span class="cal-js">{j.semaine}</span><span class="cal-n">{j.n}</span></div>
+          {j.sorties.length > 0 && (
+            <ul class="cal-sorties">
+              {j.sorties.map((s) => (
+                <li class="cal-s" data-type={s.type}>
+                  <a class="cal-lien" href={s.lien} title={s.titre}>
+                    <span class="cal-jaq">{s.jaquette && <img src={s.jaquette} alt="" loading="lazy" decoding="async" width="26" height="36" />}</span>
+                    <span class="cal-txt"><span class="cal-t">{s.titre}</span><span class="cal-meta">{meta(s)}</span></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+          {j.sorties.length > 0 && <button type="button" class="cal-plus" hidden></button>}
+          {j.dansMois && <p class="cal-aucune">Aucune sortie ce jour</p>}
+        </li>
+      ))}
+    </ol>
+    <p class="cal-rien">Aucune sortie annoncée au jour près ce mois-ci.</p>
+
+    {mois.vagues.length > 0 && (
+      <div class="cal-vagues">
+        {mois.vagues.map((v) => (
+          <details class="cal-vague" open={v.ouvert}>
+            <summary><span class="cal-vt">{v.titre}</span><span class="kn">{v.sorties.length}</span></summary>
+            <ul class="cal-sorties">
+              {v.sorties.map((s) => (
+                <li class="cal-s" data-type={s.type}>
+                  <a class="cal-lien" href={s.lien} title={s.titre}>
+                    <span class="cal-jaq">{s.jaquette && <img src={s.jaquette} alt="" loading="lazy" decoding="async" width="26" height="36" />}</span>
+                    <span class="cal-txt"><span class="cal-t">{s.titre}</span><span class="cal-meta">{meta(s)}</span></span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
+      </div>
+    )}
+
+    <p class="cal-pied">
+      {avant && <a href={`/calendrier/${avant}/`}>‹ {libelleMois(avant)}</a>}
+      {apres && <a href={`/calendrier/${apres}/`}>{libelleMois(apres)} ›</a>}
+    </p>
+  </div>
+</section>
+
+<script is:inline>
+(function () {
+  var cal = document.querySelector(".section-block.cal");
+  if (!cal) return;
+  var pad = function (n) { return (n < 10 ? "0" : "") + n; };
+  var d = new Date(), auj = d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()), ceMois = auj.slice(0, 7);
+
+  // /calendrier/ construit avant un changement de mois : on suit le mois reel
+  if (cal.getAttribute("data-courant") === "1" && cal.getAttribute("data-mois") !== ceMois &&
+      ceMois >= cal.getAttribute("data-premier") && ceMois <= cal.getAttribute("data-dernier")) {
+    location.replace("/calendrier/" + ceMois + "/");
+    return;
+  }
+
+  // aujourd'hui, et les jours passes
+  [].forEach.call(cal.querySelectorAll(".cal-jour[data-date]:not(.hors)"), function (j) {
+    var x = j.getAttribute("data-date");
+    if (x === auj) j.classList.add("auj");
+    else if (x < auj) j.classList.add("passe");
+  });
+  var m = cal.querySelector('.cal-m[data-mois="' + ceMois + '"]');
+  if (m) m.classList.add("maintenant");
+
+  // filtre Tout / Anime / Jeux, puis « +N » : quatre sorties au plus par jour (ordinateur)
+  var GRAND = window.matchMedia("(min-width: 761px)"), MAX = 4, CLE = "gn-cal-filtre";
+  function regler() {
+    var f = cal.getAttribute("data-filtre") || "tout", jours = 0;
+    [].forEach.call(cal.querySelectorAll(".cal-grille .cal-jour"), function (j) {
+      var vus = [].filter.call(j.querySelectorAll(".cal-s"), function (s) {
+        s.classList.remove("trop");
+        return f === "tout" || s.getAttribute("data-type") === f;
+      });
+      j.classList.toggle("vide", vus.length === 0);
+      if (vus.length && !j.classList.contains("hors")) jours++;
+      var b = j.querySelector(".cal-plus");
+      if (!b) return;
+      var trop = GRAND.matches && vus.length > MAX && !j.classList.contains("ouvert");
+      if (trop) vus.slice(MAX - 1).forEach(function (s) { s.classList.add("trop"); });
+      var reste = vus.length - (MAX - 1);
+      b.hidden = !(GRAND.matches && vus.length > MAX);
+      b.textContent = j.classList.contains("ouvert") ? "Réduire" : "+" + reste + " sortie" + (reste > 1 ? "s" : "");
+      b.setAttribute("aria-expanded", j.classList.contains("ouvert") ? "true" : "false");
+    });
+    cal.classList.toggle("sans-jour", jours === 0);
+    [].forEach.call(cal.querySelectorAll(".cal-vague"), function (v) {
+      var n = [].filter.call(v.querySelectorAll(".cal-s"), function (s) { return f === "tout" || s.getAttribute("data-type") === f; }).length;
+      v.hidden = n === 0;
+      var k = v.querySelector("summary .kn");
+      if (k) k.textContent = n;
+    });
+  }
+  function filtrer(f) {
+    if (f !== "anime" && f !== "game") f = "tout";
+    cal.setAttribute("data-filtre", f);
+    [].forEach.call(cal.querySelectorAll(".cal-filtre"), function (b) {
+      var on = b.getAttribute("data-filtre") === f;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    regler();
+  }
+  cal.addEventListener("click", function (e) {
+    var b = e.target.closest ? e.target.closest(".cal-filtre") : null;
+    if (b) {
+      var f = b.getAttribute("data-filtre");
+      try { localStorage.setItem(CLE, f); } catch (x) { /* stockage interdit : tant pis */ }
+      filtrer(f);
+      return;
+    }
+    var p = e.target.closest ? e.target.closest(".cal-plus") : null;
+    if (p) {
+      p.closest(".cal-jour").classList.toggle("ouvert");
+      regler();
+    }
+  });
+  var garde = "tout";
+  try { garde = localStorage.getItem(CLE) || "tout"; } catch (x) { garde = "tout"; }
+  filtrer(garde);
+  if (GRAND.addEventListener) GRAND.addEventListener("change", regler);
+
+  // telephone : la bande des mois defile jusqu'au mois affiche
+  var on = cal.querySelector(".cal-m.on"), bande = cal.querySelector(".cal-annees");
+  if (on && bande && bande.scrollWidth > bande.clientWidth) bande.scrollLeft = on.offsetLeft - (bande.clientWidth - on.offsetWidth) / 2;
+})();
+</script>

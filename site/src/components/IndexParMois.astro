@@ -63,7 +63,7 @@ for (const f of fiches) {
   if (!rd) {
     // Aucune fiche dans ce cas aujourd'hui, mais un item peut arriver sans
     // date : mieux vaut un groupe dedie qu'une fiche orpheline.
-    cle = "9999-99"; annee = "—"; libelle = "Date non annoncée"; jour = "—";
+    cle = "9999-99"; annee = "—"; libelle = "Date à annoncer"; jour = "—";
   } else if (f.releasePrecision === "year") {
     // 77 fiches n'ont qu'un millesime, stocke en 01-01. L'afficher au 1er
     // janvier serait une date inventee.

@@ -287,11 +287,10 @@ async function readCatalogMetrics(pool: any) {
 async function readWorkflowMetrics(pool: any) {
   try {
     const anilist: any = await pool.query(`SELECT UNIX_TIMESTAMP(MAX(updated_at)) AS lp FROM anime_items WHERE cover LIKE '%anilistcdn%' OR cover LIKE '%s4.anilist%'`);
-    const jikan: any = await pool.query(`SELECT UNIX_TIMESTAMP(MAX(updated_at)) AS lp FROM anime_items WHERE mal_id IS NOT NULL`);
     const animsched: any = await pool.query(`SELECT UNIX_TIMESTAMP(MAX(updated_at)) AS lp FROM anime_items WHERE anime_schedule_route IS NOT NULL`);
     const rawg: any = await pool.query(`SELECT UNIX_TIMESTAMP(MAX(updated_at)) AS lp FROM game_items WHERE cover LIKE '%rawg.io%' OR cover LIKE '%igdb%'`);
     // Intervals (en ms) pour calculer prochain run
-    const INTERVALS = { anilist: 3*3600000, jikan: 3*3600000, animeschedule: 3*3600000, rawg: 2.5*3600000 };
+    const INTERVALS = { anilist: 3*3600000, animeschedule: 3*3600000, rawg: 2.5*3600000 };
     function buildEntry(key: string, ts: any) {
       // ts = UNIX_TIMESTAMP() en secondes UTC (independant du TZ MariaDB)
       const tsMs = ts && Number(ts) > 0 ? Number(ts) * 1000 : null;
@@ -304,7 +303,6 @@ async function readWorkflowMetrics(pool: any) {
     }
     return {
       anilist: buildEntry("anilist", anilist[0]?.lp),
-      jikan: buildEntry("jikan", jikan[0]?.lp),
       animeschedule: buildEntry("animeschedule", animsched[0]?.lp),
       rawg: buildEntry("rawg", rawg[0]?.lp),
     };

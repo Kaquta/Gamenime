@@ -3,7 +3,7 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
 import HeroHeader from "../../components/HeroHeader.astro";
 ---
 
-<BaseLayout title="Mes préférences — GameNime" jetons="braise prefs">
+<BaseLayout noindex title="Mes préférences — GameNime" jetons="braise prefs">
   <HeroHeader activeTab="none" />
 
   <main class="prefs-page container">
@@ -286,7 +286,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
 
       var GENRES_ANIME = ["Action", "Fantasy", "Comedy", "Drama", "Romance", "Adventure", "Supernatural", "Slice of Life", "Sci-Fi", "Mystery", "School", "Psychological", "Isekai", "Sports", "Thriller", "Horror", "Shounen", "Music", "Magical Girl", "Mecha", "Magic", "Seinen"];
       var GENRES_GAMES = ["Indie", "Adventure", "RPG", "Strategy", "Action", "Simulation", "Puzzle", "Shooter", "Platformer", "Sports", "Board Games", "Arcade", "Visual Novel", "Tactical", "Racing", "Point-and-click", "Hack and slash", "Music", "Fighting"];
-      var PLATFORMS_ANIME = ["Crunchyroll", "Netflix", "YouTube", "Disney+", "Hulu", "Amazon Prime Video", "Bilibili TV", "iQ", "Tencent Video", "HIDIVE"];
+      var PLATFORMS_ANIME = ["Crunchyroll", "ADN", "Netflix", "Amazon Prime Video", "Disney+", "HBO Max", "HIDIVE", "Hulu"];
       var PLATFORMS_GAMES = ["PC", "PlayStation", "Xbox", "Nintendo", "iOS", "Android"];
       var genresContentFilter = "all";
       var platformsContentFilter = "all";

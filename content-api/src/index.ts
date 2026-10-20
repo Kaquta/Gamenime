@@ -7,11 +7,11 @@ import bcrypt from "bcryptjs";
 import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
 import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
-import { registerGameNimeRoutes, clearFeedCache } from "./gamenime/routes.js";
+import { registerGameNimeRoutes, clearFeedCache, lireBadges, badgeDe } from "./gamenime/routes.js";
 import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
-import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchJikan , matchAnimeRoutesCycle, applyFranchiseFloorsCycle } from "./gamenime/refetch-cron.js";
-import { startRefetchGamesCron, refetchOneGameItem, fetchRawg, fetchIgdb, lookupIgdbBySlug, matchOrphanGamesCycle } from "./gamenime/refetch-games-cron.js";
+import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchKitsu, matchAnimeRoutesCycle, applyFranchiseFloorsCycle } from "./gamenime/refetch-cron.js";
+import { startRefetchGamesCron, refetchOneGameItem, fetchIgdb, matchOrphanGamesCycle } from "./gamenime/refetch-games-cron.js";
 import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { expandSearchTerm } from "./gamenime/search-aliases.js";
@@ -21,6 +21,14 @@ import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setS
 import { registerAdminRuns } from "./gamenime/admin-runs.js";
 import { registerPublication } from "./gamenime/publication.js";
 import { startSynopsisCron } from "./gamenime/synopsis.js";
+import { startPresseCron } from "./gamenime/presse.js";
+import { startTmdbCron } from "./gamenime/tmdb.js";
+import { startPlateformesCron } from "./gamenime/plateformes.js";
+import { startTavilyCron } from "./gamenime/tavily.js";
+import { startPopulariteCron } from "./gamenime/popularite.js";
+import { startEuropeCron } from "./gamenime/europe.js";
+import { startIgdbJeuxCron, igdbJeuxActif } from "./gamenime/igdb-jeux.js";
+import { registerPilotage } from "./gamenime/pilotage.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -65,13 +73,17 @@ const pool = mariadb.createPool({
 // les hooks doivent exister avant l'enregistrement des routes qu'ils couvrent.
 await registerAdminRuns(app, pool);
 registerPublication(app);
+// Pilotage (dashboard, 17 octobre 2026) : interrupteurs, lancements et journal des modules automatiques. Branché ici,
+// avant les routes et les modules : ses crochets doivent exister avant les routes qu'ils regardent, et ses
+// interrupteurs (relus en base) avant les cycles qu'il planifie.
+await registerPilotage(app, pool);
 
 
 const COOKIE_NAME = process.env.APP_COOKIE_NAME || "gn_session";
 const COOKIE_SECURE = String(process.env.APP_COOKIE_SECURE || "false") === "true";
 const SESSION_DURATION_DAYS = Number(process.env.SESSION_DURATION_DAYS || 30);
 
-const BLOCKED_WORDS = ["hentai", "erotic", "sexual content", "adult only", "porn", "xxx", "nude", "nsfw", "ecchi"];
+const BLOCKED_WORDS = ["hentai", "erotic", "sexual content", "adult only", "porn", "xxx", "nude", "nsfw"]; // sans « ecchi » depuis le 16 octobre 2026 (Rey) : le contenu adulte reste refusé
 
 function isAdultContent(title: string, genre: string | null, rating: string | null): boolean {
   const check = ((title || "") + " " + (genre || "") + " " + (rating || "")).toLowerCase();
@@ -715,8 +727,16 @@ app.post("/premium/generate-reminders", async (req, reply) => {
       for (const itemType of ["anime", "game"] as const) {
         const table = itemType === "anime" ? "anime_items" : "game_items";
 
+        // Film au cinéma en France : la date du rappel est celle du cinéma (10 octobre 2026), et
+        // « Au cinéma » tient lieu de plateforme tant qu'aucune n'est connue. La date sort en texte
+        // AAAA-MM-JJ : lue comme objet Date, l'e-mail de rappel affichait « Invalid Date ».
+        const film = itemType === "anime" ? "(i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL)" : "FALSE";
+        const dateSite = itemType === "anime" ? `IF(${film}, i.fr_cinema, i.release_date)` : "i.release_date";
+        const precisionSite = itemType === "anime" ? `IF(${film}, 'day', i.release_precision)` : "i.release_precision";
         const rows: any = await pool.query(
-          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover, i.platform, i.release_date,
+          `SELECT DISTINCT f.user_id, i.id AS item_id, i.title, i.cover,
+                  IF(TRIM(IFNULL(i.platform, '')) = '' AND ${film}, 'Au cinéma', i.platform) AS platform,
+                  DATE_FORMAT(${dateSite}, '%Y-%m-%d') AS release_date, ${film} AS cinema_fr,
                   u.email AS user_email, u.display_name AS user_display_name,
                   u.email_notifications_enabled AS user_email_enabled,
                   u.email_verified AS user_email_verified,
@@ -727,8 +747,9 @@ app.post("/premium/generate-reminders", async (req, reply) => {
            INNER JOIN ${table} i ON i.id = f.item_id
            INNER JOIN users u ON u.id = f.user_id
            WHERE f.item_type = ?
-             AND DATE(i.release_date) = ?
-             AND i.release_precision = 'day'
+             AND DATE(${dateSite}) = ?
+             AND ${precisionSite} = 'day'
+             AND ${itemType === "anime" ? "IFNULL(i.statut_anilist, '') <> 'CANCELLED'" : "TRUE"}
              AND u.notifications_enabled = 1
              AND NOT EXISTS (
                SELECT 1 FROM reminder_log r
@@ -736,11 +757,26 @@ app.post("/premium/generate-reminders", async (req, reply) => {
                  AND r.item_type = ?
                  AND r.item_id = i.id
                  AND r.day_offset = ?
+                 AND r.release_date = ?
              )`,
-          [itemType, targetStr, itemType, offset]
+          [itemType, targetStr, itemType, offset, targetStr]
         );
 
+        // un anime sans date chez AniList a sa derniere lecture (dates-animes.ts : « Date a annoncer » a la lecture suivante
+        // s'il n'en retrouve pas) : pas de rappel pour une date qu'AniList a peut-etre retiree (20 octobre 2026). Le rappel
+        // est saute, pas reporte. Un film au cinema en France garde ses rappels (la date du cinema, pas celle d'AniList).
+        let aConfirmer: ReadonlySet<number> = new Set<number>();
+        if (itemType === "anime") {
+          const DA = await import("./gamenime/dates-animes.js");
+          // apres un redemarrage de l'API, la memoire du dernier passage
+          await DA.chargerSansDate(pool);
+          aConfirmer = DA.sansDateAConfirmer();
+        }
         for (const row of rows) {
+          if (!Number(row.cinema_fr) && aConfirmer.has(Number(row.item_id))) {
+            results.skipped++;
+            continue;
+          }
           const label = offset === 0 ? "Sortie aujourd\x27hui !" : (offset === 1 ? "Sortie demain !" : "Sortie dans 7 jours");
           const eventType = `reminder_j${offset}`;
           const eventKey = `${itemType}:${row.item_id}:${eventType}:${targetStr}`;
@@ -760,10 +796,24 @@ app.post("/premium/generate-reminders", async (req, reply) => {
             [row.user_id, eventId]
           );
 
-          await pool.query(
-            `INSERT INTO reminder_log (user_id, item_type, item_id, day_offset, release_date) VALUES (?, ?, ?, ?, ?)`,
+          // Un rappel par date : une date qui change (report, ou date du cinéma en France après celle
+          // du Japon) a de nouveau son rappel. Le rappel est « pris » par une seule écriture : deux
+          // appels en même temps n'envoient pas deux fois l'e-mail (l'autre passe son tour).
+          const pris: any = await pool.query(
+            `INSERT IGNORE INTO reminder_log (user_id, item_type, item_id, day_offset, release_date) VALUES (?, ?, ?, ?, ?)`,
             [row.user_id, itemType, row.item_id, offset, targetStr]
           );
+          if (Number(pris?.affectedRows) !== 1) {
+            const repris: any = await pool.query(
+              `UPDATE reminder_log SET release_date = ?, sent_at = CURRENT_TIMESTAMP, email_sent_at = NULL
+                WHERE user_id = ? AND item_type = ? AND item_id = ? AND day_offset = ? AND release_date <> ?`,
+              [targetStr, row.user_id, itemType, row.item_id, offset, targetStr]
+            );
+            if (Number(repris?.affectedRows) !== 1) {
+              results.skipped++;
+              continue;
+            }
+          }
 
           // Email envoye pour J-7 ET Jour J (offset 7 et 0) a ceux qui l'ont active + verifie.
           // L'utilisateur controle via ses preferences quels rappels il veut (7j, jour J, ou les deux).
@@ -784,8 +834,8 @@ app.post("/premium/generate-reminders", async (req, reply) => {
                 });
                 if (emailResult.ok) {
                   await pool.query(
-                    `UPDATE reminder_log SET email_sent_at = NOW() WHERE user_id = ? AND item_type = ? AND item_id = ? AND day_offset = ?`,
-                    [row.user_id, itemType, row.item_id, offset]
+                    `UPDATE reminder_log SET email_sent_at = NOW() WHERE user_id = ? AND item_type = ? AND item_id = ? AND day_offset = ? AND release_date = ?`,
+                    [row.user_id, itemType, row.item_id, offset, targetStr]
                   );
                 }
               } catch (e) { /* fire-and-forget */ }
@@ -882,8 +932,9 @@ app.post("/premium/generate-alerts", async (req, reply) => {
 
     for (const itemType of ["anime", "game"] as const) {
       const table = itemType === "anime" ? "anime_items" : "game_items";
+      // un anime annule chez AniList est retire du site (dates-animes.ts) : aucune alerte (20 octobre 2026)
       const items: any = await pool.query(
-        `SELECT id, title, cover, genre, platform, release_date FROM ${table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)`,
+        `SELECT id, title, cover, genre, platform, release_date FROM ${table} WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)${itemType === "anime" ? " AND IFNULL(statut_anilist, '') <> 'CANCELLED'" : ""}`,
         [hours]
       );
       results.scanned += items.length;
@@ -1060,6 +1111,8 @@ async function ensureFavoriteTargetExists(itemType: "anime" | "game", itemId: nu
 }
 
 app.get("/favorites", async (req, reply) => {
+  // un favori dont la fiche a ete supprimee n'est pas rendu (20 octobre 2026) : une carte vide, qui aurait dit « Date a
+  // annoncer » (la page des favoris et le menu des favoris lisent cette route)
   try {
     const user = await getAuthenticatedUser(req);
     if (!user) return reply.code(401).send({ error: "Non authentifié" });
@@ -1073,14 +1126,16 @@ app.get("/favorites", async (req, reply) => {
           COALESCE(a.title, g.title) AS title,
           COALESCE(a.cover, g.cover) AS cover,
           COALESCE(a.genre, g.genre) AS genre,
-          COALESCE(a.platform, g.platform) AS platform,
-          COALESCE(DATE_FORMAT(a.release_date,'%Y-%m-%d'), DATE_FORMAT(g.release_date,'%Y-%m-%d')) AS releaseDate,
+          COALESCE(IF(TRIM(IFNULL(a.platform, '')) = '' AND a.format = 'MOVIE' AND a.fr_cinema IS NOT NULL, 'Au cinéma', a.platform), g.platform) AS platform,
+          COALESCE(DATE_FORMAT(IF(a.format = 'MOVIE' AND a.fr_cinema IS NOT NULL, a.fr_cinema, a.release_date),'%Y-%m-%d'), DATE_FORMAT(g.release_date,'%Y-%m-%d')) AS releaseDate,
           COALESCE(a.trailer_url, g.trailer_url) AS trailerUrl,
-          COALESCE(a.release_precision, g.release_precision) AS releasePrecision
+          COALESCE(IF(a.format = 'MOVIE' AND a.fr_cinema IS NOT NULL, 'day', a.release_precision), g.release_precision) AS releasePrecision,
+          DATE_FORMAT(IF(a.format = 'MOVIE', a.fr_cinema, NULL), '%Y-%m-%d') AS cinemaFr
        FROM favorites f
        LEFT JOIN anime_items a ON f.item_type = 'anime' AND a.id = f.item_id
        LEFT JOIN game_items g ON f.item_type = 'game' AND g.id = f.item_id
        WHERE f.user_id = ?
+         AND (a.id IS NOT NULL OR g.id IS NOT NULL)
        ORDER BY f.created_at DESC`,
       [user.id]
     );
@@ -1224,16 +1279,20 @@ app.get("/cal/:token.ics", async (req, reply) => {
     }
     const userId = users[0].id;
 
-    // Agenda simple : tous les favoris avec vraie date (exclut precision=year — Q3)
+    // Agenda simple : les favoris dates au jour (20 octobre 2026). Une date au mois ou a l'annee n'a pas de jour : elle
+    // tombait le 1er (« Sortie » le 1er octobre pour un anime prevu en octobre), une fausse information. L'anime entre
+    // dans l'agenda quand son jour est annonce. Un film au cinema en France a son jour (fr_cinema).
     const rows = await pool.query(
-      `SELECT f.item_type, i.title, i.title_english AS titleEnglish, i.platform,
-              i.release_precision AS releasePrecision,
-              DATE_FORMAT(i.release_date, '%Y-%m-%d') AS releaseDate
+      `SELECT f.item_type, i.title, i.title_english AS titleEnglish,
+              IF(TRIM(IFNULL(i.platform, '')) = '' AND i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL, 'Au cinéma', i.platform) AS platform,
+              IF(i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL, 'day', i.release_precision) AS releasePrecision,
+              DATE_FORMAT(IF(i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL, i.fr_cinema, i.release_date), '%Y-%m-%d') AS releaseDate
        FROM favorites f
        INNER JOIN anime_items i ON f.item_type = 'anime' AND f.item_id = i.id
        WHERE f.user_id = ?
-         AND i.release_date IS NOT NULL
-         AND (i.release_precision IS NULL OR i.release_precision != 'year')
+         AND IF(i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL, i.fr_cinema, i.release_date) IS NOT NULL
+         AND (i.format = 'MOVIE' AND i.fr_cinema IS NOT NULL OR IFNULL(i.release_precision, 'day') = 'day')
+         AND IFNULL(i.statut_anilist, '') <> 'CANCELLED'
        UNION ALL
        SELECT f.item_type, g.title, g.title_english AS titleEnglish, g.platform,
               g.release_precision AS releasePrecision,
@@ -1242,7 +1301,7 @@ app.get("/cal/:token.ics", async (req, reply) => {
        INNER JOIN game_items g ON f.item_type = 'game' AND f.item_id = g.id
        WHERE f.user_id = ?
          AND g.release_date IS NOT NULL
-         AND (g.release_precision IS NULL OR g.release_precision != 'year')`,
+         AND IFNULL(g.release_precision, 'day') = 'day'`,
       [userId, userId]
     );
 
@@ -1722,41 +1781,6 @@ async function createNotificationsForItemChange(
 // Endpoint : re-tague les DLC via IGDB (category 1/2/4 -> "DLC").
 // Se fie a la vraie category IGDB, JAMAIS au titre (evite faux positifs
 // type "Seven Deadly Sins: Origin" qui est un jeu de base, pas un DLC).
-// Batch : rattacher les jeux RAWG-only a IGDB via leur slug (ancre fiable, pas de match par titre).
-// Cible uniquement les jeux SANS igdb_id ET SANS plateforme (economise le quota RAWG).
-app.post("/admin/link-igdb-by-slug", async (req: any, reply) => {
-  if (!requireApiKey(req, reply)) return;
-  const limit = Math.min(Number(req.query?.limit) || 50, 200);
-  const conn = await (app as any).pool.getConnection();
-  let scanned = 0, linked = 0, no_match = 0, errors = 0;
-  const examples: any[] = [];
-  try {
-    const rows: any[] = await conn.query(
-      "SELECT id, title, rawg_id FROM game_items " +
-      "WHERE igdb_id IS NULL AND rawg_id IS NOT NULL AND (platform IS NULL OR platform = '') " +
-      "ORDER BY popularity DESC LIMIT " + limit
-    );
-    for (const item of rows) {
-      scanned++;
-      try {
-        const rawg = await fetchRawg(item.rawg_id);
-        if (!rawg?.slug) { no_match++; continue; }
-        const igdbId = await lookupIgdbBySlug(rawg.slug);
-        if (!igdbId) { no_match++; continue; }
-        await conn.query("UPDATE game_items SET igdb_id = ?, last_refetch_at = NULL WHERE id = ?", [igdbId, item.id]);
-        linked++;
-        if (examples.length < 10) examples.push({ id: item.id, title: item.title, slug: rawg.slug, igdb_id: igdbId });
-      } catch {
-        errors++;
-      }
-      await new Promise((r) => setTimeout(r, 300));
-    }
-    return { ok: true, scanned, linked, no_match, errors, examples };
-  } finally {
-    conn.release();
-  }
-});
-
 app.post("/admin/retag-dlc", async (req, reply) => {
   const expected = process.env.ADMIN_API_KEY || process.env.ANIME_API_KEY || process.env.GAMES_API_KEY;
   const provided = req.headers["x-api-key"];
@@ -1875,8 +1899,9 @@ app.post("/admin/match-orphan-games", async (req, reply) => {
   const provided = req.headers["x-api-key"];
   const auth = requireApiKey(expected, provided);
   if (!auth.ok) return reply.code(auth.code).send({ ok: false, msg: auth.msg });
-  const result = await matchOrphanGamesCycle(app);
-  return reply.send({ ok: true, ...result });
+  // 409 si un passage des jeux tient le verrou (« refuse » au tableau de bord), 502 si IGDB a echoue
+  const r = await matchOrphanGamesCycle(app);
+  return reply.code(r.occupe ? 409 : r.ok ? 200 : 502).send(r);
 });
 
 // SESSION 18 : Refetch UN item precis par ID (bouton "Reparer" admin)
@@ -1890,7 +1915,7 @@ app.post("/admin/run-health-check", async (req: any, reply) => {
   const pool = (app as any).pool;
   if (!pool) return reply.code(500).send({ ok: false, msg: "pool DB introuvable" });
   const only = String((req.query as any)?.source || "").trim().toLowerCase();
-  const VALID_SRC = ["rawg", "igdb", "anilist", "jikan", "animeschedule"];
+  const VALID_SRC = ["igdb", "anilist", "kitsu", "animeschedule"];
   await runHealthCheck(app, pool, VALID_SRC.indexOf(only) !== -1 ? only : undefined);
   const rows: any[] = await pool.query(
     "SELECT source, status, http_code, error_msg, response_ms, "
@@ -2084,7 +2109,7 @@ app.post("/admin/refetch-youtube-released", async (req: any, reply) => {
   const conn = await pool.getConnection();
   try {
     const rows: any[] = await conn.query(
-      "SELECT id FROM anime_items WHERE TRIM(platform) = 'YouTube' AND release_date < CURDATE() AND mal_id IS NOT NULL ORDER BY popularity DESC"
+      "SELECT id FROM anime_items WHERE TRIM(platform) = 'YouTube' AND release_date < CURDATE() AND anilist_id IS NOT NULL ORDER BY popularity DESC"
     );
     let enriched = 0;
     let stillYoutube = 0;
@@ -2179,22 +2204,21 @@ app.get("/admin/item-raw-sources", async (req, reply) => {
       const rows = await pool.query(`SELECT id, title, anilist_id, mal_id, cover, platform, trailer_url, description FROM anime_items WHERE id = ?`, [id]);
       if (!rows.length) return reply.send({ ok: true, found: false });
       const it = rows[0];
-      const [anilist, jikan] = await Promise.all([
+      const [anilist, kitsu] = await Promise.all([
         it.anilist_id ? fetchAniList(it.anilist_id) : Promise.resolve(null),
-        it.mal_id ? fetchJikan(it.mal_id) : Promise.resolve(null),
+        it.mal_id || it.anilist_id ? fetchKitsu(it.mal_id, it.anilist_id) : Promise.resolve(null),
       ]);
       return reply.send({ ok: true, found: true, type, id, title: it.title,
         ids: { anilist_id: it.anilist_id, mal_id: it.mal_id },
         current: { cover: it.cover, platform: it.platform, trailer_url: it.trailer_url, description: it.description },
-        sources: { anilist, jikan } });
+        sources: { anilist, kitsu } });
     } else {
       const rows = await pool.query(`SELECT id, title, rawg_id, igdb_id, cover, platform, trailer_url, description FROM game_items WHERE id = ?`, [id]);
       if (!rows.length) return reply.send({ ok: true, found: false });
       const it = rows[0];
-      const [rawg, igdb] = await Promise.all([
-        it.rawg_id ? fetchRawg(it.rawg_id) : Promise.resolve(null),
-        it.igdb_id ? fetchIgdb(it.igdb_id) : Promise.resolve(null),
-      ]);
+      // RAWG retire (igdb-jeux.ts) : seule la fiche IGDB est lue.
+      const rawg = null;
+      const igdb = it.igdb_id ? await fetchIgdb(it.igdb_id) : null;
       return reply.send({ ok: true, found: true, type, id, title: it.title,
         ids: { rawg_id: it.rawg_id, igdb_id: it.igdb_id },
         current: { cover: it.cover, platform: it.platform, trailer_url: it.trailer_url, description: it.description },
@@ -2407,10 +2431,12 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const { id } = req.params as { id: string };
 
     const rows: any = await pool.query(
-      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative" : ""}, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
-              DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate,
-              release_precision AS releasePrecision,
-              DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s') AS releaseDatetime,
+      // Film au cinéma en France : sa date est celle du cinéma (10 octobre 2026) ; « Au cinéma » tient
+      // lieu de plateforme tant qu'il n'en a aucune.
+      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative, format, DATE_FORMAT(IF(format = 'MOVIE', fr_cinema, NULL), '%Y-%m-%d') AS cinemaFr" : ""}, cover, genre, ${itemType === "anime" ? "IF(TRIM(IFNULL(platform, '')) = '' AND format = 'MOVIE' AND fr_cinema IS NOT NULL, 'Au cinéma', platform) AS platform" : "platform"}, description, rating, rating_score AS ratingScore, popularity, screenshots,
+              DATE_FORMAT(${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, fr_cinema, release_date)" : "release_date"},'%Y-%m-%d') AS releaseDate,
+              ${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, 'day', release_precision)" : "release_precision"} AS releasePrecision,
+              ${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, NULL, DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s'))" : "DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s')"} AS releaseDatetime,
               is_recently_released AS isRecentlyReleased, trailer_url AS trailerUrl
        FROM ${table} WHERE id = ?`,
       [id]
@@ -2429,8 +2455,17 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const down = Number(voteRows[0]?.downvotes ?? 0);
     const total = up + down;
 
+    // Badge « populaire » / « tres-attendu » : le même que dans les listes (gamenime/routes.ts, lireBadges).
+    let badge: string | null = null;
+    try {
+      badge = badgeDe(await lireBadges(pool), itemType, rows[0].id);
+    } catch (e: any) {
+      req.log.warn({ err: e?.message }, "badges : calcul impossible");
+    }
+
     return {
       ...rows[0],
+      badge,
       votes: { up, down, total, percent: total > 0 ? Math.round((up / total) * 100) : 0 }
     };
   });
@@ -2499,6 +2534,8 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     }
 
     const conn = await pool.getConnection();
+    // animes dont l'identifiant AniList disparu est remplace par ce lot : oublies des absents une fois le lot valide
+    const remplaces: number[] = [];
     try {
       await conn.beginTransaction();
 
@@ -2517,6 +2554,18 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         if (!jpCheck.likely) {
           app.log.info({ title: b.title, reason: jpCheck.reason }, "item rejected: not japanese");
           continue;
+        }
+
+        // JEUX : RAWG retire (igdb-jeux.ts, 13 octobre 2026) : un jeu est identifie par IGDB seul.
+        // Un envoi avec un identifiant RAWG et sans IGDB (l'ancien workflow RAWG) est ignore ; un autre envoi
+        // sans identifiant IGDB peut encore completer un jeu existant (trouve par son titre), jamais en creer
+        // un (regle des orphelins plus bas). rawgId n'est plus ecrit.
+        if (itemType === "game") {
+          if ((b as any).rawgId && !(b as any).igdbId) {
+            app.log.info({ title: b.title }, "game rejected: envoi RAWG (RAWG retire)");
+            continue;
+          }
+          (b as any).rawgId = null;
         }
 
         // ═══ SESSION 13.3 : Filtre NICHES (GAMES UNIQUEMENT) ═══
@@ -2643,6 +2692,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
                AND cover = ?
              )
            )
+           ${itemType === "game" ? "ORDER BY (? IS NOT NULL AND igdb_id = ?) DESC" : "ORDER BY (? IS NOT NULL AND anilist_id = ?) DESC"}
            LIMIT 1`,
           [
             b.anilistId, b.anilistId,
@@ -2652,9 +2702,46 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
             b.releaseDate || null, normalizedStrictIncoming,
             b.releaseDate || null, normalizedIncoming,
             lookupCover, b.releaseDate || null, lookupCover,
+            // la fiche qui porte deja cet identifiant (IGDB pour un jeu, AniList pour un anime, 20 octobre 2026) passe
+            // avant un homonyme
+            ...(itemType === "game" ? [(b as any).igdbId ?? null, (b as any).igdbId ?? null] : [b.anilistId ?? null, b.anilistId ?? null]),
           ]
         );
         const before = beforeRows.length ? beforeRows[0] : null;
+
+        // JEUX : identite IGDB (13 octobre 2026). Une fiche trouvee par son titre, sa cover ou la liste de
+        // blocage qui porte un AUTRE identifiant IGDB est un homonyme (ou un rapprochement faux) : on n'y
+        // touche pas, l'envoi est ignore (jamais d'identifiant IGDB ecrase).
+        if (itemType === "game" && before && Number(before.igdbId) > 0 && Number((b as any).igdbId) > 0 && Number(before.igdbId) !== Number((b as any).igdbId)) {
+          app.log.warn({ title: b.title, igdbId: (b as any).igdbId, existant: { id: before.id, title: before.title, igdbId: before.igdbId } }, "game skipped: autre identifiant IGDB que la fiche existante (homonyme ?)");
+          continue;
+        }
+
+        // ANIMES : identite AniList (20 octobre 2026). Le passage « Dates des animes » (dates-animes.ts) relit la date et
+        // le statut de chaque anime par son identifiant AniList. Une fiche trouvee par son titre, sa jaquette ou la liste
+        // de blocage (doublon fusionne) qui porte un AUTRE identifiant AniList n'est pas reecrite : cet envoi lui
+        // donnerait l'identifiant, donc les dates et le statut, d'un autre anime (et il basculerait a chaque envoi).
+        // L'envoi est ignore, comme pour les jeux (montre une fois au tableau de bord, sauf une redirection de la liste de
+        // blocage). Seule exception : l'identifiant de la fiche a disparu d'AniList (fiche fusionnee ou supprimee chez eux,
+        // vu au dernier passage des dates) et l'envoi est le meme anime (meme MAL quand les deux en ont un, sinon meme
+        // titre) : l'identifiant est remplace, une seule fois par disparition vue (l'identifiant vu absent doit etre encore
+        // celui de la fiche), et la fiche suit de nouveau AniList.
+        if (itemType === "anime" && before && Number(before.anilistId) > 0 && Number(b.anilistId) > 0 && Number(before.anilistId) !== Number(b.anilistId)) {
+          const DA = await import("./gamenime/dates-animes.js");
+          const malAvant = Number(before.malId) > 0 ? Number(before.malId) : 0;
+          const malEnvoi = Number(b.malId) > 0 ? Number(b.malId) : 0;
+          const titreAvant = String(before.title ?? "").trim().toLowerCase();
+          const memeAnime = malAvant && malEnvoi ? malAvant === malEnvoi : titreAvant !== "" && titreAvant === String(b.title ?? "").trim().toLowerCase();
+          if (!(DA.absentsDAniList().get(Number(before.id)) === Number(before.anilistId) && memeAnime)) {
+            app.log.warn({ title: b.title, anilistId: b.anilistId, existant: { id: before.id, title: before.title, anilistId: before.anilistId } }, "anime ignore : autre identifiant AniList que la fiche existante (doublon fusionne ou homonyme)");
+            if (!blocklistRedirect && DA.ignoreAMontrer(Number(before.id), Number(b.anilistId))) {
+              pushActivity({ type: "bulk", message: `Envoi ignore : ${b.title}`, detail: `identifiant AniList ${b.anilistId}, autre que celui de la fiche #${before.id} (${before.anilistId}) : homonyme ?`, level: "warn" });
+            }
+            continue;
+          }
+          remplaces.push(Number(before.id));
+          app.log.info({ title: b.title, id: before.id, avant: before.anilistId, apres: b.anilistId }, "anime : identifiant AniList remplace (l'ancien a disparu d'AniList)");
+        }
 
         // FIX RACINE anti-doublons : AnimeSchedule ENRICHIT les items existants
         // (dates), il ne CREE PAS de nouveaux animes. Un item sans anilist_id ET
@@ -2669,6 +2756,13 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         if (itemType === "anime") {
           if (!before && !b.anilistId && !b.malId) {
             app.log.warn({ title: b.title }, "Orphelin sans ID rejete (AnimeSchedule enrichit, ne cree pas)");
+            continue;
+          }
+          // ANIME : jamais cree sans date (20 octobre 2026). release_date est facultative depuis « Date a annoncer »
+          // (dates-animes.ts) : un tel envoi faisait echouer tout le lot (NOT NULL), il est maintenant ignore seul. Un
+          // anime deja en base, lui, est complete comme avant (l'envoi n'ecrit jamais sa date).
+          if (!before && !b.releaseDate) {
+            app.log.info({ title: b.title }, "anime sans date ignore (pas de creation sans date)");
             continue;
           }
         } else {
@@ -2693,6 +2787,17 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         // valeur précédente (IF VALUES(release_datetime) IS NOT NULL ...).
         (b as any).releaseDatetime = gnSanitizeReleaseDatetime(b.releaseDate, b.releaseDatetime);
 
+        // ANIMES : une seule echelle pour la popularite et la note, celle d'AniList
+        // (popularite-anilist, 12 octobre 2026). AnimeSchedule (suivis, environ 100 fois
+        // moins) et l'ancien Jikan (membres MyAnimeList) ecrasaient la valeur d'AniList :
+        // le dernier workflow passe gagnait. Un envoi sans identifiant AniList ne touche
+        // donc plus ni la popularite ni la note (0 et null : la valeur en base est gardee).
+        // JEUX : une seule echelle aussi, celle d'IGDB (listes et note, igdb-jeux.ts,
+        // 13 octobre 2026) : les envois ne les ecrivent plus, sauf cycle coupe (IGDB_JEUX_ENABLED a 0).
+        const notesAniList = itemType === "anime" ? b.anilistId != null : !igdbJeuxActif();
+        const popEntrante = notesAniList ? b.popularity : 0;
+        const noteEntrante = notesAniList ? b.ratingScore : null;
+
         // ETAT CLEAN session 10:
         // INSERT colonnes/placeholders/values incluent rating_score (note qualitative 0-100).
         // - INT, donc pas de comparaison `!= ''` (interdit sur INT en MariaDB)
@@ -2705,7 +2810,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
         const insertVals: any[] = [
           b.title, b.titleEnglish, normalizedStrictIncoming, b.anilistId, b.malId, b.animeScheduleRoute, ...(itemType === "game" ? [(b as any).rawgId ?? null, (b as any).igdbId ?? null] : []), b.cover, b.genre, b.platform, b.releaseDate, b.releaseDatetime,
           b.releasePrecision || null,
-          b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, b.ratingScore, b.popularity, b.screenshots
+          b.isRecentlyReleased ? 1 : 0, b.trailerUrl, b.description, b.rating, noteEntrante, popEntrante, b.screenshots
         ];
         if (itemType === "game") insertVals.push((b as any).dlcs ?? null);
 
@@ -2760,8 +2865,8 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
               b.trailerUrl, b.trailerUrl, b.trailerUrl,
               b.description,
               b.rating, b.rating, b.rating,
-              b.ratingScore, b.ratingScore,
-              b.popularity, b.popularity,
+              noteEntrante, noteEntrante,
+              popEntrante, popEntrante,
               b.screenshots, b.screenshots, b.screenshots,
               ...dlcsParams,
               before.id,
@@ -2800,19 +2905,28 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
           );
         }
 
+        // la fiche mise a jour elle-meme (trouvee par identifiant, elle peut porter un autre titre que l'envoi)
         const afterRows: any = await conn.query(
           `SELECT id, title, platform, DATE_FORMAT(release_date,'%Y-%m-%d') AS releaseDate, trailer_url AS trailerUrl, cover, description, rating, rating_score AS ratingScore${itemType === "game" ? ", dlcs" : ""}
-           FROM ${table} WHERE title = ? LIMIT 1`,
-          [b.title]
+           FROM ${table} WHERE ${before ? "id = ?" : "title = ?"} LIMIT 1`,
+          [before ? before.id : b.title]
         );
         const after = afterRows.length ? afterRows[0] : null;
 
         if (before && after) {
-          await createNotificationsForItemChange(conn, itemType, before, after);
+          // un anime annule chez AniList est retire du site (dates-animes.ts) : ses abonnes ne sont pas prevenus de ses
+          // changements (bande-annonce, plateforme...) (20 octobre 2026)
+          const annule = itemType === "anime" && Number((await conn.query("SELECT IFNULL(statut_anilist, '') = 'CANCELLED' AS a FROM anime_items WHERE id = ?", [before.id]))[0]?.a) === 1;
+          if (!annule) await createNotificationsForItemChange(conn, itemType, before, after);
         }
       }
 
       await conn.commit();
+      // les remplacements d'identifiant AniList sont valides : une seule fois par disparition vue
+      if (remplaces.length) {
+        const DA = await import("./gamenime/dates-animes.js");
+        for (const id of remplaces) DA.absentRemplace(id);
+      }
 
       // Invalidate GameNime feed cache after bulk insert
       // (new items may have changed the top scores)
@@ -2840,9 +2954,9 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       const cover = String((sample as any).cover || "");
       let source = "unknown";
       if (cover.includes("anilistcdn") || cover.includes("anilist.co")) source = "anilist";
-      else if (cover.includes("myanimelist.net")) source = "jikan";
       else if (cover.includes("animeschedule.net")) source = "animeschedule";
-      else if (cover.includes("rawg.io") || cover.includes("igdb")) source = "rawg";
+      else if (cover.includes("igdb")) source = "igdb";
+      else if (cover.includes("rawg.io")) source = "rawg";
       const sourceLabel = source.charAt(0).toUpperCase() + source.slice(1);
       trackLastRun(`push-${prefix.replace("/", "")}-${source}`, { total: cleanedItems.length, filtered });
       pushActivity({
@@ -2920,4 +3034,41 @@ startQualityCron(app);
 
 // Synopsis FR rédigés par Ollama (migration 014)
 startSynopsisCron({ pool, log: app.log });
+
+// Disponibilité en France : annonces lues dans la presse (Gameblog, LevelUp) et TMDB (migration 015)
+startPresseCron({ pool, log: app.log });
+startTmdbCron({ pool, log: app.log });
+
+// Plateformes des animes : liste blanche européenne, plateformes vérifiées pour la France (presse, TMDB)
+startPlateformesCron({
+  pool,
+  log: app.log,
+  rafraichir: clearFeedCache,
+  notifier: (avant, apres) => createNotificationsForItemChange(pool, "anime", avant, apres),
+  // Film au cinéma en France : « Au cinéma — titre / En France le 8 octobre 2026 » aux abonnés (favoris).
+  notifierCinema: (film, date, texte) =>
+    createNotificationEventAndFanout(pool, "anime", film.id, "anime_platform_cinema", `anime:${film.id}:cinema:${date}`,
+      { title: film.title, cover: film.cover, label: "Au cinéma", newValue: texte }),
+});
+
+// Tavily : recherche ciblée des plateformes annoncées pour la France (animes incomplets, J-7 d'abord)
+startTavilyCron({ pool, log: app.log });
+
+// Popularite et note des animes : une seule echelle, celle d'AniList (relue toutes les 3 h)
+startPopulariteCron({ pool, log: app.log, rafraichir: clearFeedCache });
+
+// Bonus europeen des animes : lecteurs de Wikipedia fr, de, it, es (un passage par jour)
+startEuropeCron({ pool, log: app.log, rafraichir: clearFeedCache });
+
+// Jeux : IGDB seul, RAWG retire (listes IGDB et notes toutes les 3 h, decouverte chaque jour par /games/bulk)
+startIgdbJeuxCron({
+  pool,
+  log: app.log,
+  rafraichir: clearFeedCache,
+  ajouter: async (items) => {
+    const r = await app.inject({ method: "POST", url: "/games/bulk", headers: { "x-api-key": process.env.GAMES_API_KEY || "" }, payload: { items } });
+    const d: any = (() => { try { return r.json(); } catch { return null; } })();
+    return r.statusCode === 200 ? { ok: true, total: Number(d?.total) || 0 } : { ok: false, erreur: `HTTP ${r.statusCode}` };
+  },
+});
 
