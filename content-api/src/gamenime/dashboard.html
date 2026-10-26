@@ -940,6 +940,207 @@ html{scroll-behavior:smooth}
 .proc-note a{color:#d9a978;text-decoration:none;border-bottom:1px solid rgba(217,169,120,.35)}
 .proc-note a:hover{color:#ffe8c0}
 </style>
+<style>
+/* === SYNOPSIS : relecture avant affichage (v9.5, maquette v4 validée le 15 octobre 2026) — classes syn-* seulement === */
+/* === Section Synopsis : relecture avant affichage (maquette v4, 15 octobre 2026) ===
+   Mêmes valeurs que la section Publication (.pub) : cadre #242429 rayon 18, panneaux #0c0c0e,
+   filets #1a1a1f / #121216, or #d9a978 / #ffe8c0, vert #30d16c, ambre #ff9f0a, rouge #ff453a,
+   textes #f4f2f0 / #9b9ba3 / #6b6b74 / #47474f, chiffres en chasse fixe. */
+.syn{border:1px solid #242429;border-radius:18px;background:linear-gradient(180deg,rgba(20,20,24,.92),rgba(11,11,14,.88));overflow:hidden}
+
+/* bandeau : compteurs et état du cron */
+.syn-bilan{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:#121216;border-bottom:1px solid #1a1a1f}
+.syn-k{background:#0c0c0e;padding:13px 18px 12px}
+.syn-k b{display:block;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:1.25rem;font-weight:700;color:#f4f2f0;line-height:1.2;font-variant-numeric:tabular-nums}
+.syn-k span{display:block;margin-top:3px;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:#6b6b74}
+.syn-k.amb b{color:#ffba4d} .syn-k.ok b{color:#5fe08f} .syn-k.run b{color:#ffe8c0}
+.syn-cron{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;padding:10px 20px;background:#08080a;border-bottom:1px solid #1a1a1f;
+          font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#6b6b74}
+.syn-cron span{white-space:nowrap}
+.syn-cron span+span::before{content:"\00b7";margin-right:10px;color:#2b2b32}
+.syn-cron i{width:7px;height:7px;border-radius:50%;background:#47474f;flex:none}
+.syn-cron.actif i{background:#30d16c;animation:gnbat 2.4s ease-in-out infinite}
+.syn-cron b{color:#9b9ba3;font-weight:600}
+
+/* filtres : mêmes pastilles que « Items incomplets » */
+.syn-outils{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:13px 20px 3px}
+.syn-outils .gc-chips{flex:1;padding-bottom:0}
+.syn-regle{padding:9px 20px 13px;font-size:.76rem;line-height:1.5;color:#6b6b74}
+.syn-regle b{color:#9b9ba3;font-weight:600}
+
+/* cartes */
+.syn-liste{display:flex;flex-direction:column;gap:12px;padding:0 20px 20px}
+.syn-carte{border:1px solid #242429;border-radius:14px;background:#0c0c0e;overflow:hidden;transition:border-color .2s}
+.syn-carte:hover{border-color:#2f2f36}
+.syn-tete{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:13px 16px 11px}
+.syn-type{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+          padding:3px 7px;border-radius:6px;background:#17171b;color:#9b9ba3;flex:none}
+.syn-titre{margin:0;flex:1;min-width:180px;font-size:.92rem;font-weight:700;color:#f4f2f0;line-height:1.35}
+.syn-rang{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.72rem;color:#6b6b74;flex:none}
+.syn-rang b{color:#ffe8c0;font-weight:700}
+.syn-alertes{display:flex;gap:6px;flex-wrap:wrap;padding:0 16px 11px}
+.syn-alertes span{font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(255,159,10,.1);color:#ffba4d;
+                  box-shadow:0 0 0 1px rgba(255,159,10,.2) inset}
+
+.syn-duo{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#121216;border-top:1px solid #1a1a1f;border-bottom:1px solid #1a1a1f}
+.syn-pan{background:#0a0a0c;padding:13px 16px 15px;min-width:0}
+.syn-pan-t{display:flex;align-items:baseline;gap:8px;margin-bottom:9px;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:#6b6b74}
+.syn-pan-t em{font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:0;text-transform:none;color:#47474f}
+
+/* le synopsis : chaque phrase se touche pour la signaler fausse */
+.syn-texte{margin:0;font-size:.9rem;line-height:1.65;color:#f4f2f0}
+.syn-ph{cursor:pointer;border-radius:4px;padding:1px 1px;transition:background .15s,color .15s;-webkit-tap-highlight-color:transparent;
+        text-decoration:underline;text-decoration-color:transparent;text-underline-offset:4px;text-decoration-thickness:1px}
+.syn-ph:hover{background:rgba(217,169,120,.1);text-decoration-color:rgba(217,169,120,.55)}
+.syn-ph.faux{background:rgba(255,69,58,.13);color:#ffc2bd;text-decoration:underline wavy rgba(255,69,58,.85);text-decoration-thickness:1px}
+/* phrase signalée : ses mots se touchent un par un (mot faux), l'étiquette « fausse ✕ » retire le signalement */
+.syn-ph.faux{cursor:default}
+.syn-ph.faux .syn-mot{cursor:pointer;border-radius:3px;transition:background .12s,color .12s}
+.syn-ph.faux .syn-mot:hover{background:rgba(255,69,58,.24)}
+.syn-mot.on{background:#ff453a;color:#160404;text-decoration:none;box-shadow:0 0 0 1px #ff453a}
+.syn-ph.faux .syn-mot.on:hover{background:#ff6a61}
+.syn-tag{display:inline-block;margin-left:5px;padding:0 5px;border-radius:4px;vertical-align:1px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+        font:700 .58rem/1.5 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;background:#ff453a;color:#160404;text-decoration:none}
+.syn-tag:hover{background:#ff6a61}
+.syn-ph.neuf{background:rgba(48,209,108,.1);color:#c8f3d6;text-decoration-color:rgba(48,209,108,.5)}
+.syn-ph.neuf::after{content:"corrigée";display:inline-block;margin-left:5px;padding:0 5px;border-radius:4px;vertical-align:1px;
+        font:700 .58rem/1.5 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;background:#30d16c;color:#04120a}
+.syn-ph.neuf:hover{background:rgba(48,209,108,.16)}
+.syn-ph.neuf.faux{background:rgba(255,69,58,.13);color:#ffc2bd;text-decoration:underline wavy rgba(255,69,58,.85);text-decoration-thickness:1px}
+.syn-ph.neuf.faux::after{content:none}
+.syn-notes s{color:#ff9a92;text-decoration-color:rgba(255,69,58,.7)}
+.syn-notes{margin-top:12px;font-size:.76rem;color:#6b6b74}
+.syn-notes summary{cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:6px}
+.syn-notes summary::-webkit-details-marker{display:none}
+.syn-notes summary::before{content:"\25b8";font-size:.66rem;color:#47474f;transition:transform .2s}
+.syn-notes[open] summary::before{transform:rotate(90deg)}
+.syn-notes ul{margin:8px 0 0;padding-left:16px;line-height:1.55;color:#9b9ba3}
+
+/* v4 : phrase que le contrôle n'a pas retrouvée dans sa preuve (« à vérifier ») : ambre pointillé.
+   Le juge se trompe parfois : rien n'est bloqué, la preuve est dans « Contrôle phrase par phrase ». */
+.syn-ph.doute{background:rgba(255,159,10,.07);text-decoration:underline dotted rgba(255,159,10,.8);text-decoration-thickness:1.5px}
+.syn-ph.doute::after{content:"à vérifier";display:inline-block;margin-left:5px;padding:0 5px;border-radius:4px;vertical-align:1px;
+        font:700 .58rem/1.5 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.04em;text-transform:uppercase;background:#ff9f0a;color:#1a0f00}
+.syn-ph.doute:hover{background:rgba(255,159,10,.14);text-decoration-color:#ff9f0a}
+.syn-ph.doute.faux{background:rgba(255,69,58,.13);color:#ffc2bd;text-decoration:underline wavy rgba(255,69,58,.85);text-decoration-thickness:1px}
+.syn-ph.doute.faux::after{content:none}
+.syn-ph.vise{box-shadow:0 0 0 1px rgba(217,169,120,.6)}
+
+/* v4 : contrôle phrase par phrase : chaque phrase, son verdict, le passage de la source qui la prouve */
+.syn-ctrl{margin-top:13px;border-top:1px solid #16161a;padding-top:10px}
+.syn-ctrl>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;color:#6b6b74}
+.syn-ctrl>summary::-webkit-details-marker{display:none}
+.syn-ctrl>summary::before{content:"\25b8";font-size:.66rem;color:#47474f;transition:transform .2s}
+.syn-ctrl[open]>summary::before{transform:rotate(90deg)}
+.syn-ctrl>summary em{white-space:nowrap;font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:0;text-transform:none;color:#47474f}
+.syn-ctrl>summary em.amb{color:#ffba4d} .syn-ctrl>summary em.ok{color:#5fe08f}
+.syn-pv{list-style:none;margin:9px 0 0;padding:0;display:flex;flex-direction:column;gap:2px}
+.syn-pv li{display:flex;gap:9px;padding:7px 8px;border-radius:8px;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.syn-pv li:hover{background:rgba(255,255,255,.025)}
+.syn-pv li>i{flex:none;width:14px;font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.68rem;color:#47474f;padding-top:1px;text-align:right}
+.syn-pv li>div{flex:1;min-width:0;font-size:.75rem;line-height:1.5;color:#9b9ba3}
+.syn-v{display:inline-block;margin-right:6px;padding:0 6px;border-radius:4px;font:700 .58rem/1.6 ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.04em;text-transform:uppercase}
+.syn-v.ok{background:rgba(48,209,108,.12);color:#5fe08f}
+.syn-v.doute{background:#ff9f0a;color:#1a0f00}
+.syn-v.corr{background:#30d16c;color:#04120a}
+.syn-lab{font-size:.68rem;font-weight:600;color:#6b6b74}
+.syn-pv q{display:block;margin-top:3px;color:#b3b3ba;quotes:"\00ab\00a0" "\00a0\00bb"}
+.syn-pv li.ok q{color:#6b6b74;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.syn-pv li.ok.ouvert q{display:block;color:#9b9ba3}
+.syn-why{margin:4px 0 0;color:#d8cfc4}
+.syn-why b{font-weight:700;color:#ffba4d}
+.syn-pv li.corr .syn-why{color:#9b9ba3}
+.syn-pv li.corr .syn-why b{color:#5fe08f}
+.syn-avant{margin:4px 0 0;color:#6b6b74}
+.syn-avant s{color:#ff9a92;text-decoration-color:rgba(255,69,58,.7)}
+.syn-ecart{margin:4px 0 0;color:#6b6b74}
+
+/* v4 : site officiel en japonais : l'original et la traduction du modèle, l'un sous l'autre */
+.syn-ja,.syn-trad{white-space:normal}
+.syn-ja b,.syn-trad b{display:block;margin-bottom:3px;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:#6b6b74}
+.syn-ja span{display:block;color:#d5d2ce;font-size:.84rem;line-height:1.7}
+.syn-trad{margin-top:10px;padding-top:9px;border-top:1px solid #16161a}
+.syn-trad b{color:#d9a978}
+.syn-src .vide{white-space:normal;color:#6b6b74;font-size:.76rem}
+
+/* les sources, en onglets */
+.syn-onglets{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;margin:-2px 0 10px}
+.syn-onglets::-webkit-scrollbar{display:none}
+.syn-og{flex:none;white-space:nowrap;cursor:pointer;font-weight:600;font-size:.7rem;line-height:1;font-family:inherit;padding:6px 10px;border-radius:8px;
+        border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.025);color:#8a8a92;transition:.15s}
+.syn-og:hover{color:#d5d2ce;border-color:rgba(217,169,120,.3)}
+.syn-og.on{background:rgba(217,169,120,.13);border-color:rgba(217,169,120,.45);color:#ffe8c0}
+.syn-og .x{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.62rem;color:#47474f;margin-left:3px}
+.syn-og.on .x{color:#d9a978}
+.syn-src{display:none;max-height:320px;overflow-y:auto;font-size:.8rem;line-height:1.6;color:#b3b3ba;white-space:pre-line}
+.syn-src.on{display:block}
+.syn-src::-webkit-scrollbar{width:7px}
+.syn-src::-webkit-scrollbar-thumb{background:#242429;border-radius:4px}
+.syn-src .ext{color:#47474f;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.68rem;white-space:normal}
+.syn-art{display:flex;gap:9px;padding:6px 0;border-bottom:1px solid #121216;white-space:normal}
+.syn-art:last-child{border-bottom:none}
+.syn-art i{font-style:normal;flex:none;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;color:#47474f;padding-top:2px;width:38px}
+.syn-art span{flex:1;color:#9b9ba3}
+.syn-art em{display:block;font-style:normal;font-size:.7rem;color:#ff9a92;margin-top:2px}
+.syn-sources-bt{display:none}
+
+/* actions */
+.syn-pied{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:11px 16px}
+.syn-aide{flex:1;min-width:200px;font-size:.72rem;color:#47474f}
+.syn-aide.signal{color:#ff9a92}
+.syn-aide.neuf{color:#5fe08f}
+.syn-aide.doute{color:#ffba4d}
+.syn-bt-regen{background:transparent;border-color:rgba(217,169,120,.4);color:#ffe8c0}
+.syn-bt-regen:hover:not(:disabled){background:rgba(217,169,120,.1);filter:none}
+.syn-bt-regen b{display:inline-block;margin-left:7px;padding:0 6px;border-radius:6px;background:#ff453a;color:#160404;
+                font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;line-height:1.55}
+
+/* carte en correction : le texte reste visible, les phrases signalées barrées (seules réécrites) */
+.syn-carte.corr{border-color:rgba(217,169,120,.32)}
+.syn-attente{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-top:1px solid #1a1a1f;background:rgba(217,169,120,.06);
+             font-size:.78rem;line-height:1.55;color:#d9c9b8}
+.syn-attente i{flex:none;width:7px;height:7px;margin-top:6px;border-radius:50%;background:#d9a978;animation:gnbat 1.1s ease-in-out infinite}
+.syn-refusee{margin:0;font-size:.84rem;line-height:1.65;color:#6b6b74}
+.syn-refusee s{color:#ff9a92;text-decoration-color:rgba(255,69,58,.7)}
+.syn-refusee .garde{color:#b3b3ba}
+.syn-refusee s .mot{background:#ff453a;color:#160404;text-decoration:none;border-radius:3px;padding:0 2px}
+
+/* carte validée : repliée sur une ligne */
+.syn-carte.valide{border-color:rgba(48,209,108,.22);background:#0a0f0c}
+.syn-carte.valide .syn-alertes,.syn-carte.valide .syn-duo,.syn-carte.valide .syn-pied{display:none}
+.syn-carte.valide .syn-tete{padding:11px 16px}
+.syn-ok{display:none;font-size:.74rem;color:#5fe08f;font-weight:600}
+.syn-carte.valide .syn-ok{display:inline}
+.syn-annuler{display:none;font-size:.72rem;color:#d9a978;cursor:pointer;font-weight:700;background:none;border:0;font-family:inherit;padding:0}
+.syn-carte.valide .syn-annuler{display:inline}
+.syn-carte.valide .syn-tete .gn-bg{display:none}
+
+.syn-plus{margin:2px 20px 20px;width:calc(100% - 40px);padding:11px;border-radius:12px;cursor:pointer;font-weight:600;font-size:.78rem;font-family:inherit;
+          background:transparent;border:1px dashed #2b2b32;color:#9b9ba3}
+.syn-plus:hover{border-color:rgba(217,169,120,.4);color:#ffe8c0}
+
+@media(max-width:760px){
+  .syn-bilan{grid-template-columns:repeat(3,1fr)}
+  .syn-bilan .syn-k:nth-child(n+4){display:none}
+  .syn-k{padding:11px 14px 10px}
+  .syn-outils,.syn-regle{padding-left:14px;padding-right:14px}
+  .syn-outils{flex-direction:column;align-items:stretch}
+  .syn-outils .gc-types{align-self:flex-start}
+  .syn-liste{padding:0 12px 14px}
+  .syn-duo{grid-template-columns:1fr}
+  .syn-en{display:none}
+  .syn-carte.sources .syn-en{display:block}
+  .syn-sources-bt{display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 16px;cursor:pointer;
+                  background:#0a0a0c;border:0;border-top:1px solid #121216;color:#9b9ba3;font-weight:600;font-size:.74rem;font-family:inherit}
+  .syn-sources-bt::after{content:"\25be";color:#47474f}
+  .syn-carte.sources .syn-sources-bt::after{content:"\25b4"}
+  .syn-carte.valide .syn-sources-bt{display:none}
+  .syn-pied{padding:11px 12px}
+  .syn-aide{min-width:100%;order:3}
+  .syn-pied .pub-bt{flex:1;padding:11px 12px}
+  .syn-plus{margin:2px 12px 14px;width:calc(100% - 24px)}
+}
+</style>
 <body>
 <div class="wrap">
   <div class="top">
@@ -974,6 +1175,7 @@ html{scroll-behavior:smooth}
     <a class="gn-ix sous" href="#sec-process"><span class="n">Process</span></a>
     <a class="gn-ix sous" href="#sec-incomplete"><span class="n">Items incomplets</span></a>
     <a class="gn-ix sous" href="#sec-tools"><span class="n">Outils</span></a>
+    <a class="gn-ix" href="#page-synopsis"><span class="jauge"></span><span class="n">Synopsis</span><span class="gn-bg" id="syn-bg-idx">&mdash;</span></a>
     <div class="gn-idx-pied" id="gn-idx-pied">&nbsp;</div>
   </nav>
   <main class="gn-flux">
@@ -1246,6 +1448,41 @@ html{scroll-behavior:smooth}
 
         <div class="pub-log-bar">journal du build <span id="pub-log-t"></span></div>
         <pre class="pub-log" id="pub-log"></pre>
+      </div>
+    </section>
+
+    <!-- ═══ SYNOPSIS (v9.5 : relecture avant affichage, maquette v4) ═══ -->
+    <section class="gn-anc" id="page-synopsis">
+      <div class="gn-st"><h2>Synopsis</h2><em>relecture avant affichage</em>
+        <span class="gn-sp"></span><span class="gn-bg" id="syn-bg">&mdash;</span></div>
+
+      <div class="syn">
+        <div class="syn-bilan">
+          <div class="syn-k amb"><b id="syn-k-a_valider">&mdash;</b><span>À valider</span></div>
+          <div class="syn-k ok"><b id="syn-k-valides">&mdash;</b><span>Validés</span></div>
+          <div class="syn-k run"><b id="syn-k-correction">&mdash;</b><span>En correction</span></div>
+          <div class="syn-k"><b id="syn-k-sans_source">&mdash;</b><span>Sans source</span></div>
+          <div class="syn-k"><b id="syn-k-pas_traites">&mdash;</b><span>Pas encore traités</span></div>
+        </div>
+        <div class="syn-cron" id="syn-cron"><i></i><b>Cron</b><span>lecture&hellip;</span><span>rien ne s’affiche sur le site sans validation</span></div>
+
+        <div class="syn-outils">
+          <div class="gc-chips" id="syn-chips">
+            <button class="gc-chip on" data-f="a_valider">À valider <b>&mdash;</b></button>
+            <button class="gc-chip" data-f="a_verifier">À vérifier <b>&mdash;</b></button>
+            <button class="gc-chip" data-f="valides">Validés <b>&mdash;</b></button>
+            <button class="gc-chip" data-f="correction">En correction <b>&mdash;</b></button>
+            <button class="gc-chip" data-f="sans_source">Sans source <b>&mdash;</b></button>
+            <button class="gc-chip" data-f="tout">Tout <b>&mdash;</b></button>
+          </div>
+          <div class="gc-types" id="syn-types">
+            <button class="gc-type on" data-t="tous">Tous</button><button class="gc-type" data-t="anime">Anime</button><button class="gc-type" data-t="game">Jeux</button>
+          </div>
+        </div>
+        <div class="syn-regle">Les plus populaires d’abord. <b>À vérifier</b>&nbsp;: le contrôle n’a pas retrouvé la phrase dans sa preuve. Il se trompe parfois&nbsp;: la preuve est sous le synopsis, les sources à droite. <b>Touchez une phrase fausse</b> pour la signaler, puis <b>les mots faux</b> dedans&nbsp;: « Corriger » réécrit seulement cette phrase, d’après les sources et sans ces mots. Le reste ne bouge pas.</div>
+
+        <div class="syn-liste" id="syn-liste"></div>
+        <button class="syn-plus" id="syn-plus" hidden>Afficher les 20 suivants</button>
       </div>
     </section>
 
@@ -3399,6 +3636,427 @@ window.PIL_SOURCE = (function () {
     }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 }).observe(sec);
   }
   if (window.pilDemarrer) window.pilDemarrer();
+})();
+</script>
+<script>
+/* ═══ Section Synopsis : relecture avant affichage (v9.5, maquette v4 validée le 15 octobre) ═══
+   Décision A : rien ne s'affiche sur le site sans validation. Chaque carte montre le synopsis, le
+   contrôle phrase par phrase (verdict, source, passage) et les sources. Toucher une phrase la signale
+   fausse, puis ses mots faux ; « Corriger » ne fait réécrire que ces phrases, au prochain passage du cron. */
+(function () {
+  var E = function (id) { return document.getElementById(id); };
+  var API = "/dashboard/admin/synopsis";
+  var etat = { filtre: "a_valider", type: "tous", depuis: 0, total: 0 };
+  var cartes = {}; // "anime:52" -> carte reçue de l'API
+  var MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pl(n, un, plus) { return n + " " + (n > 1 ? plus : un); }
+  function date(ts) {
+    if (!ts) return "";
+    var d = new Date(ts * 1000);
+    return d.getDate() + " " + MOIS[d.getMonth()] + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+  function duree(ms) {
+    if (ms == null) return "";
+    var s = Math.round(ms / 1000);
+    if (s < 90) return s + " s par item";
+    var m = Math.floor(s / 60), r = s % 60;
+    return m + " min" + (r >= 30 && m < 10 ? " " + ("0" + r).slice(-2) + " s" : "") + " par item";
+  }
+  function mots(s) { return String(s).split(" ").filter(function (w) { return w.length > 0; }); } // = sentenceWords du serveur
+  function majuscule(s) { s = String(s || ""); return s.charAt(0).toUpperCase() + s.slice(1); }
+  function sansAdresse(s) { return String(s || "").replace(/\s*\([^()]*\.[a-z]{2,}\)\s*$/i, ""); }
+
+  // ─── appels ───
+  function appel(url, corps) {
+    var opts = corps ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps) } : {};
+    return fetch(url, opts).then(function (r) {
+      return r.json().catch(function () { return { ok: false, msg: "réponse illisible (HTTP " + r.status + ")" }; });
+    }).catch(function (e) { return { ok: false, msg: "API injoignable : " + (e && e.message) }; });
+  }
+
+  // ─── onglets des sources ───
+  function onglet(label, type) {
+    var m;
+    if (label === "Présentation") return type === "anime" ? "Présentation · AniList" : "Présentation · IGDB";
+    if ((m = /^Synopsis \((.+)\)$/.exec(label))) return m[1];
+    if (/^Anime News Network/.test(label)) return /début de la série/.test(label) ? "ANN · saison 1" : "ANN";
+    if (/^Wikipédia/.test(label)) return "Wikipédia";
+    if (label === "Page Steam") return "Steam";
+    if (/\(IGDB\)$/.test(label)) return "IGDB";
+    if (/^Œuvre précédente/.test(label)) return "Œuvre précédente";
+    return label.length > 26 ? label.slice(0, 25) + "…" : label;
+  }
+  function ongletsDe(c) {
+    var d = c.version.data, off = d.official, tabs = [];
+    var presse = d.sources.filter(function (s) { return /^Presse\b/.test(s.label); });
+    var aSite = false;
+    d.sources.forEach(function (s) {
+      if (/^Presse\b/.test(s.label)) return;
+      if (/^Site officiel/.test(s.label)) {
+        aSite = true;
+        if (off && off.original) {
+          tabs.push({ t: "Site officiel · japonais", html: '<div class="syn-ja"><b>Original</b><span lang="ja">' + esc(off.original) + '</span></div><div class="syn-trad"><b>Traduction du modèle · noms et chiffres contrôlés</b>' + esc(s.text) + "</div>" });
+        } else tabs.push({ t: "Site officiel", html: esc(s.text) });
+        return;
+      }
+      tabs.push({ t: onglet(s.label, c.type), titre: s.label, html: esc(s.text) });
+    });
+    if (!aSite && off && off.note) tabs.push({ t: "Site officiel", x: "rien gardé", html: '<span class="vide">Rien gardé : ' + esc(sansAdresse(off.note)) + ".</span>" });
+    if (d.press.length || presse.length) {
+      var ecartes = d.press.filter(function (p) { return !/^passage gardé/.test(p.verdict); }).length;
+      var html = presse.map(function (s) { return esc(s.text); }).join("\n\n");
+      html += d.press.map(function (p) {
+        return '<div class="syn-art"><i>' + esc(p.site) + "</i><span>" + esc(p.titre) + (/^passage gardé/.test(p.verdict) ? "" : "<em>écarté : " + esc(p.verdict) + "</em>") + "</span></div>";
+      }).join("");
+      tabs.push({ t: "Presse", x: ecartes ? pl(ecartes, "écarté", "écartés") : "", html: html });
+    }
+    return tabs;
+  }
+
+  // ─── contrôle phrase par phrase ───
+  // raison du juge : sans le gras du modèle (« *révèle* »), « … » si elle a été coupée (200 caractères)
+  function raison(why) {
+    var w = String(why || "").replace(/\*+|__/g, "").trim();
+    return w.length >= 195 && !/[.!?…»)]$/.test(w) ? w + "…" : w;
+  }
+  // pourquoi la correction automatique n'a pas été gardée (textes de la maquette v4)
+  function ecart(rej) {
+    var m;
+    if (rej === "correction refusée") return "Correction refusée : la phrase reste telle quelle.";
+    if (rej === "la correction propose de la supprimer") return "La correction proposait de la supprimer : refusé, la phrase reste.";
+    if (rej === "la correction ne l'a pas réécrite") return "La correction ne l’a pas réécrite : la phrase reste telle quelle.";
+    if ((m = /^correction non confirmée : (.*) · proposée : (.*)$/.exec(rej))) return "Correction écartée par le 2e contrôle (" + raison(m[1]) + ") : « " + m[2] + " »";
+    if ((m = /^correction sans preuve retrouvée · proposée : (.*)$/.exec(rej))) return "Correction écartée, preuve introuvable : « " + m[1] + " »";
+    return majuscule(rej);
+  }
+  function ligneHtml(r, i, type) {
+    var cl = r.verdict === "confirmée" ? "ok" : r.verdict === "à vérifier" ? "doute" : r.verdict === "corrigée" ? "corr" : "ok";
+    var pastille = r.verdict === "confirmée" ? '<span class="syn-v ok">✓ confirmée</span>'
+      : r.verdict === "à vérifier" ? '<span class="syn-v doute">à vérifier</span>'
+      : r.verdict === "corrigée" ? '<span class="syn-v corr">corrigée</span>'
+      : '<span class="syn-v ok">' + esc(r.verdict) + "</span>";
+    var lab = r.label === "Présentation" || r.label === "Fiche" || /^Site officiel/.test(r.label) ? r.label : onglet(r.label, type);
+    var h = '<li class="' + cl + '" data-i="' + i + '"><i>' + (i + 1) + "</i><div>" + pastille + '<span class="syn-lab">' + esc(lab) + "</span>";
+    if (r.passage) h += "<q>" + esc(r.passage) + "</q>";
+    if (r.verdict === "illisible") h += '<p class="syn-ecart">Le contrôle n’a pas répondu clairement.</p>';
+    if (r.verdict === "non contrôlée") h += '<p class="syn-ecart">Phrase gardée d’une version sans contrôle.</p>';
+    if (r.why) h += '<p class="syn-why"><b>Contrôle :</b> ' + esc(raison(r.why)) + "</p>";
+    if (r.asked) h += '<p class="syn-ecart">Réécrite à la demande.</p>';
+    if (r.before) h += '<p class="syn-avant">Phrase d’avant : <s>' + esc(r.before) + "</s></p>";
+    if (r.rejected) h += '<p class="syn-ecart">' + esc(ecart(r.rejected)) + "</p>";
+    return h + "</div></li>";
+  }
+  function bilanControle(rows) {
+    var vus = [], doutes = 0, corr = 0, ok = 0;
+    rows.forEach(function (r) {
+      if (vus.indexOf(r) >= 0) return;
+      vus.push(r);
+      if (r.verdict === "à vérifier") doutes++; else if (r.verdict === "corrigée") corr++; else if (r.verdict === "confirmée") ok++;
+    });
+    return { doutes: doutes, corr: corr, ok: ok };
+  }
+
+  // ─── cartes ───
+  function enTete(c, badge) {
+    var rang = c.rank == null ? '<span class="syn-rang">hors fenêtre</span>' : '<span class="syn-rang">rang <b>' + c.rank + "</b></span>";
+    var ok = c.status === "approved" ? "✓ Validé" + (c.reviewedAt ? " le " + date(c.reviewedAt) : "") : "✓ Validé à l’instant";
+    return '<header class="syn-tete"><span class="syn-type">' + (c.type === "anime" ? "Anime" : "Jeu") + '</span><h3 class="syn-titre">' + esc(c.title) + "</h3>" + rang + badge
+      + '<span class="syn-ok">' + ok + '</span><button class="syn-annuler">Annuler</button></header>';
+  }
+  function carteHtml(c) {
+    var cle = c.type + ":" + c.id;
+    if (c.status === "correction" && c.version && c.correction) return carteCorrection(c);
+    var v = c.version, d = v ? v.data : null;
+    var badge = c.status === "auto" ? '<span class="gn-bg ok">sans alerte</span>'
+      : c.status === "no_source" || c.status === "failed" ? '<span class="gn-bg">sans synopsis</span>'
+      : '<span class="gn-bg amb">à relire</span>';
+    var h = '<article class="syn-carte' + (c.status === "approved" ? " valide" : "") + '" data-cle="' + cle + '">' + enTete(c, badge);
+    if (c.alerts.length) h += '<div class="syn-alertes">' + c.alerts.map(function (a) { return "<span>" + esc(a) + "</span>"; }).join("") + "</div>";
+    // pas de synopsis (sans source, échec) : la raison, et ce qui a été lu
+    if (!c.text) {
+      h += '<div class="syn-attente"><div>' + esc(c.note || "Pas de synopsis.") + "</div></div></article>";
+      return h;
+    }
+    var phrases = d ? d.sentences : [c.text];
+    var rows = d && d.rows.length === phrases.length ? d.rows : [];
+    h += '<div class="syn-duo"><section class="syn-pan syn-fr"><div class="syn-pan-t">Synopsis <em>' + (v ? v.chars + " car. · " + esc(v.code) + (v.createdAt ? " · " + date(v.createdAt) : "") : "ancienne version, sans preuves") + "</em></div>";
+    h += '<p class="syn-texte">' + phrases.map(function (s, i) {
+      var r = rows[i], cl = r && r.verdict === "à vérifier" ? " doute" : r && r.verdict === "corrigée" ? " neuf" : "";
+      return '<span class="syn-ph' + cl + '" data-i="' + i + '">' + esc(s) + "</span>";
+    }).join(" ") + "</p>";
+    if (rows.length) {
+      var b = bilanControle(rows), resume = [];
+      if (b.doutes) resume.push('<em class="amb">' + b.doutes + " à vérifier" + (b.corr ? " · " + pl(b.corr, "corrigée", "corrigées") : "") + "</em>");
+      else if (b.corr) resume.push("<em>" + pl(b.corr, "corrigée", "corrigées") + "</em>");
+      else resume.push('<em class="ok">' + pl(b.ok, "confirmée", "confirmées") + "</em>");
+      h += '<details class="syn-ctrl"' + (b.doutes || b.corr ? " open" : "") + "><summary>Contrôle phrase par phrase " + resume.join("") + '</summary><ol class="syn-pv">' + rows.map(function (r, i) { return ligneHtml(r, i, c.type); }).join("") + "</ol></details>";
+    } else if (d && d.checkNote) {
+      h += '<details class="syn-ctrl"><summary>Contrôle phrase par phrase <em>' + esc(d.checkNote) + "</em></summary></details>";
+    }
+    if (d && (d.notes.length || d.dropped.length)) {
+      h += '<details class="syn-notes"><summary>Notes du modèle (' + d.notes.length + (d.dropped.length ? " · " + pl(d.dropped.length, "retirée", "retirées") : "") + ")</summary><ul>"
+        + d.notes.map(function (n) { return "<li>" + esc(n.note) + "</li>"; }).join("")
+        + d.dropped.map(function (x) {
+          var m = /^(.*?) \((.*)\)$/.exec(x);
+          return "<li>" + (m ? "<s>" + esc(m[1]) + "</s> : retirée, " + esc(m[2]) : "<s>" + esc(x) + "</s> : retirée") + "</li>";
+        }).join("") + "</ul></details>";
+    }
+    h += "</section>";
+    if (v) {
+      var tabs = ongletsDe(c);
+      h += '<button class="syn-sources-bt">Sources · ' + tabs.length + '</button><section class="syn-pan syn-en"><div class="syn-onglets">'
+        + tabs.map(function (t, k) {
+          return '<button class="syn-og' + (k === 0 ? " on" : "") + '" data-og="' + k + '"' + (t.titre ? ' title="' + esc(t.titre) + '"' : "") + ">" + esc(t.t) + (t.x ? ' <span class="x">' + esc(t.x) + "</span>" : "") + "</button>";
+        }).join("") + "</div>"
+        + tabs.map(function (t, k) { return '<div class="syn-src' + (k === 0 ? " on" : "") + '">' + t.html + "</div>"; }).join("") + "</section>";
+    } else {
+      h += '<section class="syn-pan syn-en"><div class="syn-src on"><span class="vide">Écrit avant la v9.5 : ni preuves ni sources gardées.</span></div></section>';
+    }
+    h += "</div>";
+    // pied : l'aide de base dit ce qu'il y a à vérifier
+    var base = "Touchez une phrase fausse pour la signaler", cls = "";
+    if (/^(?:correction en échec|demande de correction)/.test(c.note || "")) { base = c.note; cls = "signal"; }
+    else if (rows.length) {
+      var bb = bilanControle(rows);
+      if (bb.doutes) { base = pl(bb.doutes, "phrase à vérifier", "phrases à vérifier") + (bb.corr ? " · " + pl(bb.corr, "corrigée", "corrigées") + " · relisez-les, puis Valider" : " · la preuve est sous le synopsis"); cls = "doute"; }
+      else if (bb.corr) { base = pl(bb.corr, "phrase corrigée", "phrases corrigées") + " · relisez-les, puis Valider"; cls = "neuf"; }
+    }
+    h += '<footer class="syn-pied"><span class="syn-aide' + (cls ? " " + cls : "") + '" data-base="' + esc(base) + '" data-cls="' + cls + '">' + esc(base) + "</span>"
+      + '<button class="pub-bt syn-bt-regen" disabled>Corriger</button>'
+      + '<button class="pub-bt pub-bt-b syn-bt-ok">Valider</button></footer></article>';
+    return h;
+  }
+  function carteCorrection(c) {
+    var d = c.version.data, req = c.correction, cle = c.type + ":" + c.id;
+    var touches = [];
+    var texte = d.sentences.map(function (s, i) {
+      if (req.flagged.indexOf(i) < 0) return '<span class="garde">' + esc(s) + "</span>";
+      var pos = req.marked[String(i)] || [];
+      var w = mots(s);
+      pos.forEach(function (p) { if (w[p]) touches.push(w[p].replace(/^[«"“(]+|[,;:.!?…»"”)]+$/g, "")); });
+      return "<s>" + w.map(function (x, p) { return pos.indexOf(p) >= 0 ? '<span class="mot">' + esc(x) + "</span>" : esc(x); }).join(" ") + "</s>";
+    }).join(" ");
+    var n = req.flagged.length, reste = d.sentences.length - n;
+    var msg = "Correction au prochain passage du cron&nbsp;: " + (n > 1 ? "seules les phrases barrées sont réécrites" : "seule la phrase barrée est réécrite") + ", d’après les sources"
+      + (touches.length ? ", sans " + touches.map(function (t) { return "«&nbsp;" + esc(t) + "&nbsp;»"; }).join(", ") : "") + "."
+      + (reste ? " " + (reste > 1 ? "Les " + reste + " autres restent telles quelles." : "L’autre reste telle quelle.") : "");
+    return '<article class="syn-carte corr" data-cle="' + cle + '">' + enTete(c, '<span class="gn-bg run">correction</span>')
+      + '<div class="syn-attente"><i></i><div><p class="syn-refusee">' + texte + '</p><div style="margin-top:7px">' + msg + "</div></div></div>"
+      + '<footer class="syn-pied"><span class="syn-aide">En attente du cron</span><button class="pub-bt syn-bt-regen syn-bt-retirer">Annuler la demande</button></footer></article>';
+  }
+
+  // ─── interactions d'une carte ───
+  function brancher(el) {
+    var c = cartes[el.getAttribute("data-cle")];
+    if (!c) return;
+    var regen = el.querySelector(".syn-bt-regen"), ok = el.querySelector(".syn-bt-ok"), aide = el.querySelector(".syn-aide");
+    var phrases = el.querySelectorAll(".syn-texte .syn-ph");
+    function majSignal() {
+      if (!regen || !ok || !aide || el.classList.contains("corr")) return;
+      var n = el.querySelectorAll(".syn-ph.faux").length, m = el.querySelectorAll(".syn-mot.on").length;
+      regen.innerHTML = n ? "Corriger<b>" + n + "</b>" : "Corriger";
+      regen.disabled = n === 0;
+      ok.disabled = n > 0;
+      var base = aide.getAttribute("data-base"), cls = aide.getAttribute("data-cls");
+      aide.className = "syn-aide" + (n ? " signal" : cls ? " " + cls : "");
+      var phr = n + (n > 1 ? " phrases" : " phrase");
+      aide.textContent = !n ? base
+        : !m ? phr + " signalée" + (n > 1 ? "s" : "") + " · touchez les mots faux pour guider la correction"
+        : phr + " · " + m + (m > 1 ? " mots faux" : " mot faux") + " · " + (n > 1 ? "seules ces phrases seront réécrites" : "seule cette phrase sera réécrite") + (m > 1 ? ", sans ces mots" : ", sans ce mot");
+    }
+    function signaler(ph) {
+      ph.setAttribute("data-texte", ph.textContent);
+      ph.innerHTML = mots(ph.textContent).map(function (w) { return '<span class="syn-mot">' + esc(w) + "</span>"; }).join(" ") + '<span class="syn-tag" title="Retirer le signalement">fausse ✕</span>';
+      ph.classList.add("faux");
+    }
+    function retirer(ph) {
+      ph.textContent = ph.getAttribute("data-texte") || "";
+      ph.classList.remove("faux");
+    }
+    if (c.version && c.status !== "approved") {
+      Array.prototype.forEach.call(phrases, function (ph) {
+        ph.addEventListener("click", function (e) {
+          var t = e.target;
+          if (t.classList && t.classList.contains("syn-tag")) retirer(ph);
+          else if (t.classList && t.classList.contains("syn-mot")) t.classList.toggle("on");
+          else if (!ph.classList.contains("faux")) signaler(ph);
+          majSignal();
+        });
+      });
+    }
+    Array.prototype.forEach.call(el.querySelectorAll(".syn-pv li"), function (li) {
+      var ph = phrases[Number(li.getAttribute("data-i"))];
+      li.addEventListener("mouseenter", function () { if (ph) ph.classList.add("vise"); });
+      li.addEventListener("mouseleave", function () { if (ph) ph.classList.remove("vise"); });
+      li.addEventListener("click", function () { li.classList.toggle("ouvert"); });
+    });
+    Array.prototype.forEach.call(el.querySelectorAll(".syn-og"), function (og) {
+      og.addEventListener("click", function () {
+        var i = Number(og.getAttribute("data-og"));
+        Array.prototype.forEach.call(el.querySelectorAll(".syn-og"), function (o) { o.classList.toggle("on", o === og); });
+        Array.prototype.forEach.call(el.querySelectorAll(".syn-src"), function (s, k) { s.classList.toggle("on", k === i); });
+      });
+    });
+    var src = el.querySelector(".syn-sources-bt");
+    if (src) src.addEventListener("click", function () { el.classList.toggle("sources"); });
+    function apres(j, sinon) {
+      if (j && j.carte) remplacer(j.carte, j.ok === false ? j.msg : null);
+      else if (aide) { aide.className = "syn-aide signal"; aide.textContent = (j && j.msg) || sinon; }
+      compteurs();
+    }
+    if (ok) ok.addEventListener("click", function () {
+      if (ok.disabled) return;
+      ok.disabled = true;
+      appel(API + "/valider", { type: c.type, id: c.id, version: c.version ? c.version.id : 0 }).then(function (j) {
+        if (j && j.ok && j.carte) {
+          cartes[el.getAttribute("data-cle")] = j.carte;
+          el.classList.add("valide");
+          var t = el.querySelector(".syn-ok"); if (t) t.textContent = "✓ Validé à l’instant";
+          compteurs();
+        } else apres(j, "validation impossible");
+      });
+    });
+    var annuler = el.querySelector(".syn-annuler");
+    if (annuler) annuler.addEventListener("click", function () {
+      appel(API + "/annuler", { type: c.type, id: c.id }).then(function (j) { apres(j, "annulation impossible"); });
+    });
+    if (regen && regen.classList.contains("syn-bt-retirer")) {
+      regen.addEventListener("click", function () {
+        regen.disabled = true;
+        appel(API + "/annuler-demande", { type: c.type, id: c.id }).then(function (j) { apres(j, "annulation impossible"); });
+      });
+    } else if (regen) {
+      regen.addEventListener("click", function () {
+        if (regen.disabled || !c.version) return;
+        var demande = Array.prototype.map.call(el.querySelectorAll(".syn-ph.faux"), function (ph) {
+          var m = [];
+          Array.prototype.forEach.call(ph.querySelectorAll(".syn-mot"), function (s, p) { if (s.classList.contains("on")) m.push(p); });
+          return { index: Number(ph.getAttribute("data-i")), texte: ph.getAttribute("data-texte"), mots: m };
+        });
+        if (!demande.length) return;
+        regen.disabled = true;
+        appel(API + "/corriger", { type: c.type, id: c.id, version: c.version.id, phrases: demande }).then(function (j) { apres(j, "demande impossible"); });
+      });
+    }
+    majSignal();
+  }
+
+  function remplacer(c, msg) {
+    var cle = c.type + ":" + c.id;
+    cartes[cle] = c;
+    var ancien = E("syn-liste").querySelector('[data-cle="' + cle + '"]');
+    var tmp = document.createElement("div");
+    tmp.innerHTML = carteHtml(c);
+    var el = tmp.firstChild;
+    if (ancien) ancien.parentNode.replaceChild(el, ancien);
+    else E("syn-liste").appendChild(el);
+    brancher(el);
+    if (msg) {
+      var aide = el.querySelector(".syn-aide");
+      if (aide) { aide.className = "syn-aide signal"; aide.textContent = msg; }
+    }
+  }
+
+  // ─── compteurs, liste, filtres ───
+  function majCompteurs(j) {
+    var k = j.counts;
+    ["a_valider", "valides", "correction", "sans_source", "pas_traites"].forEach(function (n) { var b = E("syn-k-" + n); if (b) b.textContent = k[n]; });
+    Array.prototype.forEach.call(E("syn-chips").querySelectorAll(".gc-chip"), function (ch) { var b = ch.querySelector("b"); if (b) b.textContent = k[ch.getAttribute("data-f")]; });
+    ["syn-bg", "syn-bg-idx"].forEach(function (id) {
+      var b = E(id); if (!b) return;
+      b.className = "gn-bg " + (k.a_valider ? "amb" : "ok");
+      b.textContent = id === "syn-bg" ? (k.a_valider ? k.a_valider + " à valider" : "rien à valider") : String(k.a_valider);
+    });
+    var cron = E("syn-cron");
+    if (cron) {
+      // l'interrupteur et la pause générale sont ceux du Pilotage
+      var marche = j.cron.active && !j.cron.pause;
+      cron.className = "syn-cron" + (marche ? " actif" : "");
+      cron.innerHTML = "<i></i><b>" + (marche ? "Cron actif" : j.cron.active ? "Cron en pause" : "Cron coupé") + "</b><span>" + esc(j.cron.code) + (j.cron.msPerItem ? " · " + duree(j.cron.msPerItem) : "") + "</span><span>rien ne s’affiche sur le site sans validation</span>";
+    }
+  }
+  function compteurs() {
+    return appel(API + "?vue=compteurs").then(function (j) { if (j && j.ok) majCompteurs(j); });
+  }
+  function charger(suite) {
+    if (!suite) etat.depuis = 0;
+    var url = API + "?filtre=" + etat.filtre + "&type=" + etat.type + "&depuis=" + etat.depuis;
+    var plus = E("syn-plus");
+    return appel(url).then(function (j) {
+      var liste = E("syn-liste");
+      if (!j || !j.ok) {
+        if (!suite) liste.innerHTML = "";
+        liste.insertAdjacentHTML("beforeend", '<div class="syn-regle">Bloc indisponible : ' + esc((j && j.msg) || "?") + "</div>");
+        return;
+      }
+      majCompteurs(j);
+      if (!suite) { liste.innerHTML = ""; cartes = {}; }
+      j.items.forEach(function (c) { remplacer(c, null); });
+      if (!suite && !j.items.length) liste.innerHTML = '<div class="syn-regle">Aucun synopsis dans ce filtre.</div>';
+      etat.total = j.total;
+      var vus = etat.depuis + j.items.length;
+      plus.hidden = vus >= j.total;
+      plus.textContent = "Afficher les " + Math.min(20, Math.max(0, j.total - vus)) + " suivants";
+    });
+  }
+  Array.prototype.forEach.call(E("syn-chips").querySelectorAll(".gc-chip"), function (ch) {
+    ch.addEventListener("click", function () {
+      Array.prototype.forEach.call(E("syn-chips").querySelectorAll(".gc-chip"), function (o) { o.classList.toggle("on", o === ch); });
+      etat.filtre = ch.getAttribute("data-f");
+      charger(false);
+    });
+  });
+  Array.prototype.forEach.call(E("syn-types").querySelectorAll(".gc-type"), function (ty) {
+    ty.addEventListener("click", function () {
+      Array.prototype.forEach.call(E("syn-types").querySelectorAll(".gc-type"), function (o) { o.classList.toggle("on", o === ty); });
+      etat.type = ty.getAttribute("data-t");
+      charger(false);
+    });
+  });
+  E("syn-plus").addEventListener("click", function () { etat.depuis += 20; charger(true); });
+  // les pastilles d'« Items incomplets » (gcFilter, gcType) retirent « on » de toutes les .gc-chip et
+  // .gc-type de la page : celles du bloc retrouvent leur état juste après
+  function majFiltres() {
+    Array.prototype.forEach.call(E("syn-chips").querySelectorAll(".gc-chip"), function (o) { o.classList.toggle("on", o.getAttribute("data-f") === etat.filtre); });
+    Array.prototype.forEach.call(E("syn-types").querySelectorAll(".gc-type"), function (o) { o.classList.toggle("on", o.getAttribute("data-t") === etat.type); });
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest(".gc-chip, .gc-type") : null;
+    if (t && !t.closest("#page-synopsis")) setTimeout(majFiltres, 0);
+  });
+
+  // suivi : compteurs toutes les minutes ; une carte en correction est relue jusqu'à son retour
+  setInterval(function () {
+    compteurs();
+    Object.keys(cartes).forEach(function (cle) {
+      var c = cartes[cle];
+      if (c.status !== "correction") return;
+      appel(API + "/carte?type=" + c.type + "&id=" + c.id).then(function (j) {
+        if (j && j.ok && j.carte && j.carte.status !== "correction") remplacer(j.carte, null);
+      });
+    });
+  }, 60000);
+  charger(false);
+
+  // la section est écrite en dur, comme Publication et Pilotage : le script de la piste B ne l'observe pas, il lui
+  // faut son propre observateur pour allumer l'index
+  var sec = E("page-synopsis");
+  if (sec && window.IntersectionObserver) {
+    new IntersectionObserver(function (es) {
+      es.forEach(function (ev) {
+        if (!ev.isIntersecting) return;
+        document.querySelectorAll("#gn-idx .gn-ix").forEach(function (x) { x.classList.remove("ici"); });
+        var a = document.querySelector('#gn-idx .gn-ix[href="#page-synopsis"]');
+        if (a) a.classList.add("ici");
+      });
+    }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 }).observe(sec);
+  }
 })();
 </script>
 </body>

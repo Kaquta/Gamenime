@@ -719,6 +719,17 @@ export function sansFauxJour(d: { date: string; precision: Precision } | null, a
   if (!d || !fauxJour(d) || d.date <= aujourdhui) return d;
   return { date: `${d.date.slice(0, 4)}-01-01`, precision: "year" };
 }
+/**
+ * IGDB n'a aucune date pour ce jeu et le dit : des sorties, toutes sans date, dont une au moins marquée « TBD »
+ * (Alien: Isolation 2), et pas de première sortie. Une fiche sans aucune sortie, ou des sorties vides sans « TBD », ne
+ * comptent pas (un champ qui manque peut venir d'une réponse partielle).
+ */
+export function igdbSansDate(fiche: any): boolean {
+  const rds = fiche?.release_dates;
+  if (!Array.isArray(rds) || !rds.length || Number(fiche?.first_release_date) > 0) return false;
+  if (rds.some((r: any) => Number(r?.date) > 0)) return false;
+  return rds.some((r: any) => /^tbd$/i.test(String(r?.human ?? "").trim()));
+}
 /** La période que couvre une date : le jour, le mois ou l'année. */
 function periode(d: DateJeu): { debut: string; fin: string } {
   const date = String(d.date);
@@ -966,6 +977,387 @@ export async function fusionnerJeux(
   }
 }
 
+// ── Éditions groupées d'IGDB (Rey, 23 octobre 2026 : « une édition groupée n'est pas une fiche du radar »)
+
+/** Type IGDB d'une édition groupée (game_type « Bundle » ; l'ancien champ category a la même valeur). */
+export const TYPE_EDITION_GROUPEE = 3;
+/** Un jeu de l'édition sorti au moins ce nombre de secondes avant elle est « déjà sorti » (2 jours : l'heure de sortie
+ * d'un même jour varie d'une région à l'autre). */
+const AVANCE_DEJA_SORTI_S = 2 * 86400;
+/**
+ * Une édition n'est retirée qu'au deuxième passage qui la trouve retirable, une heure au moins après le premier, avec le
+ * même contenu chez IGDB et les mêmes fiches sur le site : une réponse partielle d'IGDB, ou une édition qu'IGDB est encore
+ * en train de remplir, ne retire rien. (En mémoire : après un redémarrage, le premier passage la note de nouveau.)
+ */
+export const CONFIRMATION_EDITION_MS = 3600 * 1000;
+const editionsVues = new Map<number, { quand: number; signature: string }>();
+/** Essais : oublie les éditions notées. */
+export function oublierEditionsVues(): void {
+  editionsVues.clear();
+}
+
+export interface EditionRetiree {
+  id: number;
+  titre: string;
+  igdb: number;
+  /** Les jeux de l'édition chez IGDB (6 au plus). */
+  jeux: string[];
+  /** Favoris, votes, notifications, alertes et rappels passés sur les fiches de ses jeux (déplacés vers la seule,
+   * copiés sur chacune quand il y en a plusieurs). */
+  relations: number;
+  /** Lignes parties avec elle (déjà sur la fiche du jeu, ou aucune fiche où les mettre) : gardées dans le journal
+   * (table editions_retirees), comme la fiche elle-même. */
+  supprimees: number;
+  /** Les fiches du site de ses jeux, qui reprennent ses favoris ; vide : aucune. */
+  vers: Array<{ id: number; titre: string }>;
+}
+export interface EditionGardee {
+  id: number;
+  titre: string;
+  igdb: number;
+  /**
+   * « jeu nouveau » : un de ses jeux sort avec elle (ou n'est pas encore sorti) et n'a pas sa fiche ; « jeux inconnus » :
+   * IGDB n'en nomme aucun ; « titre » : la fiche ne porte pas nettement le nom de l'édition (degré 1 ou 2), ou porte aussi
+   * bien celui d'un de ses jeux (sans doute ce jeu, mal rattaché) ; « date » : la date de la fiche ne colle pas à celle de
+   * l'édition ; « pas sortie » : l'édition n'est pas encore sortie (IGDB la remplit encore) ; « dates incompletes » : IGDB
+   * a refusé le statut des dates (un accès anticipé ne se distingue pas d'une sortie) ; « a confirmer » : retirable, elle
+   * le sera au passage suivant si rien ne change ; « changee » : la fiche a changé pendant le passage.
+   */
+  raison: "jeu nouveau" | "jeux inconnus" | "titre" | "date" | "pas sortie" | "dates incompletes" | "a confirmer" | "changee";
+}
+
+/**
+ * La première vraie sortie d'une fiche IGDB (secondes) : sa première date utile (Europe et monde entier quand IGDB en
+ * donne, sans les dates annulées, datesUtiles) qui n'est ni un accès anticipé, ni une alpha, ni une bêta, ni un
+ * « Advanced Access » ; 0 sinon (un jeu encore en accès anticipé n'est pas sorti : sa 1.0 sera nouvelle).
+ */
+export function premiereSortie(g: any): number {
+  const d = datesUtiles(g?.release_dates, true).find((r) => !anticipee(r));
+  return d ? Number(d.date) : 0;
+}
+
+/**
+ * Une édition groupée n'apporte aucun jeu nouveau quand chacun de ses jeux est déjà sorti avant elle (2 jours au
+ * moins) ou a déjà sa fiche sur le site (identifiant IGDB) : Diablo IV: Age of Hatred Collection (Diablo IV, Vessel of
+ * Hatred, et Lord of Hatred qui a sa fiche). Un jeu sans date, en accès anticipé, ou qui sort avec elle sans avoir sa
+ * fiche, est nouveau : l'édition reste (Yakuza Kiwami 3 & Dark Ties, le seul accès du site à ces deux jeux). Sans jeu
+ * connu : elle reste.
+ */
+export function sansJeuNouveau(dateEdition: number, jeux: Array<{ id: number; date: number }>, surLeSite: Set<number>): boolean {
+  if (!jeux.length) return false;
+  return jeux.every((j) => surLeSite.has(j.id) || (dateEdition > 0 && j.date > 0 && j.date <= dateEdition - AVANCE_DEJA_SORTI_S));
+}
+
+/** Le type IGDB de ces fiches (game_type ; ancien champ category si IGDB refuse le nouveau). */
+let champType = "game_type";
+async function lireTypes(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, ids: number[]): Promise<Map<number, number>> {
+  const res = new Map<number, number>();
+  for (let i = 0; i < ids.length; i += 400) {
+    const paquet = ids.slice(i, i + 400);
+    const corps = (c: string) => `fields id, ${c}; where id = (${paquet.join(",")}); limit 500;`;
+    let d: any[];
+    try {
+      d = await requete(deps, cfg, "games", corps(champType));
+    } catch (e) {
+      if (champType !== "game_type" || !/HTTP 400/.test(message(e))) throw e;
+      d = await requete(deps, cfg, "games", corps("category"));
+      champType = "category";
+    }
+    if (d.length === 0 && paquet.length >= LOT_VIDE_SUSPECT) throw new Error(`IGDB games : réponse vide pour ${paquet.length} jeux (types)`);
+    for (const g of d) {
+      const t = Number(g?.[champType]);
+      if (Number(g?.id) > 0 && Number.isFinite(t)) res.set(Number(g.id), t);
+    }
+  }
+  return res;
+}
+
+/** Les jeux de ces éditions groupées chez IGDB : édition -> ses jeux (noms, dates avec leur statut et leur région). */
+async function lireJeuxDesEditions(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, editions: number[]): Promise<Map<number, any[]>> {
+  const res = new Map<number, any[]>();
+  const voulues = new Set(editions);
+  for (let i = 0; i < editions.length; i += 50) {
+    const paquet = editions.slice(i, i + 50);
+    for (let decalage = 0; ; decalage += 500) {
+      const d = await requete(
+        deps,
+        cfg,
+        "games",
+        `fields id, name, alternative_names.name, first_release_date, release_dates.date, release_dates.human${CHAMPS_DATES}, bundles; ` +
+          `where bundles = (${paquet.join(",")}); limit 500; offset ${decalage};`
+      );
+      for (const g of d) {
+        for (const b of Array.isArray(g?.bundles) ? g.bundles : []) {
+          if (!voulues.has(Number(b))) continue;
+          const l = res.get(Number(b)) ?? [];
+          if (!l.some((x) => Number(x.id) === Number(g.id))) l.push(g);
+          res.set(Number(b), l);
+        }
+      }
+      if (d.length < 500) break;
+    }
+  }
+  return res;
+}
+
+/** JSON d'une ligne de la base (BigInt en texte, dates en ISO). */
+const enJson = (o: unknown) => JSON.stringify(o, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+
+/**
+ * Retire une édition groupée du site, en une transaction :
+ *  - le journal d'abord (table editions_retirees) : la fiche et toutes ses lignes (favoris, votes, notifications,
+ *    alertes, rappels, Steam), telles quelles, pour pouvoir la remettre ; sans journal, rien n'est retiré ;
+ *  - ses lignes passent sur les fiches de ses jeux (cibles) : déplacées vers la seule, copiées sur chacune quand il y en a
+ *    plusieurs (sauf les événements de notification, propres à l'édition) ; une ligne qu'une fiche a déjà (même
+ *    utilisateur) n'est pas doublée ; le reste part avec elle ;
+ *  - son titre et sa cover vont dans merge_blocklist (rejet : un envoi qui la reprendrait est écarté), sauf un titre qui
+ *    est celui d'un de ses jeux (proteges) : un jeu ne doit jamais être bloqué ; les renvois de merge_blocklist vers elle
+ *    (fiches fusionnées autrefois) deviennent des rejets, sauf le titre d'un de ses jeux, qui n'est plus bloqué ;
+ *  - la fiche est supprimée.
+ * null : la fiche a changé entre-temps (autre identifiant IGDB, supprimée) : rien n'est fait.
+ */
+async function retirerEdition(
+  deps: IgdbJeuxDeps,
+  id: number,
+  igdb: number,
+  cibles: number[],
+  motif: string,
+  proteges: Set<string>
+): Promise<{ relations: number; supprimees: number; cibles: number[] } | null> {
+  if (typeof deps.pool.getConnection !== "function") return null;
+  const conn = await deps.pool.getConnection();
+  try {
+    await conn.query("START TRANSACTION");
+    const l: any[] = await conn.query("SELECT * FROM game_items WHERE id = ? FOR UPDATE", [id]);
+    const p = l[0];
+    if (!p || Number(p.igdb_id) !== igdb) {
+      await conn.query("ROLLBACK");
+      return null;
+    }
+    const la: number[] = [];
+    for (const c of cibles) if (c !== id && (await conn.query("SELECT id FROM game_items WHERE id = ? FOR UPDATE", [c])).length) la.push(c);
+    // le journal : la fiche et ses lignes, avant tout changement
+    const lignes: Record<string, unknown[]> = {};
+    for (const t of TABLES_LIEES) {
+      try {
+        lignes[t] = [...(await conn.query(`SELECT * FROM ${t} WHERE item_type = 'game' AND item_id = ?`, [id]))];
+        if (t === "notification_events" && lignes[t].length) {
+          lignes.user_notifications = [
+            ...(await conn.query("SELECT * FROM user_notifications WHERE event_id IN (SELECT id FROM notification_events WHERE item_type = 'game' AND item_id = ?)", [id])),
+          ];
+        }
+      } catch (e) {
+        if (Number((e as any)?.errno) !== 1146) throw e;
+      }
+    }
+    try {
+      lignes.jeux_steam = [...(await conn.query("SELECT * FROM jeux_steam WHERE game_id = ?", [id]))];
+    } catch (e) {
+      if (Number((e as any)?.errno) !== 1146) throw e;
+    }
+    // les fiches fusionnées autrefois dans l'édition : merge_blocklist renvoie vers elle
+    const renvois: any[] = [...(await conn.query("SELECT * FROM merge_blocklist WHERE item_type = 'game' AND redirect_to_id = ?", [id]))];
+    if (renvois.length) lignes.merge_blocklist = renvois;
+    await conn.query("INSERT INTO editions_retirees (game_id, igdb_id, titre, motif, cibles, contenu) VALUES (?, ?, ?, ?, ?, ?)", [
+      id,
+      igdb,
+      String(p.title ?? "").slice(0, 500),
+      motif.slice(0, 255),
+      la.join(",").slice(0, 255) || null,
+      enJson({ fiche: p, lignes }),
+    ]);
+    let relations = 0;
+    let supprimees = 0;
+    for (const t of TABLES_LIEES) {
+      try {
+        const compte = async () => Number((await conn.query(`SELECT COUNT(*) AS n FROM ${t} WHERE item_type = 'game' AND item_id = ?`, [id]))?.[0]?.n ?? 0);
+        const avant = await compte();
+        if (!avant) continue;
+        if (la.length === 1) {
+          // une ligne que l'autre fiche a déjà (même utilisateur) n'est pas déplacée : elle part avec l'édition
+          await conn.query(`UPDATE IGNORE ${t} SET item_id = ? WHERE item_type = 'game' AND item_id = ?`, [la[0], id]);
+          relations += avant - (await compte());
+        } else if (la.length > 1 && t !== "notification_events") {
+          // plusieurs jeux sur le site : la ligne va sur chacun (un favori de l'édition est un favori de chacun de ses jeux)
+          const cols = ((await conn.query(`SHOW COLUMNS FROM ${t}`)) as any[])
+            .filter((c) => !/auto_increment/i.test(String(c?.Extra ?? "")) && String(c?.Field) !== "item_id")
+            .map((c) => "`" + String(c.Field).replace(/`/g, "") + "`");
+          for (const c of la) {
+            const r: any = await conn.query(`INSERT IGNORE INTO ${t} (${cols.join(", ")}, item_id) SELECT ${cols.join(", ")}, ? FROM ${t} WHERE item_type = 'game' AND item_id = ?`, [c, id]);
+            relations += Number(r?.affectedRows ?? 0);
+          }
+        }
+        // perdues (au journal seulement) : celles qui ne vont sur aucune fiche ; une ligne qu'une fiche avait déjà ne l'est pas
+        if (!la.length || (la.length > 1 && t === "notification_events")) supprimees += avant;
+        const reste = await compte();
+        if (!reste) continue;
+        if (t === "notification_events") {
+          // les notifications reçues de ces événements partent avec eux (comme le nettoyage du tableau de bord)
+          try {
+            await conn.query("DELETE FROM user_notifications WHERE event_id IN (SELECT id FROM notification_events WHERE item_type = 'game' AND item_id = ?)", [id]);
+          } catch (e) {
+            if (Number((e as any)?.errno) !== 1146) throw e;
+          }
+        }
+        await conn.query(`DELETE FROM ${t} WHERE item_type = 'game' AND item_id = ?`, [id]);
+      } catch (e) {
+        if (Number((e as any)?.errno) !== 1146) throw e;
+      }
+    }
+    try {
+      await conn.query("DELETE FROM jeux_steam WHERE game_id = ?", [id]);
+    } catch (e) {
+      if (Number((e as any)?.errno) !== 1146) throw e;
+    }
+    // un renvoi vers l'édition ne pointe plus sur une fiche disparue (un envoi serait recréé) : le titre d'un de ses jeux
+    // n'est plus bloqué (le jeu peut revenir) ; les autres restent rejetés (-1)
+    for (const r of renvois) {
+      if (proteges.has(motsTitre(r.blocked_title).join(" "))) await conn.query("DELETE FROM merge_blocklist WHERE id = ?", [r.id]);
+      else await conn.query("UPDATE merge_blocklist SET redirect_to_id = -1 WHERE id = ?", [r.id]);
+    }
+    if (!proteges.has(motsTitre(p.title).join(" "))) {
+      await conn.query("INSERT INTO merge_blocklist (item_type, blocked_title, blocked_cover, redirect_to_id, reason) VALUES ('game', ?, ?, -1, ?)", [
+        String(p.title ?? ""),
+        vide(p.cover) ? null : p.cover,
+        motif,
+      ]);
+    }
+    await conn.query("DELETE FROM game_items WHERE id = ?", [id]);
+    await conn.query("COMMIT");
+    return { relations, supprimees, cibles: la };
+  } catch (e) {
+    await conn.query("ROLLBACK").catch(() => {});
+    throw e;
+  } finally {
+    try {
+      await Promise.resolve(conn.release());
+    } catch {
+      /* connexion déjà perdue */
+    }
+  }
+}
+
+/**
+ * Les éditions groupées du site (fiches rattachées à une fiche IGDB de type Bundle) : celles qui n'apportent aucun jeu
+ * nouveau sont retirées (retirerEdition), au deuxième passage qui le constate ; les autres restent, avec leur raison.
+ * Garde-fous : la fiche porte nettement le nom de l'édition (degré 1 ou 2), mieux que celui de chacun de ses jeux, et sa
+ * date colle à celle de l'édition ; l'édition est sortie ; IGDB a donné le statut des dates. Une fiche dont l'identifiant
+ * est partagé (fusion refusée) n'est jamais retirée. Rend les fiches retirées ; une erreur arrête les retraits (ceux déjà
+ * faits restent, notés) et se lit dans res.editionsErreur.
+ */
+async function editionsGroupees(
+  deps: IgdbJeuxDeps,
+  cfg: IgdbJeuxConfig,
+  jeux: any[],
+  fiches: Map<number, any>,
+  partages: Set<number>,
+  res: BilanJeux,
+  maintenant: number
+): Promise<Set<number>> {
+  const retirees = new Set<number>();
+  const candidats = jeux.filter((j) => Number(j.igdb_id) > 0 && !partages.has(Number(j.id)) && fiches.has(Number(j.igdb_id)));
+  if (!candidats.length) return retirees;
+  const types = await lireTypes(deps, cfg, [...new Set(candidats.map((j) => Number(j.igdb_id)))]);
+  const editions = candidats.filter((j) => types.get(Number(j.igdb_id)) === TYPE_EDITION_GROUPEE);
+  for (const x of [...editionsVues.keys()]) if (!editions.some((j) => Number(j.igdb_id) === x)) editionsVues.delete(x);
+  if (!editions.length) return retirees;
+  if (!res.champsComplets) {
+    // sans le statut des dates, un accès anticipé passe pour une sortie : rien n'est retiré
+    for (const j of editions) res.editionsGardees.push({ id: Number(j.id), titre: String(j.title ?? ""), igdb: Number(j.igdb_id), raison: "dates incompletes" });
+    return retirees;
+  }
+  const contenus = await lireJeuxDesEditions(deps, cfg, editions.map((j) => Number(j.igdb_id)));
+  // les fiches du site, par identifiant IGDB (une seule par identifiant : les doublons sont fusionnés avant)
+  const surLeSite = new Map<number, any>();
+  for (const j of jeux) if (Number(j.igdb_id) > 0 && !partages.has(Number(j.id))) surLeSite.set(Number(j.igdb_id), j);
+  // la fiche du site d'un de ses jeux : celle qui porte son identifiant IGDB ET un de ses noms (une fiche mal rattachée
+  // n'est ni « sa fiche », ni une cible pour les favoris)
+  const saFiche = (g: any, sauf: number): { id: number; titre: string } | null => {
+    const x = surLeSite.get(Number(g.id));
+    return x && Number(x.id) !== sauf && degreFiche(x, nomsIgdb(g)) > 0 ? { id: Number(x.id), titre: String(x.title ?? "") } : null;
+  };
+  for (const j of editions) {
+    const igdb = Number(j.igdb_id);
+    const fiche = fiches.get(igdb);
+    const garder = (raison: EditionGardee["raison"]) => {
+      if (raison !== "a confirmer") editionsVues.delete(igdb);
+      res.editionsGardees.push({ id: Number(j.id), titre: String(j.title ?? ""), igdb, raison });
+    };
+    const contenu = (contenus.get(igdb) ?? []).filter((g) => Number(g?.id) > 0 && Number(g.id) !== igdb);
+    if (!contenu.length) {
+      garder("jeux inconnus");
+      continue;
+    }
+    // la fiche est l'édition : son nom (degré 1 ou 2), mieux que celui de chacun de ses jeux (« Game X » rattaché par
+    // erreur à « Game X: Complete Edition » est le jeu, pas l'édition)
+    const dEdition = degreFiche(j, nomsIgdb(fiche));
+    const dJeu = Math.min(...contenu.map((g) => degreFiche(j, nomsIgdb(g)) || 9));
+    if (!dEdition || dEdition > 2 || dJeu <= dEdition) {
+      garder("titre");
+      continue;
+    }
+    const dateEdition = premiereSortie(fiche);
+    if (!(dateEdition > 0) || dateEdition * 1000 > maintenant) {
+      garder("pas sortie");
+      continue;
+    }
+    if (j.date) {
+      const ecart = Math.abs(Date.parse(String(j.date) + "T00:00:00Z") - dateEdition * 1000) / 86400000;
+      if (!(ecart <= matchWindowDays(String(j.date), (j.prec ?? "day") as any))) {
+        garder("date");
+        continue;
+      }
+    }
+    const ailleurs = new Set(contenu.filter((g) => !!saFiche(g, Number(j.id))).map((g) => Number(g.id)));
+    if (!sansJeuNouveau(dateEdition, contenu.map((g) => ({ id: Number(g.id), date: premiereSortie(g) })), ailleurs)) {
+      garder("jeu nouveau");
+      continue;
+    }
+    const surSite = contenu.map((g) => saFiche(g, Number(j.id))).filter((x): x is { id: number; titre: string } => !!x);
+    // deuxième passage qui la trouve retirable, une heure au moins après le premier, rien de changé : elle est retirée
+    const signature = contenu.map((g) => Number(g.id)).sort((a, b) => a - b).join(",") + "|" + surSite.map((x) => x.id).sort((a, b) => a - b).join(",");
+    const vue = editionsVues.get(igdb);
+    if (!vue || vue.signature !== signature || maintenant - vue.quand < CONFIRMATION_EDITION_MS) {
+      if (!vue || vue.signature !== signature) editionsVues.set(igdb, { quand: maintenant, signature });
+      garder("a confirmer");
+      continue;
+    }
+    const proteges = new Set(
+      contenu
+        .flatMap((g) => nomsIgdb(g))
+        .map((n) => motsTitre(n).join(" "))
+        .concat(surSite.map((x) => motsTitre(x.titre).join(" ")))
+        .filter(Boolean)
+    );
+    let r: { relations: number; supprimees: number; cibles: number[] } | null;
+    try {
+      r = await retirerEdition(deps, Number(j.id), igdb, surSite.map((x) => x.id), "edition groupee IGDB (aucun jeu nouveau)", proteges);
+    } catch (e) {
+      // les retraits déjà faits restent (notés) ; les suivants attendront le prochain passage
+      res.editionsErreur = message(e);
+      break;
+    }
+    if (!r) {
+      garder("changee");
+      continue;
+    }
+    editionsVues.delete(igdb);
+    retirees.add(Number(j.id));
+    surLeSite.delete(igdb);
+    const cibles = new Set(r.cibles);
+    res.editions.push({
+      id: Number(j.id),
+      titre: String(j.title ?? ""),
+      igdb,
+      jeux: contenu.map((g) => String(g?.name ?? "")).filter(Boolean).slice(0, 6),
+      relations: r.relations,
+      supprimees: r.supprimees,
+      vers: surSite.filter((x) => cibles.has(x.id)),
+    });
+  }
+  return retirees;
+}
+
 /**
  * Fiche gardée d'un groupe qui porte le même identifiant IGDB : celle dont le titre colle le mieux à la fiche
  * IGDB, puis sans « (AAAA) », la plus complète, la plus populaire, la plus ancienne.
@@ -1043,8 +1435,9 @@ export interface ChangementDate {
   avant: DateJeu;
   apres: DateJeu;
   source: "igdb" | "steam";
-  /** fauxJour : un 31/12 ou 1/1 devenu une vraie date ou l'année ; report, avance, precise, autre. */
-  sorte: "fauxJour" | "report" | "avance" | "precise" | "autre";
+  /** fauxJour : un 31/12 ou 1/1 devenu une vraie date ou l'année ; aAnnoncer : un faux jour devenu « Date à annoncer »
+   * (IGDB n'a plus aucune date) ; report, avance, precise, autre. */
+  sorte: "fauxJour" | "aAnnoncer" | "report" | "avance" | "precise" | "autre";
   statut?: { avant: "sorti" | "a venir"; apres: "sorti" | "a venir" };
 }
 
@@ -1076,6 +1469,12 @@ export interface BilanJeux {
   /** Toutes les fusions du passage (rattachement, même identifiant IGDB, identifiants morts, douteux). */
   fusions: Fusion[];
   dates: ChangementDate[];
+  /** Éditions groupées d'IGDB retirées du site (aucun jeu nouveau : editionsGroupees). */
+  editions: EditionRetiree[];
+  /** Éditions groupées gardées, avec leur raison (un jeu nouveau dedans, jeux inconnus, rattachement douteux). */
+  editionsGardees: EditionGardee[];
+  /** La lecture des éditions groupées a échoué : rien n'a été retiré à ce passage. */
+  editionsErreur?: string;
   /** false : IGDB a refusé le statut et la région des dates (règle stricte : pas d'accès anticipé, toutes les régions). */
   champsComplets: boolean;
   liens: BilanLiens;
@@ -1086,7 +1485,7 @@ export interface BilanJeux {
 
 const bilanVide = (): BilanJeux => ({
   jeux: 0, avecIgdb: 0, avecListes: 0, popularites: 0, notes: 0, notesGardees: 0, jaquettes: 0, planchers: 0, douteux: [], relies: [], absents: [],
-  fusions: [], dates: [], champsComplets: true, liens: { cherches: 0, lies: [], ambigus: [], introuvables: [], doublons: [], fusions: [], transferts: [] }, requetes: 0,
+  fusions: [], dates: [], editions: [], editionsGardees: [], champsComplets: true, liens: { cherches: 0, lies: [], ambigus: [], introuvables: [], doublons: [], fusions: [], transferts: [] }, requetes: 0,
 });
 
 let compteur = 0;
@@ -1268,7 +1667,7 @@ async function passageSousVerrou(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, mainte
   // 2. jeux, fiches IGDB (avec leurs dates), listes, planchers, ce que dit Steam
   const jeux: any[] = await deps.pool.query(
     "SELECT id, title, title_english, igdb_id, cover, rating_score, popularity, popularity_source, DATE_FORMAT(release_date, '%Y-%m-%d') AS date, " +
-      "release_precision AS prec FROM game_items"
+      "release_precision AS prec, date_a_annoncer AS a_annoncer FROM game_items"
   );
   res.jeux = jeux.length;
   const ids = [...new Set(jeux.map((j) => Number(j.igdb_id)).filter((x) => x > 0))];
@@ -1315,6 +1714,16 @@ async function passageSousVerrou(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, mainte
     return res;
   }
 
+  // 2 bis. éditions groupées d'IGDB (Rey, 23 octobre : « une édition groupée n'est pas une fiche du radar ») : celles
+  //    qui n'apportent aucun jeu nouveau sont retirées du site (editionsGroupees) ; une lecture d'IGDB en panne ou
+  //    refusée ici : rien n'est retiré, le reste du passage continue
+  let retirees = new Set<number>();
+  try {
+    retirees = await editionsGroupees(deps, cfg, jeux, fiches, partages, res, maintenant.getTime());
+  } catch (e) {
+    res.editionsErreur = message(e);
+  }
+
   // 3. écriture : date, valeur IGDB (selon le statut), plancher, note, jaquette
   let changes = 0;
   const absents: any[] = [];
@@ -1323,6 +1732,7 @@ async function passageSousVerrou(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, mainte
     if (res.douteux.length < 60) res.douteux.push({ id: Number(j.id), titre: String(j.title), nom, raison });
   };
   for (const j of jeux) {
+    if (retirees.has(Number(j.id))) continue;
     const igdb = Number(j.igdb_id) || 0;
     const partage = partages.has(Number(j.id));
     const fiche = igdb && !partage ? fiches.get(igdb) : undefined;
@@ -1374,9 +1784,20 @@ async function passageSousVerrou(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, mainte
       signaler(j, fiche ? String(fiche.name || "") : "", raison);
       douteux.push({ j, fiche });
     }
-    if (fin.date && fin.precision && (fin.date !== nous.date || fin.precision !== nous.precision)) {
+    // « Date à annoncer » (Rey, 23 octobre) : notre date est un faux jour encore à venir (un 31/12 ou un 1/1 « au jour »),
+    // la fiche IGDB est nettement la nôtre (degré 1 ou 2) et IGDB dit « TBD » sans aucune date (igdbSansDate), Steam
+    // non plus : la date est effacée, le jeu est « Date à annoncer » (date_a_annoncer = 1, à la fin d'« À venir »,
+    // routes.ts), comme les animés reportés. Il reprend une date dès qu'IGDB en donne une (ci-dessous :
+    // date_a_annoncer = 0) ; Steam ne relit pas un jeu sans date.
+    const aAnnoncer =
+      !raison && !!fiche && fin.source === "base" && fauxJour(nous) && String(nous.date) > aujourdhui && degreFiche(j, nomsIgdb(fiche)) <= 2 && igdbSansDate(fiche);
+    if (aAnnoncer) {
+      sets.push("release_date = NULL", "release_precision = NULL", "date_a_annoncer = 1");
+      res.dates.push({ ...changementDate(j, nous, { date: null, precision: null, source: "igdb" }, aujourdhui), sorte: "aAnnoncer" });
+    } else if (fin.date && fin.precision && (fin.date !== nous.date || fin.precision !== nous.precision)) {
       sets.push("release_date = ?", "release_precision = ?");
       params.push(fin.date, fin.precision);
+      if (Number(j.a_annoncer) === 1) sets.push("date_a_annoncer = 0");
       res.dates.push(changementDate(j, nous, fin, aujourdhui));
     }
     const statut: "sorti" | "a venir" = fin.date && fin.precision ? statutSite(fin.date, fin.precision, aujourdhui) : "a venir";
@@ -1560,7 +1981,7 @@ async function passageSousVerrou(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, mainte
       }
     }
   }
-  if (changes > 0 || res.liens.lies.length > 0 || res.fusions.length > 0 || res.liens.transferts.length > 0) deps.rafraichir?.();
+  if (changes > 0 || res.liens.lies.length > 0 || res.fusions.length > 0 || res.liens.transferts.length > 0 || res.editions.length > 0) deps.rafraichir?.();
   return res;
 }
 
@@ -1856,6 +2277,8 @@ interface EtatCycle {
   signales?: string;
   /** Les rattachements douteux déjà signalés (passage). */
   douteux?: string;
+  /** La dernière erreur des éditions groupées signalée (passage) : pas répétée toutes les 3 h. */
+  editionsErreur?: string;
 }
 
 /**
@@ -1881,6 +2304,8 @@ async function tourPassage(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, etat: EtatCy
         absents: p.absents.length,
         dates: p.dates.length,
         fusions: p.fusions.map((x) => `${x.perdant.titre} (#${x.perdant.id}) -> ${x.gagnant.titre} (#${x.gagnant.id})`).slice(0, 20),
+        editions: p.editions.map((x) => `${x.titre} (#${x.id})${x.vers.length ? " -> " + x.vers.map((v) => v.titre + " (#" + v.id + ")").join(", ") : ""}${x.supprimees ? " ; " + x.supprimees + " ligne(s) au journal seulement" : ""}`).slice(0, 20),
+        editionsGardees: p.editionsGardees.map((x) => `${x.titre} (#${x.id}) : ${x.raison}`).slice(0, 20),
         relies: p.relies.length,
         liens: { lies: p.liens.lies.length, doublons: p.liens.doublons.length, fusions: p.liens.fusions.length, transferts: p.liens.transferts.length, introuvables: p.liens.introuvables.length, ambigus: p.liens.ambigus.length },
       },
@@ -1893,10 +2318,27 @@ async function tourPassage(deps: IgdbJeuxDeps, cfg: IgdbJeuxConfig, etat: EtatCy
       deps.log.info(
         {
           module: "igdb-jeux", jeux: p.jeux, avecListes: p.avecListes, popularites: p.popularites, notes: p.notes, jaquettes: p.jaquettes, lies: p.liens.lies.length,
-          fusions: p.fusions.length, dates: p.dates.length, relies: p.relies.length, absents: p.absents.length,
+          fusions: p.fusions.length, dates: p.dates.length, relies: p.relies.length, absents: p.absents.length, editions: p.editions.length,
         },
         "jeux IGDB : passage terminé"
       );
+    }
+    // éditions groupées retirées du site (aucun jeu nouveau), ou leur lecture en échec : au fil d'activité
+    // les retraits faits sont toujours au fil d'activité (même si le passage échoue plus loin) ; une erreur des éditions,
+    // quand elle change
+    const erreurEditions = p.editionsErreur ? String(p.editionsErreur).slice(0, 120) : "";
+    const nouvelleErreur = !!erreurEditions && erreurEditions !== etat.editionsErreur;
+    etat.editionsErreur = erreurEditions;
+    if (p.editions.length || nouvelleErreur) {
+      const retraits = p.editions.slice(0, 5).map((x) => `${x.titre}${x.vers.length ? " (favoris sur " + x.vers.map((v) => v.titre).join(", ") + ")" : ""}`).join(", ");
+      pushActivity({
+        type: "igdb",
+        message: p.editions.length
+          ? `Jeux IGDB : ${p.editions.length} édition${p.editions.length > 1 ? "s" : ""} groupée${p.editions.length > 1 ? "s" : ""} retirée${p.editions.length > 1 ? "s" : ""} du site`
+          : "Jeux IGDB : éditions groupées non vérifiées",
+        detail: p.editions.length ? retraits + (nouvelleErreur ? " ; puis : " + erreurEditions : "") : erreurEditions,
+        level: p.editions.length ? "info" : "warn",
+      });
     }
     const doublons = p.liens.doublons.map((x) => `${x.id}=${x.autre.id}`).sort().join(",");
     const nouveauxDoublons = doublons !== "" && doublons !== etat.signales;

@@ -8,6 +8,7 @@ import cookie from "@fastify/cookie";
 import { sendEmail, verifySmtpConnection } from "./email.js";
 import { sendPasswordResetEmail, sendWelcomeEmail, consumePasswordResetToken, sendVerificationEmail, consumeVerificationToken, sendReminderEmail, sendAlertEmail } from "./email-service.js";
 import { registerGameNimeRoutes, clearFeedCache, lireBadges, badgeDe } from "./gamenime/routes.js";
+import { DESCRIPTION_SITE } from "./gamenime/synopsis-site.js";
 import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizePlatform as gnSanitizePlatform, mergePlatforms as gnMergePlatforms, sanitizeReleaseDatetime as gnSanitizeReleaseDatetime, isLikelyJapaneseAnime as gnIsLikelyJapaneseAnime, normalizeTitleStrict as gnNormalizeTitleStrict } from "./gamenime/core.js";
 
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchKitsu, matchAnimeRoutesCycle, applyFranchiseFloorsCycle } from "./gamenime/refetch-cron.js";
@@ -20,7 +21,7 @@ import { startDashboard, pushActivity, trackLastRun, trackVisit, trackPing, setS
 
 import { registerAdminRuns } from "./gamenime/admin-runs.js";
 import { registerPublication } from "./gamenime/publication.js";
-import { startSynopsisCron } from "./gamenime/synopsis.js";
+import { registerSynopsisBloc, startSynopsisCron } from "./gamenime/synopsis-bloc.js";
 import { startPresseCron } from "./gamenime/presse.js";
 import { startTmdbCron } from "./gamenime/tmdb.js";
 import { startPlateformesCron } from "./gamenime/plateformes.js";
@@ -29,6 +30,7 @@ import { startPopulariteCron } from "./gamenime/popularite.js";
 import { startEuropeCron } from "./gamenime/europe.js";
 import { startIgdbJeuxCron, igdbJeuxActif } from "./gamenime/igdb-jeux.js";
 import { registerPilotage } from "./gamenime/pilotage.js";
+import { registerLicencesRoutes, startLicencesCron, universDe } from "./gamenime/licences.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -2433,7 +2435,7 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
     const rows: any = await pool.query(
       // Film au cinéma en France : sa date est celle du cinéma (10 octobre 2026) ; « Au cinéma » tient
       // lieu de plateforme tant qu'il n'en a aucune.
-      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative, format, DATE_FORMAT(IF(format = 'MOVIE', fr_cinema, NULL), '%Y-%m-%d') AS cinemaFr" : ""}, cover, genre, ${itemType === "anime" ? "IF(TRIM(IFNULL(platform, '')) = '' AND format = 'MOVIE' AND fr_cinema IS NOT NULL, 'Au cinéma', platform) AS platform" : "platform"}, description, rating, rating_score AS ratingScore, popularity, screenshots,
+      `SELECT id, title, title_english AS titleEnglish${itemType === "anime" ? ", title_native AS titleNative, format, DATE_FORMAT(IF(format = 'MOVIE', fr_cinema, NULL), '%Y-%m-%d') AS cinemaFr" : ""}, cover, genre, ${itemType === "anime" ? "IF(TRIM(IFNULL(platform, '')) = '' AND format = 'MOVIE' AND fr_cinema IS NOT NULL, 'Au cinéma', platform) AS platform" : "platform"}, ${DESCRIPTION_SITE} AS description, rating, rating_score AS ratingScore, popularity, screenshots,
               DATE_FORMAT(${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, fr_cinema, release_date)" : "release_date"},'%Y-%m-%d') AS releaseDate,
               ${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, 'day', release_precision)" : "release_precision"} AS releasePrecision,
               ${itemType === "anime" ? "IF(format = 'MOVIE' AND fr_cinema IS NOT NULL, NULL, DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s'))" : "DATE_FORMAT(release_datetime,'%Y-%m-%dT%H:%i:%s')"} AS releaseDatetime,
@@ -2463,9 +2465,19 @@ function registerDomain(prefix: "/anime" | "/games", table: string, apiKeyEnv: "
       req.log.warn({ err: e?.message }, "badges : calcul impossible");
     }
 
+    // Univers (licences.ts, 22 octobre 2026) : la licence de la fiche, ses autres sorties du radar et ses repères ;
+    // comme le badge, une erreur ne fait jamais tomber la fiche.
+    let univers: Record<string, any> | null = null;
+    try {
+      univers = await universDe(pool, itemType, Number(rows[0].id));
+    } catch (e: any) {
+      req.log.warn({ err: e?.message }, "univers : calcul impossible");
+    }
+
     return {
       ...rows[0],
       badge,
+      univers,
       votes: { up, down, total, percent: total > 0 ? Math.round((up / total) * 100) : 0 }
     };
   });
@@ -2998,6 +3010,8 @@ void verifySmtpConnection();
 await registerGameNimeRoutes(app, pool, {
   adminApiKey: process.env.ANIME_API_KEY,
 });
+// Univers (licences.ts) : la liste des licences (onglet) et une licence entière (sa page)
+registerLicencesRoutes(app, pool);
 
 // Tracking visiteurs (trafic du site) — alimente le dashboard
 app.post("/track", async (req, reply) => {
@@ -3022,6 +3036,9 @@ setStatsPool(pool);
 startDashboard(app, pool);
 startRefetchGamesCron(app);
 startHealthCheckCron(app, pool);
+// Synopsis v9.5 : bloc de relecture du dashboard (routes /admin/synopsis*), enregistré avant l'écoute ; le cycle
+// (startSynopsisCron, plus bas) est planifié par le Pilotage
+registerSynopsisBloc(app, pool);
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
 
 startRefetchCron(app);
@@ -3059,6 +3076,17 @@ startPopulariteCron({ pool, log: app.log, rafraichir: clearFeedCache });
 
 // Bonus europeen des animes : lecteurs de Wikipedia fr, de, it, es (un passage par jour)
 startEuropeCron({ pool, log: app.log, rafraichir: clearFeedCache });
+
+// Licences et univers : chaque fiche dans sa licence et le passé de la licence (un passage par jour, ligne du Pilotage)
+startLicencesCron({
+  pool,
+  log: app.log,
+  lireFlux: async (chemin) => {
+    const r = await app.inject({ method: "GET", url: chemin });
+    if (r.statusCode !== 200) throw new Error(`${chemin} : HTTP ${r.statusCode}`);
+    return r.json();
+  },
+});
 
 // Jeux : IGDB seul, RAWG retire (listes IGDB et notes toutes les 3 h, decouverte chaque jour par /games/bulk)
 startIgdbJeuxCron({

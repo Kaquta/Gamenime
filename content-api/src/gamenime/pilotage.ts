@@ -3,7 +3,7 @@
  *
  * Demande de Rey (17 octobre 2026) : « je veux avoir le contrôle sur tout dorénavant via le dashboard ».
  * Ce module :
- *  - tient le registre des 28 lignes du Pilotage : 22 cycles de l'API, 4 tâches de n8n, les images HD (tâche de
+ *  - tient le registre des 30 lignes du Pilotage : 24 cycles de l'API, 4 tâches de n8n, les images HD (tâche de
  *    l'hôte) et le synopsis (piloté par son propre travail) ;
  *  - planifie les cycles de l'API à la place de leurs setTimeout/setInterval : interrupteur à chaud (en base : plus
  *    besoin de .env ni de redémarrage), lancement immédiat, pause générale, un seul passage à la fois par module
@@ -169,6 +169,7 @@ const FAMILLES = [
   { id: "plateformes", nom: "Plateformes et sorties en France", sous: "Ce qui fait apparaître un titre sur le site." },
   { id: "classements", nom: "Popularité et classements", sous: "Top 25, Top 150, bonus Europe." },
   { id: "contenus", nom: "Contenus", sous: "Textes et images." },
+  { id: "univers", nom: "Univers", sous: "Licences et alertes d'univers." },
   { id: "surveillance", nom: "Surveillance et comptes", sous: "Alertes, rappels, sessions." },
 ];
 
@@ -193,6 +194,43 @@ const presenterEnvois = (b: Record<string, any>): Presentation => {
     details,
     chiffre: { v: fr(total), l: total > 1 ? "reçus au dernier envoi" : "reçu au dernier envoi" },
     alerte: N(b.code) >= 400 ? `Dernier envoi refusé par l'API (HTTP ${N(b.code)}).` : null,
+  };
+};
+
+/**
+ * Synopsis (v9.5) : ce qu'a fait le dernier passage (détails), et les chiffres du bloc Synopsis relus en direct (infos),
+ * montrés à part. Un passage enregistré porte toujours « code » (la version du module) ; sans lui, seuls les chiffres.
+ */
+const presenterSynopsis = (b: Record<string, any>, ctx: { infos: Record<string, any> | null }): Presentation => {
+  const i = ctx.infos || {}, e = erreurDe(b), passe = b.code !== undefined && b.code !== null;
+  // une demande ignorée (version dépassée, illisible) compte avec les échecs : la carte du bloc en dit la raison
+  const red = N(b.rediges), cor = N(b.corriges), ech = N(b.correctionsEchec) + N(b.demandesIgnorees), remis = N(b.remis), av = N(i.aValider);
+  const ol = b.ollama ? coupe(b.ollama, 120) : null;
+  const fins: Record<string, string> = {
+    vide: "plus rien à rédiger", limite: "limite du passage atteinte", fenetre: "fin de la fenêtre horaire",
+    coupe: "coupé ou mis en pause", ollama: "Ollama ne répond pas",
+  };
+  const details: Array<[string, string]> = [];
+  if (passe) {
+    details.push(["Rédigés", fr(red)], ["Corrections", fr(cor + ech) + (ech ? ` (${fr(ech)} en échec)` : "")]);
+    if (N(b.sansSource) + N(b.echecs)) details.push(["Sans source · échecs", `${fr(N(b.sansSource))} · ${fr(N(b.echecs))}`]);
+    if (remis) details.push(["Remis au passage suivant", fr(remis)]);
+    if (N(b.demandesAnnulees)) details.push(["Demandes annulées en route", fr(N(b.demandesAnnulees))]);
+    if (b.fin && fins[String(b.fin)]) details.push(["Arrêt", fins[String(b.fin)] as string]);
+  }
+  const parts = [red || !(cor + ech) ? pl(red, "rédigé", "rédigés") : "", cor ? pl(cor, "corrigé", "corrigés") : "", ech ? `${fr(ech)} correction${ech > 1 ? "s" : ""} en échec` : "", ol ? "Ollama en attente" : ""];
+  const bloc: Array<[string, string, string]> = [
+    ["", "À valider", fr(av)], ["", "Validés", fr(N(i.valides))], ["", "En correction", fr(N(i.correction))],
+    ["", "Sans source", fr(N(i.sansSource))], ["", "Pas encore traités", fr(N(i.pasTraites))],
+  ];
+  return {
+    res: e ? `erreur : ${e}` : parts.filter(Boolean).join(" · "),
+    nv: e ? "k" : ol || remis ? "m" : red + cor + ech === 0 ? "n" : "o",
+    ...(details.length ? { details } : {}),
+    chiffre: { v: fr(av), l: "synopsis à valider" },
+    donnees: ctx.infos ? { t: "Dans le bloc Synopsis", l: bloc } : null,
+    alerte: ol ? `Ollama ne répond pas : ${ol} (reprise au prochain passage).` : remis ? `AniList indisponible : ${fr(remis)} synopsis remis au passage suivant.` : null,
+    notable: cor + ech ? { nv: ech ? "warn" : "ok", texte: `${pl(cor, "correction faite", "corrections faites")}` + (ech ? `, ${fr(ech)} en échec` : ""), detail: "à relire dans le bloc Synopsis" } : null,
   };
 };
 
@@ -573,9 +611,11 @@ const FICHES: Fiche[] = [
   {
     id: "synopsis", fam: "contenus", nom: "Synopsis", src: "api",
     role: "Ollama rédige les synopsis en français ; rien ne s'affiche sans ta validation",
-    rythme: "chaque nuit, dans sa fenêtre horaire",
-    pilote: { t: "Piloté par le travail Synopsis.", d: "Son interrupteur et ses réglages arrivent avec le bloc Synopsis ; ici, son état." },
-    sansLancer: "Se règle dans le bloc Synopsis",
+    coupe: "Plus aucun synopsis n'est rédigé ni corrigé (un passage en cours s'arrête après l'étape en cours, quelques minutes au plus) ; ceux déjà rédigés restent à valider dans le bloc Synopsis.",
+    rallume: "Rallumé, il repart dans les 10 minutes, dans sa fenêtre horaire : les corrections que tu as demandées d'abord, puis les plus populaires.",
+    lancerNote: (i) => `Il fait les corrections demandées (${fr(N(i?.parLancement) || 8)} au plus), puis ${fr(N(i?.parLancement) || 8)} synopsis au plus, même hors de sa fenêtre horaire` +
+      (N(i?.msParItem) ? ` (environ ${fr(Math.max(1, Math.round(N(i?.msParItem) / MIN)))} min chacun).` : "."),
+    presenter: presenterSynopsis,
   },
   {
     id: "images-hd", fam: "contenus", nom: "Images HD", src: "hote",
@@ -583,6 +623,58 @@ const FICHES: Fiche[] = [
     rythme: "toutes les heures, à h:23 (tâche du serveur)",
     pilote: { t: "Tâche du serveur.", d: "Elle tourne par la crontab, à chaque heure et 23 ; ici, son dernier résultat." },
     sansLancer: "Se lance sur le serveur",
+  },
+  // ── univers
+  {
+    id: "licences", fam: "univers", nom: "Licences et univers", src: "api",
+    role: "Range chaque fiche du site dans sa licence et retrouve le passé de la licence (repères) pour le bloc Univers",
+    coupe: "Le calcul s'arrête. Les licences déjà calculées restent affichées.",
+    rallume: "Un passage part dans la minute si celui du jour a été manqué.",
+    presenter: (b) => {
+      const e = erreurDe(b), arret = b.arret ? coupe(b.arret, 160) : null, garde = b.garde ? coupe(b.garde, 160) : null;
+      const req = b.requetes || {}, ch = b.changements || {};
+      const liste = (k: string): string[] => (Array.isArray(ch[k]) ? ch[k].map(String) : []);
+      // les listes du bilan sont plafonnées à 30 : le compte de chaque sorte est à part
+      const nb = (k: string): number => (ch.comptes && Number.isFinite(Number(ch.comptes[k])) ? Number(ch.comptes[k]) : liste(k).length);
+      const nouv = liste("nouvelles"), reun = liste("reunies"), sep = liste("separees"), rev = liste("reveillees"), ren = liste("renommees");
+      const morceaux = [
+        nb("nouvelles") ? pl(nb("nouvelles"), "licence nouvelle", "licences nouvelles") : "",
+        nb("reunies") ? pl(nb("reunies"), "réunie", "réunies") : "",
+        nb("separees") ? pl(nb("separees"), "séparée", "séparées") : "",
+        nb("reveillees") ? pl(nb("reveillees"), "réveillée", "réveillées") : "",
+      ].filter(Boolean);
+      const lignes: Array<[string, string, string]> = [
+        ...nouv.slice(0, 5).map((x): [string, string, string] => ["", coupe(x, 80), "nouvelle"]),
+        ...reun.slice(0, 3).map((x): [string, string, string] => ["", coupe(x, 80), "réunie"]),
+        ...sep.slice(0, 3).map((x): [string, string, string] => ["", coupe(x, 80), "séparée"]),
+        ...rev.slice(0, 3).map((x): [string, string, string] => ["", coupe(x, 80), "réveillée"]),
+        ...ren.slice(0, 3).map((x): [string, string, string] => ["", coupe(x, 80), "renommée"]),
+      ];
+      return {
+        res: e ? `erreur : ${e}` : arret ? `rien d'écrit : ${arret}` : garde ? `rien d'écrit : ${garde}` : `${fr(N(b.blocs))} blocs remplis sur ${fr(N(b.fiches))} fiches · ${pl(N(b.croisees), "licence animés et jeux", "licences animés et jeux")}`,
+        nv: e ? "k" : arret || garde ? "m" : N(b.fiches) === 0 ? "n" : "o",
+        details: [
+          ["Fiches du site", `${fr(N(b.fiches))} (${fr(N(b.animes))} animés, ${fr(N(b.jeux))} jeux)`],
+          ["Licences", fr(N(b.licences))],
+          ["Licences de 2 sorties ou plus", fr(N(b.licences2))],
+          ["Mêlant animés et jeux", fr(N(b.croisees))],
+          ["Repères (sorties d'avant)", fr(N(b.reperes))],
+          ["Ponts par le titre · le nom · les catalogues", `${fr(N(b.pontsTitre))} · ${fr(N(b.pontsNom))} · ${fr(N(b.pontsCatalogue))}`],
+          ["Requêtes AniList · IGDB · Wikidata", `${fr(N(req.al))} · ${fr(N(req.ig))} · ${fr(N(req.wd))}`],
+          ["Écrit", b.ecrit ? "oui" : "non"],
+        ],
+        chiffre: { v: fr(N(b.blocs)), l: "blocs remplis" },
+        alerte: e
+          ? `${prefixe("Licences", e)} : rien n'est écrit, les licences d'avant restent affichées.`
+          : arret
+            ? `Passage incomplet (${arret}) : rien n'est écrit, les licences d'avant restent affichées.`
+            : garde
+              ? `Garde-fou, ${garde} : rien n'est écrit, les licences d'avant restent affichées (si elle se confirme 18 h plus tard, elle est écrite).`
+              : null,
+        donnees: lignes.length ? { t: "Changements au dernier passage", l: lignes } : null,
+        notable: morceaux.length ? { nv: "info", texte: `Licences : ${morceaux.join(", ")}`, detail: coupe([...nouv, ...reun, ...sep, ...rev].slice(0, 5).join(", "), 200) } : null,
+      };
+    },
   },
   // ── surveillance et comptes
   {
@@ -1259,22 +1351,6 @@ async function europeLe(table: "anime_items" | "game_items"): Promise<number | n
   });
 }
 
-async function lireSynopsis(): Promise<Record<string, number> | null> {
-  return enCache("synopsis", MIN, async () => {
-    try {
-      const c: Record<string, number> = {};
-      for (const t of ["anime_items", "game_items"]) {
-        for (const r of await sql(`SELECT synopsis_status AS s, COUNT(*) AS n FROM ${t} WHERE synopsis_status IS NOT NULL GROUP BY synopsis_status`)) {
-          c[String(r.s)] = N(c[String(r.s)]) + N(r.n);
-        }
-      }
-      return c;
-    } catch {
-      return null;
-    }
-  });
-}
-
 async function lireOllama(): Promise<{ ok: boolean; modeles: string[]; charges: string[]; erreur?: string }> {
   return enCache("ollama", MIN, async () => {
     const base = (process.env.OLLAMA_URL || "http://ollama:11434").replace(/\/+$/, "");
@@ -1384,6 +1460,23 @@ async function ligneModule(f: Fiche): Promise<Record<string, any>> {
       if (!dernier && le) m.dernier = { fin: iso(le), duree: null, res: "passage d'avant le Pilotage", nv: "o" };
     }
     if (pr) Object.assign(m, { chiffre: pr.chiffre ?? null, details: pr.details ?? null, jauges: pr.jauges ?? null, donnees: pr.donnees ?? null, alerte: pr.alerte ?? null });
+    if (f.id === "synopsis") {
+      // ses chiffres (à valider, validés…) se lisent en direct, même avant son premier passage ; il contrôle toutes
+      // les 10 min mais ne rédige que dans sa fenêtre horaire : la ligne montre la fenêtre et le vrai prochain passage
+      if (!pr && infos) {
+        const p0 = presenterSynopsis({}, { infos });
+        Object.assign(m, { chiffre: p0.chiffre ?? null, donnees: p0.donnees ?? null });
+      }
+      if (infos?.rythme) m.rythme = String(infos.rythme);
+      const ouverture = N(infos?.ouverture);
+      if (e.prochain && ouverture > e.prochain) {
+        const pas = ms(e.def.rythmeMs ?? H);
+        let p = e.prochain;
+        while (p < ouverture) p += pas;
+        m.prochain = iso(p);
+      }
+      m.lien = { h: "#page-synopsis", l: "Ouvrir le bloc Synopsis" };
+    }
     if (dernier?.niveau === "k" && !m.alerte) m.alerte = dernier.resume.replace(/^erreur : /, "Erreur : ");
     if (dernier?.niveau !== "k" && dernier?.niveau !== "m") m.alerte = null;
     if (f.id === "moment-animes" || f.id === "moment-jeux") {
@@ -1439,19 +1532,6 @@ async function ligneModule(f: Fiche): Promise<Record<string, any>> {
     m.details = [["Jaquettes en HD", fr(hd.images)], ["Échecs", fr(hd.echecs)], ["Dernière nouveauté", hd.maj ? heureParis(hd.maj) : "—"]];
     if (hd.erreur) m.alerte = `Manifeste des images HD illisible : ${hd.erreur}.`;
     m.prochain = iso(creneauSuivant(Date.now(), Array.from({ length: 24 }, (_, h) => h + 23 / 60)));
-    return m;
-  }
-  if (f.id === "synopsis") {
-    const actif = process.env.SYNOPSIS_ENABLED === "1";
-    const c = await lireSynopsis();
-    m.etat = actif ? "ok" : "off";
-    m.dernier = null;
-    if (c) {
-      const av = N(c.to_review) + N(c.correction);
-      m.chiffre = { v: fr(av), l: av > 1 ? "synopsis à valider" : "synopsis à valider" };
-      m.details = [["À valider", fr(av)], ["Rédigés", fr(N(c.auto) + N(c.validated) + N(c.valide))], ["Sans source", fr(N(c.no_source))], ["Échecs", fr(N(c.failed))]];
-    }
-    m.etatTexte = actif ? null : "coupé";
     return m;
   }
   // un cycle de l'API qui n'a pas démarré (configuration incomplète)

@@ -211,6 +211,8 @@ const CYCLES_SURVEILLES: Array<{ module: string; nom: string; toleranceH: number
   { module: "steam", nom: "Steam (dates PC des jeux)", toleranceH: 6 },
   // Contrôle des données des animés (controle-donnees.ts) : chaque jour à 5 h 30 UTC
   { module: "controle-donnees", nom: "Contrôle des données (animés)", toleranceH: 30 },
+  // Licences et univers (licences.ts) : chaque jour à 3 h 10 UTC
+  { module: "licences", nom: "Licences et univers", toleranceH: 30 },
 ];
 
 async function verifierCyclesInternes(app: FastifyInstance): Promise<void> {

@@ -46,6 +46,8 @@ import {
   mergePlatforms,
   hasYearSuffix,
   formatReleaseDateLabel, stripDisplayTags} from "./core.js";
+// Bascule des synopsis (21 octobre 2026) : le synopsis validé par Rey remplace la description sur le site
+import { DESCRIPTION_SITE, MAJ_SITE, SYNOPSIS_PAGE } from "./synopsis-site.js";
 
 // ============================================================
 // Helpers
@@ -200,18 +202,18 @@ export function clearFeedCache(): void {
 // plateformes depuis annonces_fr) a pour date, sur tout le site, celle du cinéma, au jour près ; il
 // est montré même sans aucune de nos plateformes (le site écrit « Cinéma » / « Au cinéma »).
 const FILM_AU_CINEMA = "(format = 'MOVIE' AND fr_cinema IS NOT NULL)";
-const DATE_ANIME_SITE = `IF(${FILM_AU_CINEMA}, fr_cinema, release_date)`;
-const PRECISION_ANIME_SITE = `IF(${FILM_AU_CINEMA}, 'day', release_precision)`;
+export const DATE_ANIME_SITE = `IF(${FILM_AU_CINEMA}, fr_cinema, release_date)`;
+export const PRECISION_ANIME_SITE = `IF(${FILM_AU_CINEMA}, 'day', release_precision)`;
 const CINEMA_FR = "DATE_FORMAT(IF(format = 'MOVIE', fr_cinema, NULL), '%Y-%m-%d')";
 /** « Au cinéma » tient lieu de plateforme tant que le film n'en a aucune : c'est ce qu'affiche un site qui ne
  * connaît pas encore cinemaFr (au lieu de « Sortie Japon · EU à confirmer »). */
-const PLATEFORME_ANIME_SITE = `IF(TRIM(IFNULL(platform, '')) = '' AND ${FILM_AU_CINEMA}, 'Au cinéma', platform)`;
+export const PLATEFORME_ANIME_SITE = `IF(TRIM(IFNULL(platform, '')) = '' AND ${FILM_AU_CINEMA}, 'Au cinéma', platform)`;
 /** Anime montré sur le site : une de nos plateformes ; ou au cinéma en France ; ou japonais (ou pays inconnu) et pas encore sorti au jour près.
  * Jamais un anime annulé chez AniList (dates-animes.ts, 19 octobre 2026) : il revient tout seul si AniList le relance. */
-const ANIME_VISIBLE = `(IFNULL(statut_anilist, '') <> 'CANCELLED' AND (TRIM(IFNULL(platform, '')) <> '' OR ${FILM_AU_CINEMA} OR ((pays_origine IS NULL OR pays_origine IN ('JP', '--')) AND (release_precision IS NULL OR release_precision <> 'day' OR release_date IS NULL OR release_date > UTC_DATE()))))`;
+export const ANIME_VISIBLE = `(IFNULL(statut_anilist, '') <> 'CANCELLED' AND (TRIM(IFNULL(platform, '')) <> '' OR ${FILM_AU_CINEMA} OR ((pays_origine IS NULL OR pays_origine IN ('JP', '--')) AND (release_precision IS NULL OR release_precision <> 'day' OR release_date IS NULL OR release_date > UTC_DATE()))))`;
 
 const SELECT_ANIME = `
-  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, ${PLATEFORME_ANIME_SITE} AS platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, ${PLATEFORME_ANIME_SITE} AS platform, ${DESCRIPTION_SITE} AS description, rating,
          CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          CAST(europe_bonus AS SIGNED) AS europeBonus,
@@ -239,7 +241,7 @@ async function animesAAnnoncer(pool: any): Promise<GameNimeItem[]> {
 }
 
 const SELECT_GAMES = `
-  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating,
+  SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish, cover, genre, platform, ${DESCRIPTION_SITE} AS description, rating,
          CAST(rating_score AS SIGNED) AS ratingScore,
          CAST(popularity AS SIGNED) AS popularity,
          CAST(europe_bonus AS SIGNED) AS europeBonus,
@@ -257,6 +259,18 @@ const SELECT_GAMES = `
   ORDER BY popularity DESC, release_date DESC
   LIMIT ?
 `;
+/** Les jeux « Date à annoncer » (igdb-jeux.ts : un faux jour qu'IGDB ne date plus, 23 octobre 2026), les mêmes colonnes.
+ * Seulement pour « À venir » trié par date, où ils passent à la fin (sortByDate), comme les animés. */
+const SELECT_GAMES_A_ANNONCER = SELECT_GAMES.replace("WHERE release_date BETWEEN ? AND ?", "WHERE release_date IS NULL AND date_a_annoncer = 1");
+async function jeuxAAnnoncer(pool: any): Promise<GameNimeItem[]> {
+  if (SELECT_GAMES_A_ANNONCER === SELECT_GAMES) return [];
+  // une base sans la colonne (copie d'avant le patch) : « À venir » reste servi, sans eux
+  try {
+    return await pool.query(SELECT_GAMES_A_ANNONCER, [100]);
+  } catch {
+    return [];
+  }
+}
 
 // ============================================================
 // Badges « Populaire » / « Très attendu »
@@ -809,7 +823,10 @@ async function badgesOuRien(req: FastifyRequest): Promise<BadgesSite | null> {
     const now = new Date();
     const wide = buildWideDateFilter(now);
     const allRows: GameNimeItem[] = await pool.query(SELECT_GAMES, [wide.start, wide.end, MAX_DB_FETCH]);
-    const statusFiltered = filterByStatus(allRows, status, now);
+    // « Date à annoncer » (IGDB n'a plus aucune date) : à la fin d'« À venir » trié par date, jamais ailleurs
+    const statusFiltered = status === "upcoming" && orderBy === "date"
+      ? [...filterByStatus(allRows, status, now), ...(await jeuxAAnnoncer(pool))]
+      : filterByStatus(allRows, status, now);
     const filtered = parsed.success ? applyFeedFilters(statusFiltered, parsed.data) : statusFiltered;
     // les sortis par score : le Top 25 « du moment » (du-moment.ts) ; le reste comme avant
     const itemsRaw = orderBy === "date"
@@ -1086,16 +1103,18 @@ async function badgesOuRien(req: FastifyRequest): Promise<BadgesSite | null> {
     // Longueur du VRAI texte : les balises [FORMAT:] [STATUS:] [SEASON:] posees
     // par n8n gonflaient la mesure, si bien qu'une fiche generique de 43
     // caracteres passait le seuil quand un vrai synopsis pouvait echouer.
+    // Bascule des synopsis (21 octobre 2026) : un synopsis validé par Rey de 150 caractères ou plus est aussi un vrai
+    // synopsis (la page l'affiche à la place de la description) ; une page déjà là le reste (sa description compte).
     const descCond = withDescription
-      ? " AND description IS NOT NULL" +
-        " AND LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) >= 150"
+      ? ` AND (${SYNOPSIS_PAGE} OR (description IS NOT NULL` +
+        " AND LENGTH(TRIM(REGEXP_REPLACE(description, '\\[[A-Z]+:[^]]*\\]', ''))) >= 150))"
       : "";
     const lister = async (table: "anime_items" | "game_items", t: "anime" | "game") => {
       const rows: Array<{ id: number; slug: string; updatedAt: string; title: string; titleEnglish: string | null; releaseDate: string | null; releasePrecision: string | null }> = await pool.query(
         `SELECT CAST(id AS UNSIGNED) AS id, slug, title, title_english AS titleEnglish,
                 DATE_FORMAT(${table === "anime_items" ? DATE_ANIME_SITE : "release_date"}, '%Y-%m-%d') AS releaseDate,
                 ${table === "anime_items" ? PRECISION_ANIME_SITE : "release_precision"} AS releasePrecision,
-                DATE_FORMAT(updated_at, '%Y-%m-%d') AS updatedAt
+                DATE_FORMAT(${MAJ_SITE}, '%Y-%m-%d') AS updatedAt
          FROM ${table}
          WHERE slug IS NOT NULL AND slug != ''${descCond}${table === "anime_items" ? ` AND ${ANIME_VISIBLE}` : ""}
          ORDER BY id`
@@ -1135,7 +1154,7 @@ async function badgesOuRien(req: FastifyRequest): Promise<BadgesSite | null> {
 
     if (type === "anime" || type === "all") {
       anime = await pool.query(
-        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, ${PLATEFORME_ANIME_SITE} AS platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, ${PLATEFORME_ANIME_SITE} AS platform, ${DESCRIPTION_SITE} AS description, rating, rating_score AS ratingScore, popularity, screenshots,
                 CAST(europe_bonus AS SIGNED) AS europeBonus,
                 DATE_FORMAT(${DATE_ANIME_SITE}, '%Y-%m-%d') AS releaseDate,
                 IF(${FILM_AU_CINEMA}, NULL, DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s')) AS releaseDatetime,
@@ -1159,7 +1178,7 @@ async function badgesOuRien(req: FastifyRequest): Promise<BadgesSite | null> {
 
     if (type === "game" || type === "all") {
       games = await pool.query(
-        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, platform, description, rating, rating_score AS ratingScore, popularity, screenshots,
+        `SELECT id, slug, title, title_english AS titleEnglish, cover, genre, platform, ${DESCRIPTION_SITE} AS description, rating, rating_score AS ratingScore, popularity, screenshots,
                 CAST(europe_bonus AS SIGNED) AS europeBonus,
                 DATE_FORMAT(release_date, '%Y-%m-%d') AS releaseDate,
                 DATE_FORMAT(release_datetime, '%Y-%m-%dT%H:%i:%s') AS releaseDatetime,

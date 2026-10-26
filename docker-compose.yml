@@ -147,6 +147,8 @@ services:
     environment:
       OLLAMA_NUM_PARALLEL: "1"
       OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_FLASH_ATTENTION: "1"
+      OLLAMA_KV_CACHE_TYPE: "q8_0"
     volumes:
       - ./ollama:/root/.ollama
     # pas de port publié : seul content-api l'appelle (http://ollama:11434)

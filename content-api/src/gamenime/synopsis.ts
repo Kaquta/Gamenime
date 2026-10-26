@@ -70,16 +70,18 @@
  * - 2e essai : le modèle corrige son texte refusé, avec le motif et un conseil ;
  *   même chose pour un texte trop long.
  * - Tourne dans une fenêtre horaire (heure de Paris). Si Ollama ne répond pas,
- *   le passage s'arrête sans toucher aux items.
+ *   le passage s'arrête sans toucher aux items. Coupé ou mis en pause dans le
+ *   Pilotage, il s'arrête après le synopsis en cours (v9.5).
  * - Ne modifie pas `updated_at`.
  * - Essai à blanc, sans rien écrire en base : synopsis-essai.ts.
  *
- * Branchement (index.ts, à côté du démarrage des autres crons) :
- *   import { startSynopsisCron } from "./gamenime/synopsis.js";
- *   startSynopsisCron({ pool, log: app.log });
+ * Branchement (v9.5) : le cycle est planifié par le Pilotage du dashboard, dans
+ * synopsis-bloc.ts (startSynopsisCron), avec le bloc de relecture ; ce fichier
+ * ne dépend pas du dashboard (l'essai à blanc, synopsis-essai.ts, s'en sert seul).
  *
  * Variables d'environnement (service content-api) :
- *   SYNOPSIS_ENABLED      "1" pour activer (défaut "0")
+ *   SYNOPSIS_ENABLED      "1" : allumé à la première mise en route du Pilotage (défaut "0") ;
+ *                         ensuite, seul l'interrupteur du Pilotage compte
  *   OLLAMA_URL            défaut http://ollama:11434
  *   SYNOPSIS_MODEL        défaut ministral-3:8b
  *   SYNOPSIS_WINDOW       heures de Paris « début-fin », défaut 3-7 ; 0-24 = toujours
@@ -96,14 +98,15 @@
  */
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { setInterval, setTimeout } from "node:timers";
+import { setTimeout } from "node:timers";
 import { z } from "zod";
 import { igdbFetch } from "./twitch.js";
 
 // ─── Types et dépendances ────────────────────────────────────────────────────
 
 export type ItemType = "anime" | "game";
-export type SynopsisStatus = "auto" | "to_review" | "approved" | "failed" | "no_source";
+// v9.5 : « correction » = Rey a signalé des phrases fausses dans le bloc du dashboard ; le cron les corrige
+export type SynopsisStatus = "auto" | "to_review" | "approved" | "failed" | "no_source" | "correction";
 
 /** Ce que le module attend du pool : mysql2 comme le connecteur mariadb conviennent. */
 export interface SqlPool {
@@ -151,7 +154,7 @@ export interface Outcome {
    * v8.6 : HTTP 429 sur Tanya II et JJK S3) : écrire sans fiche ferait perdre les personnages et leur
    * genre, l'œuvre précédente et les noms que cherche la presse.
    */
-  status: Exclude<SynopsisStatus, "approved"> | "postponed";
+  status: Exclude<SynopsisStatus, "approved" | "correction"> | "postponed";
   text: string | null;
   note: string | null;
   /** Statut failed : dernière réponse refusée (journaux et essai à blanc, jamais enregistrée). */
@@ -167,7 +170,8 @@ export interface RunReport {
   failed: number;
   noSource: number;
   postponed: number; // remis au passage suivant, rien d'enregistré (pas compté dans processed)
-  stop: "done" | "window" | "ollama";
+  stop: "done" | "window" | "ollama" | "off"; // off : coupé ou mis en pause dans le Pilotage (v9.5)
+  corrections?: CorrectionReport; // v9.5 : corrections demandées dans le bloc, faites en premier
   durationS: number;
   tokens: { input: number; output: number };
   error?: string;
@@ -175,8 +179,6 @@ export interface RunReport {
 
 // ─── Réglages ────────────────────────────────────────────────────────────────
 
-const FIRST_TICK_MS = 2 * 60_000; // premier passage 2 min après le démarrage
-const TICK_MS = 10 * 60_000; // puis vérification toutes les 10 min
 // Ollama traite une requête à la fois (OLLAMA_NUM_PARALLEL 1) et la presse s'en sert aussi : un appel peut
 // attendre son tour plusieurs minutes. Appel par node:http (fetch coupe à 300 s), 15 min au plus.
 const OLLAMA_TIMEOUT_MS = 15 * 60_000;
@@ -266,10 +268,21 @@ const EnvSchema = z.object({
   SYNOPSIS_THREADS: z.coerce.number().int().min(1).max(64).default(4),
 });
 
-/** Config lue dans l'environnement ; null si le module est désactivé. Lève une erreur si une valeur est invalide. */
+/**
+ * Config lue dans l'environnement ; null si SYNOPSIS_ENABLED n'est pas à 1 (essai à blanc, qui le force).
+ * Lève une erreur si une valeur est invalide.
+ */
 export function readConfig(env: Record<string, string | undefined>): SynopsisConfig | null {
+  if (EnvSchema.parse(env).SYNOPSIS_ENABLED !== "1") return null;
+  return settingsFrom(env);
+}
+
+/**
+ * v9.5 : les réglages, que le module soit allumé ou non. L'interrupteur est dans le Pilotage : il rallume le
+ * synopsis sans redémarrer l'API. Lève une erreur si une valeur est invalide.
+ */
+export function settingsFrom(env: Record<string, string | undefined>): SynopsisConfig {
   const e = EnvSchema.parse(env);
-  if (e.SYNOPSIS_ENABLED !== "1") return null;
   return {
     ollamaUrl: e.OLLAMA_URL.replace(/\/+$/, ""),
     model: e.SYNOPSIS_MODEL,
@@ -4400,16 +4413,317 @@ export async function fetchSample(pool: SqlPool, limit: number, skipTop: number)
   return interleave(anime, game).slice(0, n);
 }
 
-/** N'écrit que si la ligne est toujours vide : une saisie manuelle faite entre-temps est préservée. */
-async function saveOutcome(pool: SqlPool, type: ItemType, id: number, outcome: Outcome, model: string): Promise<void> {
-  if (outcome.status === "postponed") return; // pas un statut de la base : l'item reste à traiter
-  await pool.query(
-    `UPDATE ${TABLES[type].table}
-        SET synopsis_fr = ?, synopsis_status = ?, synopsis_note = ?, synopsis_model = ?,
-            synopsis_generated_at = NOW(), updated_at = updated_at
-      WHERE id = ? AND synopsis_fr IS NULL`,
-    [outcome.text, outcome.status, outcome.note, outcome.status === "no_source" ? null : model, id],
+// ─── v9.5 : versions enregistrées, pour le bloc Synopsis du dashboard ─────────
+// Décision A de Rey (13 octobre) : rien ne s'affiche sans sa validation. Le bloc lui montre chaque synopsis
+// avec ce qui l'a produit : les sources lues, les notes et leurs preuves, le contrôle phrase par phrase.
+// Chaque rédaction et chaque correction devient une ligne de `synopsis_versions` ; l'item pointe sur la
+// sienne (`synopsis_version_id`). Rey touche les phrases de la version (`sentences`), jamais un texte
+// redécoupé : la correction reçoit exactement ces phrases.
+
+/** Version du module, affichée dans le bloc (« Cron coupé · v9.5 · … ») et gardée avec chaque version. */
+export const SYNOPSIS_CODE = "v9.5";
+
+/** Ce que le bloc montre d'une version, rangé en JSON dans `synopsis_versions.data`. */
+export interface VersionData {
+  sentences: string[]; // le synopsis, phrase par phrase (vide sans texte)
+  rows: SentenceRow[]; // une ligne par phrase ; vide si le contrôle n'a pas eu lieu (checkNote dit pourquoi)
+  checkNote: string | null;
+  notes: Array<{ note: string; label: string | null; passage: string | null; exact: boolean }>;
+  dropped: string[]; // notes retirées, avec la raison
+  sources: Array<{ label: string; text: string }>; // présentation et dossier, tels que le modèle les a lus
+  official: { original: string | null; text: string | null; note: string | null } | null; // site officiel (sans l'adresse : pas de lien)
+  press: PresseSeen[];
+  factsNote: string | null;
+  request?: { from: number; flagged: number[]; marked: Record<string, number[]> }; // correction demandée par Rey
+}
+
+/** Demande de correction posée par le bloc (colonne `synopsis_correction`). */
+export interface CorrectionRequest {
+  version: number; // la version que Rey a lue
+  flagged: number[]; // indices dans `sentences`
+  marked: Record<string, number[]>; // mots faux touchés, positions dans sentenceWords
+  at: string;
+}
+
+/** En-tête d'une écriture : le connecteur mariadb le renvoie seul, mysql2 dans [en-tête, champs]. */
+function headerOf(result: unknown): { insertId?: unknown; affectedRows?: unknown } {
+  const h = Array.isArray(result) ? result[0] : result;
+  return h && typeof h === "object" ? (h as { insertId?: unknown; affectedRows?: unknown }) : {};
+}
+const insertIdOf = (result: unknown): number => Number(headerOf(result).insertId ?? 0);
+export const affectedOf = (result: unknown): number => Number(headerOf(result).affectedRows ?? 0);
+
+export function versionDataFromDraft(d: Draft): VersionData {
+  const reference = [d.source, ...(d.facts?.dossier ?? []).map((e) => e.text)].join("\n");
+  const text = d.outcome.text ?? "";
+  const sentences = d.check && d.check.sentences.length ? d.check.sentences : text ? splitSentences(text, reference) : [];
+  return {
+    sentences,
+    rows: d.check && d.check.rows.length === sentences.length ? d.check.rows : [],
+    checkNote: d.check ? d.check.note : text ? "pas de contrôle" : null,
+    notes: d.notes.map((note, i) => {
+      const p = d.proofs?.[i];
+      return { note, label: p?.label ?? null, passage: p?.passage ?? null, exact: p?.exact ?? false };
+    }),
+    dropped: d.dropped,
+    sources: [{ label: "Présentation", text: d.source }, ...(d.facts?.dossier ?? []).map((e) => ({ label: e.source, text: e.text }))].filter(
+      (x) => x.text.trim().length > 0,
+    ),
+    official: d.official ? { original: d.official.original ?? null, text: d.official.text ?? null, note: d.official.note } : null,
+    press: d.press ?? [],
+    factsNote: d.factsNote,
+  };
+}
+
+const countRows = (rows: readonly SentenceRow[], v: SentenceRow["verdict"], asked = false): number =>
+  new Set(rows.filter((r) => r.verdict === v && (r.asked ?? false) === asked)).size; // une ligne partagée par deux phrases compte une fois
+
+async function insertVersion(
+  pool: SqlPool,
+  type: ItemType,
+  id: number,
+  v: { origin: "redaction" | "correction"; status: string; text: string | null; note: string | null; model: string | null; data: VersionData; ms: number | null },
+): Promise<number> {
+  const doubts = countRows(v.data.rows, "à vérifier") + countRows(v.data.rows, "à vérifier", true);
+  const fixes = countRows(v.data.rows, "corrigée") + countRows(v.data.rows, "corrigée", true);
+  const res = await pool.query(
+    `INSERT INTO synopsis_versions (item_type, item_id, num, origin, status, text, note, model, code, data, doubts, fixes, ms)
+     SELECT ?, ?, COALESCE(MAX(num), 0) + 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+       FROM synopsis_versions WHERE item_type = ? AND item_id = ?`,
+    [type, id, v.origin, v.status, v.text, v.note, v.model, SYNOPSIS_CODE, JSON.stringify(v.data), doubts, fixes, v.ms === null ? null : Math.round(v.ms), type, id],
   );
+  return insertIdOf(res);
+}
+
+/**
+ * Enregistre un item traité : sa version (sauf un échec, retenté plus tard : la note de l'item suffit),
+ * puis l'item. N'écrit que si la ligne est toujours vide (une saisie faite entre-temps est préservée) ;
+ * sinon la version est effacée.
+ */
+async function saveDraft(pool: SqlPool, d: Draft, model: string): Promise<void> {
+  const outcome = d.outcome;
+  if (outcome.status === "postponed") return; // pas un statut de la base : l'item reste à traiter
+  const usedModel = outcome.status === "no_source" ? null : model;
+  const versionId =
+    outcome.status === "failed"
+      ? null
+      : await insertVersion(pool, d.type, d.item.id, {
+          origin: "redaction",
+          status: outcome.status,
+          text: outcome.text,
+          note: outcome.note,
+          model: usedModel,
+          data: versionDataFromDraft(d),
+          ms: d.ms,
+        });
+  const res = await pool.query(
+    `UPDATE ${TABLES[d.type].table}
+        SET synopsis_fr = ?, synopsis_status = ?, synopsis_note = ?, synopsis_model = ?,
+            synopsis_generated_at = NOW(), synopsis_version_id = COALESCE(?, synopsis_version_id), updated_at = updated_at
+      WHERE id = ? AND synopsis_fr IS NULL`,
+    [outcome.text, outcome.status, outcome.note, usedModel, versionId, d.item.id],
+  );
+  if (versionId !== null && affectedOf(res) === 0) await pool.query(`DELETE FROM synopsis_versions WHERE id = ?`, [versionId]);
+}
+
+const CorrectionRequestSchema = z.object({
+  version: z.coerce.number().int().positive(),
+  flagged: z.array(z.number().int().min(0)).min(1),
+  marked: z.record(z.array(z.number().int().min(0))).default({}),
+  at: z.string().default(""),
+});
+
+const VersionRowSchema = z.object({ id: z.coerce.number(), num: z.coerce.number(), status: z.string(), text: z.string().nullable(), data: z.string() });
+
+/** Une demande de correction en attente, avec la version lue par Rey. */
+interface PendingCorrection {
+  type: ItemType;
+  item: ItemRow;
+  versionId: number | null; // version actuelle de l'item
+  request: CorrectionRequest | null; // null : demande illisible
+  version: { id: number; num: number; data: VersionData } | null;
+}
+
+/** Il reste des corrections demandées (le remplissage s'interrompt alors entre deux paquets). */
+export async function pendingCorrections(pool: SqlPool): Promise<number> {
+  let n = 0;
+  for (const type of ["anime", "game"] as const) {
+    const [row] = rowsOf(await pool.query(`SELECT COUNT(*) AS n FROM ${TABLES[type].table} WHERE synopsis_status = 'correction'`)) as Array<{ n: unknown }>;
+    n += Number(row?.n ?? 0);
+  }
+  return n;
+}
+
+async function fetchPendingCorrections(pool: SqlPool, limit: number): Promise<PendingCorrection[]> {
+  const out: PendingCorrection[] = [];
+  const Row = z.object({ id: z.coerce.number(), synopsis_correction: z.string().nullable(), synopsis_version_id: z.coerce.number().nullable() });
+  for (const type of ["anime", "game"] as const) {
+    const rows = Row.array().parse(
+      rowsOf(
+        await pool.query(
+          `SELECT id, synopsis_correction, synopsis_version_id FROM ${TABLES[type].table}
+            WHERE synopsis_status = 'correction' ORDER BY popularity DESC, id LIMIT ${Math.max(1, Math.floor(limit))}`,
+        ),
+      ),
+    );
+    const items = await fetchItemsByIds(pool, type, rows.map((r) => r.id));
+    for (const r of rows) {
+      const item = items.find((x) => x.id === r.id);
+      if (!item) continue;
+      let request: CorrectionRequest | null = null;
+      try {
+        request = CorrectionRequestSchema.parse(JSON.parse(r.synopsis_correction ?? "null"));
+      } catch {
+        request = null;
+      }
+      let version: PendingCorrection["version"] = null;
+      if (request) {
+        const [v] = VersionRowSchema.array().parse(
+          rowsOf(await pool.query(`SELECT id, num, status, text, data FROM synopsis_versions WHERE id = ? AND item_type = ? AND item_id = ?`, [request.version, type, r.id])),
+        );
+        if (v) version = { id: v.id, num: v.num, data: JSON.parse(v.data) as VersionData };
+      }
+      out.push({ type, item, versionId: r.synopsis_version_id, request, version });
+    }
+  }
+  return out;
+}
+
+/** Demande impossible à suivre (illisible, version changée, phrase hors du texte) : l'item revient à relire, avec la raison. */
+async function dropRequest(pool: SqlPool, type: ItemType, id: number, why: string): Promise<void> {
+  await pool.query(
+    `UPDATE ${TABLES[type].table} t
+        SET t.synopsis_status = COALESCE((SELECT v.status FROM synopsis_versions v WHERE v.id = t.synopsis_version_id AND v.status IN ('auto', 'to_review')), 'to_review'),
+            t.synopsis_note = ?, t.synopsis_correction = NULL, t.updated_at = t.updated_at
+      WHERE t.id = ? AND t.synopsis_status = 'correction'`,
+    [clip(why, 255), id],
+  );
+}
+
+export interface CorrectionReport {
+  corrected: number;
+  failed: number;
+  dropped: number; // demandes ignorées : illisibles, sur une version dépassée, phrase hors du texte
+  cancelled: number; // v9.5 : demandes annulées par Rey pendant leur correction (rien n'est gardé)
+}
+
+/**
+ * Corrections demandées par Rey dans le bloc : seules les phrases signalées sont réécrites, d'après les
+ * sources relues (correctSentences, v8.8 ; mots faux touchés, v8.9) ; les autres ne changent pas d'une
+ * lettre et gardent leur ligne de contrôle. Chaque phrase réécrite est contrôlée contre sa preuve
+ * (v9.4) ; NON : « à vérifier ». Le résultat est une nouvelle version, à relire. Une correction en échec
+ * rend la version d'avant, à relire, avec la raison. Une OllamaError remonte (passage arrêté, demande gardée).
+ */
+export async function runCorrections(
+  deps: SynopsisDeps,
+  cfg: SynopsisConfig,
+  chat: ChatFn,
+  getFacts: FactsFn,
+  keepGoing: () => boolean = () => true,
+): Promise<CorrectionReport> {
+  const report: CorrectionReport = { corrected: 0, failed: 0, dropped: 0, cancelled: 0 };
+  for (const p of await fetchPendingCorrections(deps.pool, cfg.maxPerRun)) {
+    if (!keepGoing()) break;
+    const { type, item } = p;
+    const table = TABLES[type].table;
+    const req = p.request;
+    const ver = p.version;
+    const why = !req
+      ? "demande de correction illisible"
+      : !ver || ver.id !== p.versionId
+        ? "demande de correction ignorée : le synopsis a changé depuis"
+        : req.flagged.some((i) => i >= ver.data.sentences.length)
+          ? "demande de correction ignorée : phrase hors du synopsis"
+          : null;
+    if (why || !req || !ver) {
+      report.dropped++;
+      await dropRequest(deps.pool, type, item.id, why ?? "demande de correction ignorée");
+      deps.log.warn({ module: "synopsis", type, id: item.id }, `synopsis : ${why}`);
+      continue;
+    }
+    const sentences = ver.data.sentences;
+    const marked: Record<number, number[]> = {};
+    for (const [k, v] of Object.entries(req.marked)) {
+      const i = Number(k);
+      const count = sentenceWords(sentences[i] ?? "").length;
+      if (req.flagged.includes(i) && v.length && v.every((x) => x < count)) marked[i] = v;
+    }
+    const t0 = Date.now();
+    const f = await factsFor({ type, item }, getFacts, { cfg, chat });
+    const sources = [{ label: "Présentation", text: cleanSource(f.item.description) }, ...(f.facts?.dossier ?? []).map((e) => ({ label: e.source, text: e.text }))];
+    const reference = sources.map((x) => x.text).join("\n");
+    const out = await correctSentences(cfg, type, f.item, sentences, req.flagged, chat, f.facts, marked).catch((err: unknown): CorrectionOutcome => {
+      if (err instanceof OllamaError) throw err;
+      return { status: "failed", sentences: [...sentences], text: sentences.join(" "), corrected: [], removed: 0, fixes: [], warnings: [], note: errMessage(err), attempts: [] };
+    });
+    if (out.status !== "corrected") {
+      report.failed++;
+      await dropRequest(deps.pool, type, item.id, `correction en échec : ${out.note ?? "?"} ; le synopsis d'avant est gardé`);
+      deps.log.warn({ module: "synopsis", type, id: item.id, note: out.note }, "synopsis : correction en échec");
+      continue;
+    }
+    // la nouvelle version : phrases gardées telles quelles (avec leur ligne), phrases réécrites contrôlées contre leur preuve
+    const kept: string[] = [];
+    const rows: SentenceRow[] = [];
+    const fullRows = ver.data.rows.length === sentences.length;
+    const notes: string[] = [];
+    for (const [i, sentence] of sentences.entries()) {
+      if (!req.flagged.includes(i)) {
+        kept.push(sentence);
+        rows.push(fullRows ? ver.data.rows[i]! : { verdict: "non contrôlée", label: "", passage: "", why: "" });
+        continue;
+      }
+      const fix = out.fixes.find((x) => x.index === i);
+      if (!fix || fix.text === null) {
+        notes.push(`phrase ${i + 1} supprimée`);
+        continue;
+      }
+      let row: SentenceRow;
+      if (fix.found && fix.found.label !== "aucune") {
+        const passage = expandPassage(fix.found, sources);
+        const again = await checkSentence(cfg, chat, fix.text, passage);
+        row = { verdict: again.verdict === "NON" ? "à vérifier" : "corrigée", label: fix.found.label, passage, why: again.verdict === "NON" ? again.why : "", before: sentence, asked: true };
+        notes.push(again.verdict === "NON" ? `phrase ${i + 1} réécrite, à vérifier (${clip(again.why || "NON", 60)})` : `phrase ${i + 1} réécrite`);
+      } else {
+        row = { verdict: "à vérifier", label: "?", passage: fix.proof, why: "preuve introuvable dans les sources", before: sentence, asked: true };
+        notes.push(`phrase ${i + 1} réécrite, preuve introuvable`);
+      }
+      const parts = splitSentences(fix.text, reference);
+      for (const part of parts.length ? parts : [fix.text]) {
+        kept.push(part);
+        rows.push(row);
+      }
+    }
+    const text = kept.join(" ").trim();
+    const note = clip(`correction demandée : ${notes.join(" ; ")}${out.warnings.length ? ` · ${out.warnings[0]}` : ""}`, 255);
+    const data: VersionData = {
+      ...ver.data,
+      sentences: kept,
+      rows,
+      checkNote: fullRows ? ver.data.checkNote : "phrases gardées : pas de contrôle dans la version d'avant",
+      sources,
+      ...(f.official ? { official: { original: f.official.original ?? null, text: f.official.text ?? null, note: f.official.note } } : {}),
+      factsNote: f.note,
+      request: { from: ver.id, flagged: req.flagged, marked: Object.fromEntries(Object.entries(marked).map(([k, v]) => [String(k), v])) },
+    };
+    const versionId = await insertVersion(deps.pool, type, item.id, { origin: "correction", status: "to_review", text, note, model: cfg.model, data, ms: Date.now() - t0 });
+    const res = await deps.pool.query(
+      `UPDATE ${table}
+          SET synopsis_fr = ?, synopsis_status = 'to_review', synopsis_note = ?, synopsis_model = ?, synopsis_version_id = ?,
+              synopsis_correction = NULL, synopsis_generated_at = NOW(), updated_at = updated_at
+        WHERE id = ? AND synopsis_status = 'correction' AND synopsis_version_id = ?`,
+      [text, note, cfg.model, versionId, item.id, ver.id],
+    );
+    if (affectedOf(res) === 0) {
+      // demande annulée entre-temps : la correction n'est pas gardée
+      await deps.pool.query(`DELETE FROM synopsis_versions WHERE id = ?`, [versionId]);
+      report.cancelled++;
+      continue;
+    }
+    report.corrected++;
+    deps.log.info({ module: "synopsis", type, id: item.id, version: versionId, note }, "synopsis : correction faite");
+  }
+  return report;
 }
 
 /** Nombre d'items par statut (jamais_tente = jamais traité), pour les journaux et le futur bloc du dashboard. */
@@ -5001,6 +5315,9 @@ function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
 export interface DraftOptions {
   chunk?: number | undefined; // items par paquet, défaut CHUNK
   keepGoing?: (() => boolean) | undefined; // consulté avant chaque paquet
+  // v9.5 : coupé ou mis en pause dans le Pilotage : consulté avant chaque item (notes, puis rédaction) ; le reste du
+  // paquet n'est pas enregistré et revient au passage suivant (quelques minutes au plus, plus un paquet entier)
+  stopNow?: (() => boolean) | undefined;
   onStep?: ((step: "notes" | "rédaction" | "contrôle", job: Job) => void) | undefined;
   facts?: FactsFn | undefined; // défaut : AniList / IGDB
   clock?: (() => number) | undefined; // horloge (ms), pour les tests de la pause d'AniList ; défaut Date.now
@@ -5050,6 +5367,7 @@ export async function draftItems(
       official?: OfficialSeen | undefined;
     }> = [];
     for (const job of pack) {
+      if (opts.stopNow?.()) return "stopped";
       opts.onStep?.("notes", job);
       const t0 = Date.now();
       const u0 = tokenUsage();
@@ -5105,6 +5423,7 @@ export async function draftItems(
       });
     }
     for (const { job, item, facts, step, timing, press, official } of steps) {
+      if (opts.stopNow?.()) return "stopped";
       let outcome = step.outcome;
       let check: CheckReport | null = null;
       if (!outcome) {
@@ -5150,18 +5469,22 @@ export async function draftItems(
   return "done";
 }
 
-/** Un passage du cron : file d'attente, paquets, enregistrement, jusqu'à la limite, la fin de la fenêtre ou une panne d'Ollama. */
+/**
+ * Un passage du cron : file d'attente, paquets, enregistrement, jusqu'à la limite, la fin de la fenêtre (vue avant
+ * chaque paquet), une panne d'Ollama, ou `keepRunning` qui dit non (v9.5 : coupé ou mis en pause dans le Pilotage),
+ * consulté avant chaque correction et chaque item : le synopsis en cours va au bout, le reste attend.
+ */
 export async function runBatch(
   deps: SynopsisDeps,
   cfg: SynopsisConfig,
-  opts: { chat?: ChatFn; now?: () => Date; chunk?: number; facts?: FactsFn } = {},
+  opts: { chat?: ChatFn; now?: () => Date; chunk?: number; facts?: FactsFn; keepRunning?: () => boolean } = {},
 ): Promise<RunReport> {
   const chat = opts.chat ?? ollamaChat;
   const now = opts.now ?? (() => new Date());
   const started = Date.now();
   const before = tokenUsage();
   const counts = { processed: 0, auto: 0, toReview: 0, failed: 0, noSource: 0, postponed: 0 };
-  const jobs = await fetchQueue(deps.pool, cfg.maxPerRun);
+  const corrections: CorrectionReport = { corrected: 0, failed: 0, dropped: 0, cancelled: 0 };
 
   const save = async (d: Draft): Promise<void> => {
     const { outcome } = d;
@@ -5177,7 +5500,7 @@ export async function runBatch(
       }
       return;
     }
-    await saveOutcome(deps.pool, d.type, d.item.id, outcome, cfg.model);
+    await saveDraft(deps.pool, d, cfg.model);
     counts.processed++;
     if (outcome.status === "auto") counts.auto++;
     else if (outcome.status === "to_review") counts.toReview++;
@@ -5216,13 +5539,57 @@ export async function runBatch(
 
   let stop: RunReport["stop"] = "done";
   let error: string | null = null;
+  const getFacts = opts.facts ?? factsWithPress(deps.pool);
+  // coupé ou mis en pause : l'arrêt vaut pour tout le reste du passage, même si on rallume entre-temps
+  let halted = false;
+  const running = (): boolean => {
+    if (!halted && opts.keepRunning && !opts.keepRunning()) halted = true;
+    return !halted;
+  };
+  const open = () => inWindow(parisHour(now()), cfg.window);
+  const going = () => open() && running();
   try {
-    const end = await draftItems(cfg, jobs, chat, save, {
-      chunk: opts.chunk,
-      facts: opts.facts ?? factsWithPress(deps.pool),
-      keepGoing: () => inWindow(parisHour(now()), cfg.window),
-    });
-    if (end === "stopped") stop = "window";
+    // v9.5 : les corrections demandées par Rey d'abord ; une demande arrivée pendant le remplissage
+    // l'interrompt à la fin du paquet en cours, puis le passage reprend après elle
+    for (let round = 0; round < 100; round++) {
+      const c = await runCorrections(deps, cfg, chat, getFacts, going);
+      corrections.corrected += c.corrected;
+      corrections.failed += c.failed;
+      corrections.dropped += c.dropped;
+      corrections.cancelled += c.cancelled;
+      if (!running()) {
+        stop = "off";
+        break;
+      }
+      if (!open()) {
+        stop = "window";
+        break;
+      }
+      const budget = cfg.maxPerRun - counts.processed - counts.postponed;
+      if (budget <= 0) break;
+      const jobs = await fetchQueue(deps.pool, budget);
+      if (jobs.length === 0) break;
+      let pending = false;
+      const end = await draftItems(
+        cfg,
+        jobs,
+        chat,
+        async (d) => {
+          await save(d);
+          pending = (await pendingCorrections(deps.pool)) > 0;
+        },
+        { chunk: opts.chunk, facts: getFacts, keepGoing: () => going() && !pending, stopNow: () => !running() },
+      );
+      if (end === "done") break;
+      if (!running()) {
+        stop = "off";
+        break;
+      }
+      if (!pending) {
+        stop = "window";
+        break;
+      }
+    }
   } catch (err) {
     if (!(err instanceof OllamaError)) throw err;
     stop = "ollama";
@@ -5232,6 +5599,7 @@ export async function runBatch(
   const report: RunReport = {
     ...counts,
     stop,
+    ...(corrections.corrected + corrections.failed + corrections.dropped + corrections.cancelled > 0 ? { corrections } : {}),
     durationS: Math.round((Date.now() - started) / 1000),
     tokens: { input: spent.input - before.input, output: spent.output - before.output },
   };
@@ -6034,47 +6402,6 @@ export async function factsFor(
   };
 }
 
-// ─── Cron ────────────────────────────────────────────────────────────────────
-
-let running = false;
-
-export function startSynopsisCron(deps: SynopsisDeps, env: Record<string, string | undefined> = process.env): void {
-  let cfg: SynopsisConfig | null;
-  try {
-    cfg = readConfig(env);
-  } catch (err) {
-    deps.log.error({ module: "synopsis", err }, "synopsis : configuration invalide, module arrêté");
-    return;
-  }
-  if (!cfg) {
-    deps.log.info({ module: "synopsis" }, "synopsis : désactivé (SYNOPSIS_ENABLED n'est pas à 1)");
-    return;
-  }
-  const active = cfg;
-  deps.log.info(
-    { module: "synopsis", model: active.model, window: active.window.join("-"), maxPerRun: active.maxPerRun },
-    "synopsis : actif",
-  );
-
-  const tick = async (): Promise<void> => {
-    if (running || !inWindow(parisHour(new Date()), active.window)) return;
-    running = true;
-    try {
-      const report = await runBatch(deps, active);
-      if (report.processed > 0 || report.postponed > 0 || report.stop === "ollama") {
-        const level = report.stop === "ollama" ? "warn" : "info";
-        deps.log[level]({ module: "synopsis", ...report, stats: await synopsisStats(deps.pool) }, "synopsis : passage terminé");
-      }
-    } catch (err) {
-      deps.log.error({ module: "synopsis", err }, "synopsis : passage interrompu");
-    } finally {
-      running = false;
-    }
-  };
-  setTimeout(() => void tick(), FIRST_TICK_MS).unref();
-  setInterval(() => void tick(), TICK_MS).unref();
-}
-
 // ─── v9.4 : chaque phrase contrôlée contre la preuve de sa note ──────────────
 // Une phrase par note depuis la v9.1, et chaque note a sa preuve : le modèle reçoit la phrase et le passage,
 // et dit seulement si la phrase en dit plus (OUI / NON). Banc du 13 octobre (44 phrases des essais v9.1 à
@@ -6176,6 +6503,7 @@ export type CheckVerdict = "OUI" | "NON" | "?";
 
 export interface SentenceCheck {
   sentence: string;
+  label: string; // v9.5 : source du passage (« Présentation », « Wikipédia : … », « Fiche ») ; « plusieurs sources » sans note correspondante
   passage: string;
   verdict: CheckVerdict; // « ? » : réponse illisible, la phrase est gardée
   why: string; // ce que le modèle dit faux (NON)
@@ -6189,6 +6517,48 @@ export interface CheckReport {
   before: string; // le synopsis rédigé, avant le contrôle
   checks: SentenceCheck[];
   note: string | null; // contrôle impossible, ou correction en échec
+  /**
+   * v9.5 : le synopsis gardé, phrase par phrase, et pour chacune ce que le bloc du dashboard affiche
+   * (verdict, source, passage, raison). `sentences.join(" ")` est le texte enregistré : le relecteur
+   * touche exactement ces phrases, et la correction les reçoit telles quelles.
+   */
+  sentences: string[];
+  rows: SentenceRow[];
+}
+
+/** Une phrase du synopsis gardé, telle que le bloc du dashboard la montre sous le texte. */
+export interface SentenceRow {
+  verdict: "confirmée" | "à vérifier" | "corrigée" | "illisible" | "non contrôlée";
+  label: string;
+  passage: string;
+  why: string; // raison du contrôle (NON) ; vide sinon
+  before?: string; // corrigée : la phrase d'avant
+  rejected?: string; // à vérifier : pourquoi la correction n'a pas été gardée (et ce qu'elle proposait)
+  asked?: boolean; // corrigée à la demande de Rey (bloc du dashboard), pas par le contrôle
+}
+
+/** Lignes du bloc pour des phrases contrôlées, une par phrase gardée (une correction en deux phrases en donne deux). */
+export function rowsFor(checks: readonly SentenceCheck[], kept: readonly string[], reference: string): { sentences: string[]; rows: SentenceRow[] } {
+  const sentences: string[] = [];
+  const rows: SentenceRow[] = [];
+  checks.forEach((c, i) => {
+    const text = kept[i] ?? c.sentence;
+    const fixed = c.fixed !== undefined && c.unconfirmed === undefined;
+    const row: SentenceRow = {
+      verdict: fixed ? "corrigée" : c.verdict === "NON" ? "à vérifier" : c.verdict === "?" ? "illisible" : "confirmée",
+      label: c.label,
+      passage: c.passage,
+      why: c.verdict === "NON" ? c.why : "",
+      ...(fixed ? { before: c.sentence } : {}),
+      ...(c.unconfirmed !== undefined ? { rejected: c.fixed !== undefined ? `${c.unconfirmed} · proposée : ${c.fixed}` : c.unconfirmed } : {}),
+    };
+    const parts = splitSentences(text, reference);
+    for (const part of parts.length ? parts : [text]) {
+      sentences.push(part);
+      rows.push(row);
+    }
+  });
+  return { sentences, rows };
 }
 
 /** « OUI », « **NON** : … », « 1. NON - … » ; sinon « ? ». */
@@ -6245,7 +6615,7 @@ export async function verifySentences(
   const alert = (o: Outcome, what: string): Outcome => ({ ...o, status: "to_review", note: clip([what, o.note].filter(Boolean).join(" · "), 255) });
   if (sentences.length === 0 || proofs.length === 0) {
     const note = `contrôle phrase / preuve impossible : ${sentences.length} phrase${sentences.length > 1 ? "s" : ""} pour ${proofs.length} note${proofs.length > 1 ? "s" : ""}`;
-    return { outcome: alert(outcome, note), report: { before: outcome.text, checks: [], note } };
+    return { outcome: alert(outcome, note), report: { before: outcome.text, checks: [], note, sentences, rows: [] } };
   }
   // v9.4.1 : chaque preuve étendue aux phrases entières de sa source ; chaque phrase avec la note qui lui
   // ressemble (sinon toutes les preuves, et la fiche : « Nioh 3 est un jeu d'action »)
@@ -6261,10 +6631,11 @@ export async function verifySentences(
   for (const [i, sentence] of sentences.entries()) {
     const j = named.length ? alignSentence(sentence, named, i) : i < passages.length ? i : null;
     const passage: string | string[] = j !== null ? passages[j]! : [...passages, fiche];
-    checks.push({ sentence, passage: typeof passage === "string" ? passage : passage.join(" / "), ...(await checkSentence(cfg, chat, sentence, passage)) });
+    const label = j !== null ? proofs[j]!.label : "plusieurs sources";
+    checks.push({ sentence, label, passage: typeof passage === "string" ? passage : passage.join(" / "), ...(await checkSentence(cfg, chat, sentence, passage)) });
   }
   const flagged = checks.flatMap((c, i) => (c.verdict === "NON" ? [i] : []));
-  if (flagged.length === 0) return { outcome, report: { before: outcome.text, checks, note: null } };
+  if (flagged.length === 0) return { outcome, report: { before: outcome.text, checks, note: null, ...rowsFor(checks, sentences, reference) } };
 
   const corr = await correctSentences(cfg, type, item, sentences, flagged, chat, facts).catch((err: unknown) => {
     if (err instanceof OllamaError) throw err;
@@ -6295,7 +6666,7 @@ export async function verifySentences(
     }
     kept.push(sentence); // telle quelle, signalée au relecteur
   }
-  const report: CheckReport = { before: outcome.text, checks, note: corr.status === "corrected" ? null : corr.note };
+  const report: CheckReport = { before: outcome.text, checks, note: corr.status === "corrected" ? null : corr.note, ...rowsFor(checks, kept, reference) };
   const fixedIdx = checks.flatMap((c, i) => (c.fixed !== undefined && c.unconfirmed === undefined ? [i + 1] : []));
   const doubtIdx = checks.flatMap((c, i) => (c.unconfirmed !== undefined ? [i + 1] : []));
   const why = (i: number) => clip(checks[i - 1]!.why || "NON", 60);

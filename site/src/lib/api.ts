@@ -44,15 +44,6 @@ export async function getItemDetail(domain: "anime" | "games", id: number | stri
   return fetchJson<ItemDetail>(`/api/${domain}/items/${id}`);
 }
 
-export async function postVote(domain: "anime" | "games", id: number | string, vote: 1 | -1): Promise<{ ok: boolean; votes: VoteData }> {
-  const r = await fetch(`/api/${domain}/items/${id}/vote`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ vote }),
-  });
-  if (!r.ok) throw new Error(`Vote failed ${r.status}`);
-  return r.json();
-}
-
 // ─────────────────────────────────────────────────────────
 // GameNime feed endpoints (scoring intelligent)
 // ─────────────────────────────────────────────────────────

@@ -12,7 +12,8 @@
  * indexables evite que ca se reproduise.
  */
 
-import { displayTitle, getItemDetail, postVote } from "./api";
+import { displayTitle, getItemDetail } from "./api";
+import { universHtml } from "./univers";
 
 export function formatDate(v) {
   if (!v) return "Date inconnue";
@@ -290,11 +291,6 @@ export function ytId(url) {
   if (!url) return null;
   var m = url.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return m ? m[1] : null;
-}
-
-export function getSmiley(p) {
-  if (p >= 80) return "😄"; if (p >= 60) return "🙂";
-  if (p >= 40) return "😐"; if (p >= 20) return "😕"; return "😢";
 }
 
 export function parseScreenshots(item) {
@@ -640,8 +636,6 @@ export function ficheHtml(item, domain, mode?) {
     animeInfoHtml = '<div class="detail-anime-info">' + infos.join('') + '</div>';
   }
 
-  var v = item.votes || { up: 0, down: 0, total: 0, percent: 0 };
-  var smiley = getSmiley(v.percent);
   var pegiLabel = formatPegi(item.rating);
   var ratingHtml = pegiLabel ? '<span class="pegi-tag"><svg class="tag-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V6l8-3Z"/></svg>' + altEsc(pegiLabel) + '</span>' : '';
   var hype = getHypeLabel(item);
@@ -693,24 +687,12 @@ export function ficheHtml(item, domain, mode?) {
     (page
       ? '<div class="fiche-duo' + (mediaHtml ? '' : ' seule') + '">' + mediaHtml + descriptionHtml + '</div>'
       : mediaHtml + descriptionHtml) +
-    '<div class="detail-votes">' +
-      '<button class="vote-btn vote-up" data-vote="1">' +
-        '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83v7.84C7 18.95 8.05 20 9.34 20h8.11c.7 0 1.36-.37 1.72-.97l2.66-6.15z"/></svg>' +
-        '<span>' + v.up + '</span>' +
-      '</button>' +
-      '<button class="vote-btn vote-down" data-vote="-1">' +
-        '<svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor"><path d="M22 4h-2c-.55 0-1 .45-1 1v9c0 .55.45 1 1 1h2V4zM2.17 11.12c-.11.25-.17.52-.17.8V13c0 1.1.9 2 2 2h5.5l-.92 4.65c-.05.22-.02.46.08.66.23.45.52.86.88 1.22L10 22l6.41-6.41c.38-.38.59-.89.59-1.42V6.34C17 5.05 15.95 4 14.66 4h-8.1c-.71 0-1.36.37-1.72.97L2.17 11.12z"/></svg>' +
-        '<span>' + v.down + '</span>' +
-      '</button>' +
-      '<div class="vote-smiley">' +
-        '<span class="smiley-emoji">' + smiley + '</span>' +
-        '<span class="smiley-percent">' + v.percent + '%</span>' +
-      '</div>' +
-    '</div>';
+    // le bloc « Univers », sous la description (lib/univers.ts)
+    universHtml(item, domain, simplifyPlatform);
 }
 
-/** Branche la fiche : galerie, votes et (page) la vignette qui lance la bande-annonce sur place.
- *  A appeler une fois par element insere : deux appels sur le meme bloc doubleraient les votes.
+/** Branche la fiche : galerie et (page) la vignette qui lance la bande-annonce sur place.
+ *  A appeler une fois par element insere : deux appels sur le meme bloc doubleraient les ecouteurs.
  *  L'element lui-meme compte (une vignette de bande-annonce remplacee seule au rechargement). */
 function dansFiche(racine, sel) {
   var l = Array.prototype.slice.call(racine.querySelectorAll(sel));
@@ -724,20 +706,6 @@ export function brancherFiche(racine, domain, id) {
       if (img) img.src = thumb.src;
       racine.querySelectorAll(".gallery-thumb").forEach(function(t) { t.classList.remove("active"); });
       thumb.classList.add("active");
-    });
-  });
-  dansFiche(racine, ".vote-btn").forEach(function(btn) {
-    btn.addEventListener("click", async function(ev) {
-      ev.stopPropagation();
-      var vote = parseInt(btn.dataset.vote);
-      try {
-        var res = await postVote(domain, id, vote);
-        var vd = res.votes;
-        racine.querySelector(".vote-up span").textContent = String(vd.up);
-        racine.querySelector(".vote-down span").textContent = String(vd.down);
-        racine.querySelector(".smiley-emoji").textContent = getSmiley(vd.percent);
-        racine.querySelector(".smiley-percent").textContent = vd.percent + "%";
-      } catch (err) { console.error("Vote error:", err); }
     });
   });
   dansFiche(racine, "a.fiche-trailer[data-yt]").forEach(function(a) {
