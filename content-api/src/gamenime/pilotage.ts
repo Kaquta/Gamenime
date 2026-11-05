@@ -3,7 +3,7 @@
  *
  * Demande de Rey (17 octobre 2026) : « je veux avoir le contrôle sur tout dorénavant via le dashboard ».
  * Ce module :
- *  - tient le registre des 30 lignes du Pilotage : 24 cycles de l'API, 4 tâches de n8n, les images HD (tâche de
+ *  - tient le registre des 33 lignes du Pilotage : 27 cycles de l'API, 4 tâches de n8n, les images HD (tâche de
  *    l'hôte) et le synopsis (piloté par son propre travail) ;
  *  - planifie les cycles de l'API à la place de leurs setTimeout/setInterval : interrupteur à chaud (en base : plus
  *    besoin de .env ni de redémarrage), lancement immédiat, pause générale, un seul passage à la fois par module
@@ -170,7 +170,7 @@ const FAMILLES = [
   { id: "classements", nom: "Popularité et classements", sous: "Top 25, Top 150, bonus Europe." },
   { id: "contenus", nom: "Contenus", sous: "Textes et images." },
   { id: "univers", nom: "Univers", sous: "Licences et alertes d'univers." },
-  { id: "surveillance", nom: "Surveillance et comptes", sous: "Alertes, rappels, sessions." },
+  { id: "surveillance", nom: "Surveillance et comptes", sous: "Alertes, rappels, épisodes et dates des favoris, notifications sur l'appareil, sessions." },
 ];
 
 const presenterLot = (quoi: string): Fiche["presenter"] => (b) => {
@@ -683,13 +683,17 @@ const FICHES: Fiche[] = [
     coupe: "Plus d'alerte Discord si une source tombe ou si un module se tait.",
     presenter: (b) => {
       const s: any[] = Array.isArray(b.sources) ? b.sources : [];
-      const ko = s.filter((x) => x.status !== "UP");
+      // AniList qui limite les requêtes (429, file-anilist.ts) : il répond, ce n'est pas une panne
+      const lim = s.filter((x) => x.limite);
+      const ko = s.filter((x) => x.status !== "UP" && !x.limite);
       const noms: Record<string, string> = { igdb: "IGDB", anilist: "AniList", kitsu: "Kitsu", animeschedule: "AnimeSchedule" };
       return {
-        res: ko.length ? `${pl(ko.length, "source en panne", "sources en panne")}` : `${fr(s.length)} sources OK`,
-        nv: s.length === 0 ? "n" : ko.length ? "m" : "o",
-        details: s.map((x) => [noms[x.source] || String(x.source), x.status === "UP" ? `OK · ${fr(N(x.ms))} ms` : `PANNE${x.err ? " · " + coupe(x.err, 80) : ""}`] as [string, string]),
-        chiffre: { v: `${s.length - ko.length}/${s.length}`, l: "sources OK" },
+        res: ko.length ? `${pl(ko.length, "source en panne", "sources en panne")}`
+          : lim.length ? `${lim.map((x) => noms[x.source] || x.source).join(", ")} limité (429)` : `${fr(s.length)} sources OK`,
+        nv: s.length === 0 ? "n" : ko.length || lim.length ? "m" : "o",
+        details: s.map((x) => [noms[x.source] || String(x.source), x.status === "UP" ? `OK · ${fr(N(x.ms))} ms`
+          : x.limite ? "LIMITÉ · HTTP 429, trop de requêtes" : `PANNE${x.err ? " · " + coupe(x.err, 80) : ""}`] as [string, string]),
+        chiffre: { v: `${s.length - ko.length - lim.length}/${s.length}`, l: "sources OK" },
         alerte: ko.length ? `${ko.map((x) => noms[x.source] || x.source).join(", ")} ne répond pas.` : null,
       };
     },
@@ -715,6 +719,106 @@ const FICHES: Fiche[] = [
       details: [["Alertes", fr(N(b.created))]],
       chiffre: { v: fr(N(b.created)), l: N(b.created) > 1 ? "alertes au dernier passage" : "alerte au dernier passage" },
     }),
+  },
+  // épisodes et dates des favoris (suivi-favoris.ts, 30 octobre 2026) : le relevé, puis l'envoi (coupé au départ)
+  {
+    id: "suivi-favoris", fam: "surveillance", nom: "Épisodes et dates des favoris", src: "api",
+    role: "Relève les épisodes sortis des animés suivis sur nos plateformes EU (horaires de « Cette semaine ») et les changements de date des titres suivis ; n'envoie rien : l'envoi est la ligne « Envoi aux abonnés »",
+    coupe: "Plus aucun épisode ni changement de date n'est relevé ; rien n'est envoyé.",
+    rallume: "Il repart dans les 10 minutes : les épisodes sortis depuis moins de 12 h sont relevés, les dates reprennent là où elles étaient.",
+    presenter: (b, ctx) => {
+      const e = erreurDe(b), ep = N(b.episodes), dt = N(b.dates), ret = N(b.retenus), envoi = b.envoi === true;
+      const i = ctx.infos || {}, cpt = i.comptes || {};
+      const statuts: Record<string, string> = { attente: envoi ? "à envoyer" : "à blanc, en attente", envoi: "envoi en cours", envoye: "envoyé", blanc: "à blanc (pas envoyé)", trop_tard: "trop tard (pas envoyé)", retenu: "retenu (garde-fou)", annule: "annulé (plus vrai à l'envoi)" };
+      const quand = (t: number): string => {
+        const d = new Date(t);
+        const jour = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "numeric", month: "short" }).format(d);
+        return `${jour} ${heureParis(t)}`;
+      };
+      const recents: any[] = Array.isArray(i.recents) ? i.recents : [];
+      const parts = [pl(ep, "épisode", "épisodes"), pl(dt, "date changée", "dates changées")];
+      return {
+        res: e ? `erreur : ${e}` : parts.join(" · ") + (envoi ? "" : " · à blanc"),
+        nv: e ? "k" : ret ? "m" : ep + dt ? "o" : "n",
+        details: [
+          ["Envoi aux abonnés", envoi ? "allumé" : "coupé : tout est relevé à blanc"],
+          ["Animés suivis avec un épisode ces 12 h", fr(N(b.animesSuivis))],
+          ["Épisodes en retard (pas annoncés)", fr(N(b.retardes))],
+          ["Pas encore dits sortis (repris au passage suivant)", fr(N(b.pasEncore))],
+          ["Horaire japonais seulement (pas annoncés)", fr(N(b.bruts))],
+          ["Sur aucune de nos plateformes EU (pas annoncés)", fr(N(b.sansPlateforme))],
+          ["Titres suivis (dates)", fr(N(b.titresSuivis))],
+          ["Changements en observation (6 h)", fr(N(b.observation))],
+          ["En attente d'envoi", fr(N(b.enAttente))],
+          ["Sur 7 jours : envoyés · à blanc · trop tard · annulés", `${fr(N(cpt.envoye))} · ${fr(N(cpt.blanc))} · ${fr(N(cpt.trop_tard))} · ${fr(N(cpt.annule))}`],
+        ],
+        chiffre: { v: fr(ep + dt), l: ep + dt > 1 ? "relevés au dernier passage" : "relevé au dernier passage" },
+        alerte: e
+          ? `${e} (nouvel essai dans 10 min).`
+          : ret
+            ? `Garde-fou, ${coupe(b.garde, 120)} : rien de ce passage n'est envoyé (à vérifier : une source a-t-elle changé d'un coup ?).`
+            : null,
+        donnees: recents.length
+          ? { t: "Derniers relevés", l: recents.slice(0, 10).map((x: any): [string, string, string] => [quand(N(x.quand)), coupe(x.titre, 60), `${coupe(x.texte, 70)} · ${statuts[x.statut] || x.statut}${x.abonnes ? ` (${pl(N(x.abonnes), "abonné", "abonnés")})` : ""}`]) }
+          : null,
+        notable: ret ? { nv: "warn", texte: `Garde-fou : ${coupe(b.garde, 120)}`, detail: "rien de ce passage n'est envoyé aux abonnés" } : null,
+      };
+    },
+  },
+  {
+    id: "envoi-favoris", fam: "surveillance", nom: "Envoi aux abonnés", src: "api",
+    role: "Envoie à la cloche des abonnés ce que relève « Épisodes et dates des favoris » : un épisode sorti depuis moins de 12 h, une date changée depuis moins de 48 h, revérifiés juste avant l'envoi",
+    coupe: "Rien n'est envoyé : les épisodes et les dates sont relevés à blanc (ligne « Épisodes et dates des favoris »).",
+    rallume: "Ce qui est relevé et encore frais (un épisode sorti depuis moins de 12 h, une date changée depuis moins de 48 h) part dans la cloche des abonnés dans les 10 minutes, puis chaque nouveauté dans la minute.",
+    confirmer: {
+      titre: "Envoyer maintenant aux abonnés ?",
+      texte: "Ce qui est relevé et encore frais (un épisode sorti depuis moins de 12 h, une date changée depuis moins de 48 h) part dans la cloche des abonnés.",
+      action: "Envoyer",
+    },
+    presenter: (b) => {
+      const e = erreurDe(b), env = N(b.envoyes), abo = N(b.abonnes), tard = N(b.tard), ann = N(b.annules);
+      const liste: any[] = Array.isArray(b.liste) ? b.liste : [];
+      return {
+        res: e ? `erreur : ${e}` : `${pl(env, "envoyé", "envoyés")} · ${pl(abo, "abonné prévenu", "abonnés prévenus")}` + (tard ? ` · ${fr(tard)} trop tard` : "") + (ann ? ` · ${pl(ann, "annulé", "annulés")}` : ""),
+        nv: e ? "k" : (tard || ann) && !env ? "m" : env ? "o" : "n",
+        details: [["Envoyés", fr(env)], ["Abonnés prévenus", fr(abo)], ["Trop tard (pas envoyés)", fr(tard)], ["Annulés (plus vrais à l'envoi : épisode retardé, date changée)", fr(ann)]],
+        chiffre: { v: fr(env), l: env > 1 ? "envoyés au dernier passage" : "envoyé au dernier passage" },
+        alerte: e ? `${prefixe("Envoi", e)} : ce qui reste est repris au passage suivant, tant que c'est frais.` : null,
+        donnees: liste.length ? { t: "Envoyés au dernier passage", l: liste.slice(0, 10).map((x: any): [string, string, string] => ["", coupe(x.titre, 60), `${coupe(x.texte, 70)} · ${pl(N(x.abonnes), "abonné", "abonnés")}`]) } : null,
+        notable: env ? { nv: "ok", texte: `${pl(env, "notification envoyée", "notifications envoyées")} aux abonnés`, detail: coupe(liste.slice(0, 4).map((x: any) => `${x.titre} : ${x.texte}`).join(", "), 200) } : null,
+      };
+    },
+  },
+  // notifications sur l'appareil (push.ts, 31 octobre 2026)
+  {
+    id: "push", fam: "surveillance", nom: "Notifications sur l'appareil", src: "api",
+    role: "Envoie aux appareils activés (téléphone, ordinateur) les notifications de la cloche des favoris, à toute heure : ni les alertes ni les images",
+    coupe: "Plus rien n'est envoyé sur les appareils ; la cloche du site continue. Ce qui a moins de 24 h part au rallumage.",
+    rallume: "Ce qui est arrivé dans la cloche depuis moins de 24 h (et pas encore lu) part dans la minute.",
+    presenter: (b, ctx) => {
+      const e = erreurDe(b), env = N(b.envoyes), exp = N(b.expires), ref = N(b.refuses), re = N(b.reessais), reg = N(b.regroupes), err = N(b.erreurs);
+      const i = ctx.infos || {}, j = i.jour || {};
+      return {
+        res: e ? `erreur : ${e}` : `${pl(env, "envoyée", "envoyées")} · ${pl(N(b.appareils), "appareil", "appareils")}` + (exp ? ` · ${pl(exp, "appareil désabonné", "appareils désabonnés")}` : "") + (re ? ` · ${fr(re)} à refaire` : "") + (err ? ` · ${pl(err, "appareil en erreur", "appareils en erreur")}` : ""),
+        nv: e || (err && !env) ? "k" : ref || re || err ? "m" : env ? "o" : "n",
+        details: [
+          ["Appareils activés · comptes", `${fr(N(i.appareils))} · ${fr(N(i.comptes))}`],
+          ["Envoyées sur 24 h (regroupées comprises)", fr(N(j.envoye) + N(j.groupe))],
+          ["Regroupées au dernier passage", fr(reg)],
+          ["Remplacées par une plus récente du même titre", fr(N(b.remplaces))],
+          ["Refusées par le service · à refaire", `${fr(ref)} · ${fr(re)}`],
+          ["Appareils en attente après une panne de leur service", fr(N(i.auRepos))],
+        ],
+        chiffre: { v: fr(N(i.appareils)), l: N(i.appareils) > 1 ? "appareils activés" : "appareil activé" },
+        alerte: e
+          ? `${prefixe("Notifications", e)} : nouvel essai dans la minute.`
+          : err
+            ? `${pl(err, "appareil en erreur", "appareils en erreur")} au dernier passage (voir le journal de l'API) : nouvel essai dans la minute.`
+            : ref
+              ? `${pl(ref, "notification refusée", "notifications refusées")} par le service du navigateur (clé ou contenu ?).`
+              : null,
+      };
+    },
   },
   {
     id: "sessions", fam: "surveillance", nom: "Purge des sessions", src: "api",
@@ -1295,8 +1399,9 @@ async function noterN8n(module: string, t0: number, code: number, corps: any): P
 
 async function lireSante(): Promise<Record<string, any>> {
   try {
-    const r = await sql("SELECT source, status, response_ms, error_msg FROM source_health ORDER BY source");
-    return { sources: (r || []).map((x: any) => ({ source: String(x.source), status: String(x.status), ms: N(x.response_ms), err: x.error_msg ? String(x.error_msg) : null })) };
+    const r = await sql("SELECT source, status, http_code, response_ms, error_msg FROM source_health ORDER BY source");
+    return { sources: (r || []).map((x: any) => ({ source: String(x.source), status: String(x.status), ms: N(x.response_ms), err: x.error_msg ? String(x.error_msg) : null,
+      limite: String(x.source) === "anilist" && String(x.status) === "DOWN" && N(x.http_code) === 429 })) };
   } catch {
     return { sources: [] };
   }
@@ -1314,7 +1419,7 @@ async function enCache<T>(cle: string, validite: number, f: () => Promise<T>): P
 async function lireSourceHealth(): Promise<Record<string, any>> {
   return enCache("source_health", 20000, async () => {
     try {
-      const r = await sql("SELECT source, status, response_ms, error_msg, last_check, last_lookup_warn_msg FROM source_health");
+      const r = await sql("SELECT source, status, http_code, response_ms, error_msg, last_check, last_lookup_warn_msg, TIMESTAMPDIFF(HOUR, last_ok, NOW()) AS ok_h FROM source_health");
       const m: Record<string, any> = {};
       for (const x of r || []) m[String(x.source)] = x;
       return m;
@@ -1552,6 +1657,11 @@ async function services(): Promise<Array<Record<string, any>>> {
     if (!x) return { nom, etat: "warn", detail: "Pas encore vérifié" };
     const up = String(x.status) === "UP";
     const quand = heureMur(x.last_check) ? ` · vérifié à ${heureMur(x.last_check)}` : "";
+    // AniList qui limite les requêtes (429) : « limité », pas « panne » ; rouge si aucun contrôle réussi depuis 24 h
+    if (cle === "anilist" && String(x.status) === "DOWN" && N(x.http_code) === 429) {
+      const vieux = x.ok_h == null || N(x.ok_h) >= 24;
+      return { nom, etat: vieux ? "crit" : "warn", detail: `Limité (HTTP 429, trop de requêtes)${vieux ? " depuis plus de 24 h" : ""}${quand}` };
+    }
     return {
       nom, etat: up ? (extra ? "warn" : "ok") : "crit",
       detail: up ? `Répond · ${fr(N(x.response_ms))} ms${quand}${extra ? " · " + extra : ""}` : `Ne répond pas${x.error_msg ? " : " + coupe(x.error_msg, 90) : ""}${quand}`,

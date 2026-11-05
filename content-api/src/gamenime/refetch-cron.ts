@@ -49,7 +49,7 @@ export async function fetchAniList(anilistId: number): Promise<SourceData | null
   const query = `query ($id: Int) { Media(id: $id, type: ANIME) { status title { native } format description startDate { year month day } coverImage { extraLarge large } trailer { id site } externalLinks { site type url } streamingEpisodes { site } } }`;
 
   try {
-    // une requete AniList a la fois pour toute l'API (dates-animes.ts : 2,1 s entre deux, sous la limite d'AniList) ;
+    // la file AniList commune de l'API (file-anilist.ts : 2,5 s au moins entre deux departs, sous la limite d'AniList) ;
     // un refus (429) suspend les suivantes le temps demande, et la lecture rend null : rien n'est change
     await tourAniList();
     const res = await fetch(ANILIST_URL, {

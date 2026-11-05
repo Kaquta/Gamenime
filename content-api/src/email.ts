@@ -4,6 +4,7 @@
  * Reliability: catches errors, returns boolean for easy testing.
  */
 import nodemailer from "nodemailer";
+import { N1_CID, N1_PNG } from "./email-n1.js";
 
 const SMTP_HOST = process.env.SMTP_HOST || "ssl0.ovh.net";
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
@@ -56,12 +57,24 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
       html: payload.html,
       text: payload.text || versTexte(payload.html),
       replyTo: payload.replyTo || CONTACT_EMAIL,
+      attachments: piecesJointes(payload.html),
     });
     return true;
   } catch (err: any) {
     console.error("[email] Send failed:", err?.message || err);
     return false;
   }
+}
+
+/**
+ * Les images jointes à un e-mail : le N°1 de l'en-tête (email-n1.ts), seulement si le HTML l'appelle (cid:).
+ * Jointe « en ligne » : la messagerie l'affiche dans l'e-mail, même quand elle bloque les images venues
+ * d'internet. (5 novembre 2026.)
+ */
+export function piecesJointes(html: string) {
+  return html.includes(`cid:${N1_CID}`)
+    ? [{ filename: "gamenime.png", content: N1_PNG, cid: N1_CID, contentType: "image/png", contentDisposition: "inline" as const }]
+    : [];
 }
 
 /**

@@ -45,6 +45,7 @@ import { sanitizePlatform, isLikelyJapaneseAnime, normalizeTitle, normalizeTitle
 import { CHAMPS_MEDIA, versEnvoi, plateformes, enBase, bloqueesParLaListe, envoyer } from "./series-en-cours.js";
 import { routesParIdentifiant } from "./refetch-cron.js";
 import { planifier } from "./pilotage.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 const ANILIST_URL = process.env.CONTROLE_ANILIST_URL || "https://graphql.anilist.co";
 const AS_API = (process.env.ANIMESCHEDULE_API_URL || "https://animeschedule.net/api/v3").replace(/\/+$/, "");
@@ -556,6 +557,7 @@ async function controler(app: FastifyInstance, pool: any, bilan: BilanControle):
     for (let essai = 0; ; essai++) {
       const attente = PAUSE_AL_MS - (Date.now() - dernierAL);
       if (dernierAL && attente > 0) await dormir(attente);
+      await tourAniList(); // la file AniList commune (file-anilist.ts)
       dernierAL = Date.now();
       const r = await fetch(ANILIST_URL, {
         method: "POST",
@@ -563,6 +565,7 @@ async function controler(app: FastifyInstance, pool: any, bilan: BilanControle):
         body: JSON.stringify({ query, variables }),
         signal: AbortSignal.timeout(30000),
       });
+      if (r.status === 429) aniListRefuse(r.headers.get("retry-after"));
       if (r.status === 429 && essai < ESSAIS_429_AL) {
         const s = Number(r.headers.get("retry-after"));
         const ms = Number.isFinite(s) && s > 0 ? Math.min(s, 90) * 1000 : ATTENTE_429_AL_MS;

@@ -97,6 +97,11 @@ function rapport(calc: Calcul, titres: Map<string, string>, dire: (l: string) =>
   }
   dire(`  licences du radar reliees par leur passe, laissees separees : ${lr.size}`);
   for (const [k, v] of [...lr].slice(0, 20)) dire(`      ${coupe(k, 80)} (${[...v].join(", ")})`);
+  // regles 7 : les reunions refusees qui tiennent (controle des oeuvres d'origine d'abord ; puis franchises differentes,
+  // noms, titres)
+  const refusO = calc.diag.refuses.filter((x) => x.origine).length;
+  dire(`  reunions refusees : ${calc.diag.refuses.length}, dont ${refusO} par le controle des oeuvres d'origine`);
+  for (const x of [...calc.diag.refuses].sort((p, q) => Number(q.origine) - Number(p.origine)).slice(0, 20)) dire(`      ${coupe(`${x.a} / ${x.b}`, 70)} (${coupe(asc(`${x.lien} : ${x.cle}`), 60)})`);
   for (const nom of ["One Piece", "Jujutsu Kaisen", "Fate"]) {
     const l = L.find((x) => norm(x.nom) === norm(nom));
     if (!l) {

@@ -1,0 +1,89 @@
+/* PUSH-DEBUT — Notifications sur l'appareil (patch du 31 octobre 2026, copie de la maquette validée le 30 octobre).
+   Jetons Caméléon du site (--t-*) : panneau et arête des tiroirs, bouton principal de Sign in (--t-grad),
+   pastilles (--t-pastille-*), cachet des en-têtes de tiroir. Aucun flou. */
+
+/* ── l'invitation, après un cœur ── */
+.gn-push {
+  position: fixed; z-index: 1400; left: 12px; right: 12px; bottom: 12px; box-sizing: border-box;
+  max-width: 440px; margin: 0 auto; padding: 18px 18px 16px; border-radius: 22px;
+  background: var(--t-panneau), var(--t-nuit, #121214); border: 1px solid var(--t-panneau-bord, rgba(255, 255, 255, .07));
+  box-shadow: var(--t-panneau-ombre, none), 0 30px 80px -24px rgba(0, 0, 0, .85); color: var(--t-ink, #f5f5f7);
+  font-family: Inter, sans-serif; text-align: left;
+  transform: translateY(0); opacity: 1; transition: transform .28s ease, opacity .28s ease;
+}
+.gn-push.gn-cache { transform: translateY(24px); opacity: 0; pointer-events: none; }
+.gn-push::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; padding: 1px; border-radius: 21px; background: var(--t-arete);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+@media (min-width: 760px) {
+  .gn-push { left: auto; right: 24px; bottom: 24px; width: 392px; margin: 0; }
+}
+.gn-push__tete { display: flex; align-items: center; gap: 12px; padding-right: 34px; }
+.gn-push__ic {
+  box-sizing: content-box; flex: none; width: 16px; height: 16px; padding: 7px; border-radius: 9px;
+  background: var(--t-cachet); color: var(--t-cachet-txt, #0e0e12); box-shadow: var(--t-cachet-ombre);
+}
+.gn-push__ic svg { display: block; width: 16px; height: 16px; }
+.gn-push__t { margin: 0; font: 600 1.12rem/1.2 "GN Poppins", Poppins, sans-serif; letter-spacing: -.01em; color: var(--t-titre, #fff); }
+.gn-push__x {
+  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; padding: 0; display: grid; place-items: center;
+  border-radius: 50%; color: var(--t-ink); font: 600 12px/1 Inter, sans-serif; cursor: pointer;
+  background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre);
+}
+.gn-push__txt { margin: 12px 0 0; font: 500 14px/1.5 Inter, sans-serif; color: var(--t-ink2, #c5c6cc); }
+.gn-push__txt strong { color: var(--t-ink, #f5f5f7); font-weight: 600; }
+.gn-push__quoi { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.gn-push__quoi li {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 8px; border-radius: 999px;
+  font: 600 12px/1 Inter, sans-serif; color: var(--t-ink);
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .09);
+}
+.gn-push__quoi svg { width: 14px; height: 14px; flex: none; color: var(--t-acc); }
+.gn-push__etapes { margin: 12px 0 0; padding: 0; list-style: none; counter-reset: gnp; display: grid; gap: 8px; }
+.gn-push__etapes li {
+  counter-increment: gnp; display: flex; align-items: center; gap: 10px; font: 500 13.5px/1.4 Inter, sans-serif; color: var(--t-ink2);
+}
+.gn-push__etapes li::before {
+  content: counter(gnp); flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font: 700 12px/1 Inter, sans-serif; color: var(--t-sur-acc, #0e0e12); background: var(--t-grad); box-shadow: var(--t-acc-ombre);
+}
+.gn-push__etapes strong { color: var(--t-ink); font-weight: 600; }
+.gn-push__etapes .gn-ios-partager { display: inline-block; width: 15px; height: 15px; vertical-align: -2px; margin: 0 2px; color: var(--t-acc); }
+.gn-push__acts { display: flex; gap: 10px; margin-top: 16px; }
+.gn-push__oui, .gn-push__non {
+  min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer; font: 600 14px/1 Inter, sans-serif;
+}
+.gn-push__oui { flex: 1 1 auto; border: 0; background: var(--t-grad); color: var(--t-sur-acc, #0e0e12); box-shadow: var(--t-acc-ombre-fort); }
+.gn-push__non { flex: none; color: var(--t-ink); background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); box-shadow: var(--t-pastille-ombre); }
+.gn-push__non--seul { flex: 1 1 auto; }
+.gn-push__pied { margin: 10px 0 0; font: 500 12px/1.45 Inter, sans-serif; color: var(--t-ink3, #8d8f97); }
+.gn-push__pied a { color: var(--t-acc); text-decoration: none; }
+
+/* ── la cloche : la carte en haut du tiroir ── */
+.gn-push-carte {
+  position: relative; display: flex; align-items: center; gap: 11px; margin: 0 0 14px; padding: 11px 12px; border-radius: 12px;
+  background: linear-gradient(90deg, var(--ep-c2, rgba(255, 140, 58, .1)), rgba(255, 255, 255, .02)); border: 1px solid var(--t-voir-bord);
+  color: var(--t-ink); font-family: Inter, sans-serif;
+}
+.gn-push-carte__ic {
+  box-sizing: content-box; flex: none; width: 16px; height: 16px; padding: 8px; border-radius: 10px;
+  background: var(--t-cachet); color: var(--t-cachet-txt, #0e0e12); box-shadow: var(--t-cachet-ombre);
+}
+.gn-push-carte__ic svg { display: block; width: 16px; height: 16px; }
+.gn-push-carte__b { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gn-push-carte__b strong { font: 600 13.5px/1.25 Inter, sans-serif; color: var(--t-ink); }
+.gn-push-carte__b small { font: 500 12px/1.3 Inter, sans-serif; color: var(--t-ink3); }
+.gn-push-carte__oui {
+  flex: none; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--t-grad); color: var(--t-sur-acc, #0e0e12); box-shadow: var(--t-acc-ombre); font: 600 13px/1 Inter, sans-serif;
+}
+
+/* ── Mes préférences et Mon compte : la ligne de l'appareil ── */
+.gn-push-etat { display: block; margin-top: 3px; }
+.gn-push-etat--ko { color: #f2a093 !important; }
+.gn-push-etat a { color: var(--t-acc, #ffb877); text-decoration: none; font-weight: 600; }
+.gn-push-off :is(.prefs-switch, .prefs-channel-icon, .acc-sw) { opacity: .5; }
+.gn-push-off strong { opacity: .75; }
+/* PUSH-FIN */

@@ -1,8 +1,12 @@
 ---
+import { anneesDeLaFenetre } from "../lib/calendrier";
 interface Props {
   domain: "anime" | "games" | "both";
 }
 const { domain } = Astro.props;
+// le choix « Annee » : les annees de la fenetre de l'API (lib/calendrier.ts) : 2026 et 2027 en 2026 ; 2026, 2027 et
+// 2028 en 2027 (avant : 2026 et 2027 ecrits en dur ; patch d'entretien, novembre 2026)
+const annees = await anneesDeLaFenetre();
 const months = [
   "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"
@@ -31,8 +35,7 @@ const platforms = domain === "games"
             </select>
             <select class="gn-select" id="filterYear">
               <option value="">Année</option>
-              <option value="2026">2026</option>
-              <option value="2027">2027</option>
+              {annees.map((a) => (<option value={a}>{a}</option>))}
             </select>
           </div>
         </div>
@@ -96,9 +99,11 @@ const platforms = domain === "games"
       params.push(`releasedAfter=${filters.year}-01-01`);
       params.push(`releasedBefore=${filters.year}-12-31`);
     } else if (filters.month) {
-      params.push(`releasedAfter=2026-${filters.month}-01`);
-      const lastDay = new Date(2026, parseInt(filters.month), 0).getDate();
-      params.push(`releasedBefore=2026-${filters.month}-${lastDay}`);
+      // un mois sans annee : celui de l'annee en cours (avant : 2026 ecrit en dur ; patch d'entretien, novembre 2026)
+      const an = new Date().getFullYear();
+      params.push(`releasedAfter=${an}-${filters.month}-01`);
+      const lastDay = new Date(an, parseInt(filters.month), 0).getDate();
+      params.push(`releasedBefore=${an}-${filters.month}-${lastDay}`);
     }
     return params.join("&");
   }

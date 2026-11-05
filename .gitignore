@@ -49,3 +49,11 @@ nginx/static/hd/
 sauvegardes/
 site/.build-report/
 anime_workflow_n8n.json
+# APERCU-DISCORD (29 octobre 2026) : ce que produit la tache gn-apercu (GIF, page du robot de Discord, apercu d'essai) et son etat
+/nginx/static/apercu/*
+/nginx/static/apercu-essai/*
+/apercu/etat.json
+/apercu/journal.txt
+/apercu/journal.txt.tmp
+/apercu/.verrou
+/apercu/.gn-apercu.*

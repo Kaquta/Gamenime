@@ -62,6 +62,7 @@ import { DB_DATE_RANGE_YEARS, MAX_DB_FETCH } from "./constants.js";
 import { pushActivity, trackLastRun } from "./dashboard.js";
 import { interrupteur, planifier } from "./pilotage.js";
 import type { Journal, SqlPool } from "./presse.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 import { igdbFetch } from "./twitch.js";
 
 const PREMIER_CONTROLE_MS = 40 * 60 * 1000;
@@ -207,6 +208,7 @@ async function appel(cfg: EuropeConfig, url: string, options: RequestInit, nom: 
   for (let essai = 0; essai < 2; essai++) {
     let r: Response;
     try {
+      if (nom === "AniList") await tourAniList(); // la file AniList commune (file-anilist.ts)
       r = await fetch(url, { ...options, headers: { "User-Agent": AGENT, ...((options.headers as Record<string, string>) ?? {}) }, signal: AbortSignal.timeout(75000) });
     } catch (e) {
       if (essai === 0) {
@@ -215,6 +217,7 @@ async function appel(cfg: EuropeConfig, url: string, options: RequestInit, nom: 
       }
       throw new Error(`${nom} injoignable (${message(e)})`);
     }
+    if (r.status === 429 && nom === "AniList") aniListRefuse(r.headers.get("retry-after"));
     if ((r.status === 429 || r.status === 503) && essai === 0) {
       const ms = attenteDemandee(r.headers.get("retry-after"));
       if (ms != null && ms > ATTENTE_MAX_MS) return r;

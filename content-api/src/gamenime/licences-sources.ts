@@ -2,8 +2,8 @@
  * licences-sources.ts — Les lectures du module des licences (licences.ts) : AniList, IGDB et Wikidata.
  *
  * Plan validé par Rey le 22 octobre 2026 (licences-module-plan.md, § 6) :
- *  - AniList : le limiteur commun de l'API (tourAniList, dates-animes.ts : 2,1 s entre deux requêtes de la Phase B,
- *    du contrôle J-7 et des dates, et la même suspension après un 429), plus 4 s au moins entre deux requêtes de ce
+ *  - AniList : la file commune de l'API (tourAniList, file-anilist.ts : 2,5 s au moins entre deux départs, tous modules
+ *    confondus, et la même suspension après un 429), plus 4 s au moins entre deux requêtes de ce
  *    module ; rien de h:54 à h:05 (n8n interroge AniList de h:56 à h:04) ; un plafond de requêtes ; arrêt immédiat si
  *    AniList a suspendu son API (403 « temporarily disabled »).
  *  - IGDB : la fonction commune de l'API (igdbFetch, twitch.ts) : le jeton Twitch partagé, aucun nouveau jeton ;

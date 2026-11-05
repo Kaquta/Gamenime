@@ -10,7 +10,10 @@ import HeroHeader from "../components/HeroHeader.astro";
       <h1 class="auth-card__title">Créer un compte</h1>
       <p class="auth-card__subtitle">Rejoins GameNime pour suivre tes anime et jeux favoris</p>
 
-      <div id="authError" class="auth-card__error hidden"></div>
+      <div id="authError" class="auth-card__error hidden" role="alert"></div>
+
+      <!-- Google et Discord (patch du 4 novembre 2026, copie de la maquette validée) : tout passe par l'API -->
+      <div class="auth-social"><a class="auth-social__btn auth-social__btn--google" href="/api/auth/google?depuis=register" data-fournisseur="google"><span class="auth-social__logo" aria-hidden="true"><img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjEwIDEwIDIwIDIwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxtYXNrIGlkPSJtYXNrMF8xMjk4XzEyNTEwIiBzdHlsZT0ibWFzay10eXBlOmFscGhhIiBtYXNrVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTI5LjM5ODcgMTguMTgxNEgxOS45ODQ5VjIyLjA0NDVIMjUuMzU5OEMyNS4xMjg2IDIzLjI5NCAyNC40Mjk0IDI0LjM1OTYgMjMuMzY3NiAyNS4wNzEyQzIyLjQ3NDYgMjUuNjcxNiAyMS4zMjY2IDI2LjAyMTEgMTkuOTg0OSAyNi4wMjExQzE3LjM4NjQgMjYuMDIxMSAxNS4xODIzIDI0LjI2NjYgMTQuMzk0NyAyMS45MDA0QzE0LjE5NTIgMjEuMjk4OSAxNC4wODUzIDIwLjY1OTkgMTQuMDg1MyAxOS45OTgzQzE0LjA4NTMgMTkuMzM2NyAxNC4xOTUyIDE4LjY5NjYgMTQuMzk0NyAxOC4wOTYyQzE1LjE4MjMgMTUuNzMxMSAxNy4zODY0IDEzLjk3NTUgMTkuOTg0OSAxMy45NzU1QzIxLjQ1MjQgMTMuOTc1NSAyMi43NjcgMTQuNDgxNiAyMy44MDM5IDE1LjQ3MTNMMjYuNjY1MyAxMi42MDU3QzI0LjkzNiAxMC45OTA4IDIyLjY3ODYgMTAgMTkuOTg0OSAxMEMxNi4wODMyIDEwIDEyLjcwNSAxMi4yNDE0IDExLjA2MTggMTUuNTA3NkMxMC4zODMgMTYuODU5MiAxMCAxOC4zODM0IDEwIDE5Ljk5OTRDMTAgMjEuNjE1NSAxMC4zODMgMjMuMTM5NiAxMS4wNjE4IDI0LjQ5MTNDMTIuNzA1IDI3Ljc1OTcgMTYuMDgzMiAzMCAxOS45ODQ5IDMwQzIyLjY3OTcgMzAgMjQuOTQ4NSAyOS4xMTM3IDI2LjYwMTggMjcuNTg2MUMyOC40ODg3IDI1Ljg0NTIgMjkuNTczMiAyMy4yNzAyIDI5LjU3MzIgMjAuMjI3NUMyOS41NzMyIDE5LjUxODIgMjkuNTEzMSAxOC44MzUgMjkuMzk4NyAxOC4xODI1VjE4LjE4MTRaIiBmaWxsPSIjRTk0RkZGIi8+PC9tYXNrPjxnIG1hc2s9InVybCgjbWFzazBfMTI5OF8xMjUxMCkiPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIwX2ZfMTI5OF8xMjUxMCkiPjxnIGNsaXAtcGF0aD0idXJsKCNwYWludDBfYW5ndWxhcl8xMjk4XzEyNTEwX2NsaXBfcGF0aCkiPjxnIHRyYW5zZm9ybT0ibWF0cml4KDAuMDA4MDQxMjkgLTAuMDA4MDUxODYgMC4wMDgwNDEyOCAwLjAwODA1MTg2IDE5LjY4MTkgMTkuNzkyNykiPjxmb3JlaWduT2JqZWN0IHg9Ii0yMTA1LjY0IiB5PSItMjEwNS42NCIgd2lkdGg9IjQyMTEuMjkiIGhlaWdodD0iNDIxMS4yOSI+PGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImJhY2tncm91bmQ6Y29uaWMtZ3JhZGllbnQoZnJvbSA5MGRlZyxyZ2JhKDI1NSwgNzAsIDY1LCAxKSAwZGVnLHJnYmEoMjU1LCA3MCwgNjUsIDEpIDQuMTQ1NTVkZWcscmdiYSg0OSwgMTM0LCAyNTUsIDEpIDM5LjE1NGRlZyxyZ2JhKDQ5LCAxMzQsIDI1NSwgMSkgNzIuMDA0NGRlZyxyZ2JhKDAsIDE2NSwgMTgzLCAxKSA5Ni43NDYzZGVnLHJnYmEoMTQsIDE4OCwgOTUsIDEpIDEyMC44OTdkZWcscmdiYSgxNCwgMTg4LCA5NSwgMSkgMTU0LjcyMmRlZyxyZ2JhKDEwOCwgMTk2LCAwLCAxKSAxNzkuMTM2ZGVnLHJnYmEoMjU1LCAyMDQsIDAsIDEpIDIwMy41ODhkZWcscmdiYSgyNTUsIDIxMSwgMjAsIDEpIDIyNi45MTVkZWcscmdiYSgyNTUsIDIwNCwgMCwgMSkgMjUxLjY4OGRlZyxyZ2JhKDI1NSwgMTA2LCA0MywgMSkgMjczLjEyOWRlZyxyZ2JhKDI1MywgNzAsIDY1LCAxKSAyODkuMzA1ZGVnLHJnYmEoMjU1LCA3MCwgNjUsIDEpIDM1OS41OTNkZWcscmdiYSgyNTUsIDcwLCA2NSwgMSkgMzYwZGVnKTtoZWlnaHQ6MTAwJTt3aWR0aDoxMDAlO29wYWNpdHk6MSI+PC9kaXY+PC9mb3JlaWduT2JqZWN0PjwvZz48L2c+PC9nPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIxX2ZfMTI5OF8xMjUxMCkiPjxlbGxpcHNlIGN4PSIyMC4wNDk2IiBjeT0iMjAuMjQxMyIgcng9IjUuMzk2MzQiIHJ5PSIyLjgzNTM3IiB0cmFuc2Zvcm09InJvdGF0ZSgyNC40NDczIDIwLjA0OTYgMjAuMjQxMykiIGZpbGw9IiMzMTg2RkYiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjJfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjMzLjM1MzgiIGN5PSIxOC4yMTU1IiByeD0iNy40MzkxOCIgcnk9IjMuMDkzNTciIGZpbGw9IiMzMTg2RkYiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjNfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI1LjI3NDQiIGN5PSIxNi4yMTk1IiByeD0iNy40MDg1NCIgcnk9IjIuMzc4MDUiIGZpbGw9IiNGRjQ2NDEiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjRfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI5LjU0MjciIGN5PSIxMi45MjY4IiByeD0iNy40MDg1NCIgcnk9IjIuMzc4MDUiIGZpbGw9IiNGRjVCOEIiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjVfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI0LjQ4MTciIGN5PSIxOS44NzgiIHJ4PSI4LjUwNjEiIHJ5PSIzLjEwOTc2IiBmaWxsPSIjMzE4NkZGIi8+PC9nPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXI2X2ZfMTI5OF8xMjUxMCkiPjxlbGxpcHNlIGN4PSIyNS4xODQyIiBjeT0iMTQuMDE5NyIgcng9IjQuNTM4ODIiIHJ5PSIyLjM3ODA1IiB0cmFuc2Zvcm09InJvdGF0ZSgtMjguNjU5OSAyNS4xODQyIDE0LjAxOTcpIiBmaWxsPSIjRkY0NjQxIi8+PC9nPjwvZz48ZGVmcz48ZmlsdGVyIGlkPSJmaWx0ZXIwX2ZfMTI5OF8xMjUxMCIgeD0iNS4yNTkyMiIgeT0iNC45MDY2OCIgd2lkdGg9IjI5LjczODEiIGhlaWdodD0iMjkuNzcyIiBmaWx0ZXJVbml0cz0idXNlclNwYWNlT25Vc2UiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiI+PGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz48ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluPSJTb3VyY2VHcmFwaGljIiBpbjI9IkJhY2tncm91bmRJbWFnZUZpeCIgcmVzdWx0PSJzaGFwZSIvPjxmZUdhdXNzaWFuQmx1ciBzdGREZXZpYXRpb249IjEiIHJlc3VsdD0iZWZmZWN0MV9mb3JlZ3JvdW5kQmx1cl8xMjk4XzEyNTEwIi8+PC9maWx0ZXI+PGNsaXBQYXRoIGlkPSJwYWludDBfYW5ndWxhcl8xMjk4XzEyNTEwX2NsaXBfcGF0aCI+PHBhdGggZD0iTTcuMjU5MjIgMTkuNzkyN0M3LjI1OTIyIDEyLjY3NTkgMTMuMDIwOSA2LjkwNjY4IDIwLjEyODMgNi45MDY2OEMyNy4yMzU3IDYuOTA2NjggMzIuOTk3MyAxMi42NzU5IDMyLjk5NzMgMTkuNzkyN0MzMi45OTczIDI2LjkwOTQgMjcuMjM1NyAzMi42Nzg2IDIwLjEyODMgMzIuNjc4NkMxMy4wMjA5IDMyLjY3ODYgNy4yNTkyMSAyNi45MDk0IDcuMjU5MjIgMTkuNzkyN1oiLz48L2NsaXBQYXRoPjxmaWx0ZXIgaWQ9ImZpbHRlcjFfZl8xMjk4XzEyNTEwIiB4PSIxMi45OTc3IiB5PSIxNC44MjgiIHdpZHRoPSIxNC4xMDM4IiBoZWlnaHQ9IjEwLjgyNjUiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXIyX2ZfMTI5OF8xMjUxMCIgeD0iMjMuOTE0NiIgeT0iMTMuMTIxOSIgd2lkdGg9IjE4Ljg3ODQiIGhlaWdodD0iMTAuMTg3MSIgZmlsdGVyVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZUZsb29kIGZsb29kLW9wYWNpdHk9IjAiIHJlc3VsdD0iQmFja2dyb3VuZEltYWdlRml4Ii8+PGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJCYWNrZ3JvdW5kSW1hZ2VGaXgiIHJlc3VsdD0ic2hhcGUiLz48ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIxIiByZXN1bHQ9ImVmZmVjdDFfZm9yZWdyb3VuZEJsdXJfMTI5OF8xMjUxMCIvPjwvZmlsdGVyPjxmaWx0ZXIgaWQ9ImZpbHRlcjNfZl8xMjk4XzEyNTEwIiB4PSIxNS44NjU5IiB5PSIxMS44NDE1IiB3aWR0aD0iMTguODE3MSIgaGVpZ2h0PSI4Ljc1NjEiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXI0X2ZfMTI5OF8xMjUxMCIgeD0iMjAuMTM0MSIgeT0iOC41NDg3OCIgd2lkdGg9IjE4LjgxNzEiIGhlaWdodD0iOC43NTYxIiBmaWx0ZXJVbml0cz0idXNlclNwYWNlT25Vc2UiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiI+PGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz48ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluPSJTb3VyY2VHcmFwaGljIiBpbjI9IkJhY2tncm91bmRJbWFnZUZpeCIgcmVzdWx0PSJzaGFwZSIvPjxmZUdhdXNzaWFuQmx1ciBzdGREZXZpYXRpb249IjEiIHJlc3VsdD0iZWZmZWN0MV9mb3JlZ3JvdW5kQmx1cl8xMjk4XzEyNTEwIi8+PC9maWx0ZXI+PGZpbHRlciBpZD0iZmlsdGVyNV9mXzEyOThfMTI1MTAiIHg9IjEzLjk3NTYiIHk9IjE0Ljc2ODMiIHdpZHRoPSIyMS4wMTIyIiBoZWlnaHQ9IjEwLjIxOTUiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXI2X2ZfMTI5OF8xMjUxMCIgeD0iMTkuMDQwNCIgeT0iOS4wMDQxOSIgd2lkdGg9IjEyLjI4NzgiIGhlaWdodD0iMTAuMDMwOSIgZmlsdGVyVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZUZsb29kIGZsb29kLW9wYWNpdHk9IjAiIHJlc3VsdD0iQmFja2dyb3VuZEltYWdlRml4Ii8+PGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJCYWNrZ3JvdW5kSW1hZ2VGaXgiIHJlc3VsdD0ic2hhcGUiLz48ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIxIiByZXN1bHQ9ImVmZmVjdDFfZm9yZWdyb3VuZEJsdXJfMTI5OF8xMjUxMCIvPjwvZmlsdGVyPjwvZGVmcz48L3N2Zz4=" alt="" width="20" height="20"></span>Continuer avec Google</a><a class="auth-social__btn auth-social__btn--discord" href="/api/auth/discord?depuis=register" data-fournisseur="discord"><span class="auth-social__logo" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/></svg></span>Continuer avec Discord</a></div><div class="auth-sep">ou avec ton e-mail</div>
 
       <div class="auth-card__field">
         <label for="regName">Pseudo</label>
@@ -30,46 +33,167 @@ import HeroHeader from "../components/HeroHeader.astro";
       <button id="registerBtn" class="auth-card__btn" type="button">Créer mon compte</button>
 
       <p class="auth-card__switch">
-        Déjà un compte ? <a href="/signin">Se connecter</a>
+        Déjà un compte ? <a href="/signin" id="lienConnexion">Se connecter</a>
       </p>
+      <p class="auth-legal">En créant ton compte, tu acceptes les <a href="/cgu">conditions d'utilisation</a> et la <a href="/confidentialite">politique de confidentialité</a>.</p>
     </div>
   </div>
 </BaseLayout>
 
 <script>
   var apiBase = "/api";
-  var nameInput = document.getElementById("regName");
-  var emailInput = document.getElementById("regEmail");
-  var passwordInput = document.getElementById("regPassword");
-  var registerBtn = document.getElementById("registerBtn");
+  var nameInput = document.getElementById("regName") as HTMLInputElement | null;
+  var emailInput = document.getElementById("regEmail") as HTMLInputElement | null;
+  var passwordInput = document.getElementById("regPassword") as HTMLInputElement | null;
+  var registerBtn = document.getElementById("registerBtn") as HTMLButtonElement | null;
   var errorDiv = document.getElementById("authError");
+  var NOMS: Record<string, string> = { google: "Google", discord: "Discord" };
 
-  function showError(msg) {
+  // ── où revenir une fois le compte créé : ?retour=… (un chemin du site), sinon la page d'où l'on vient, sinon l'accueil ──
+  function cheminSur(v: any) {
+    return typeof v === "string" && v.length <= 300 && v.charAt(0) === "/" && v.charAt(1) !== "/" && !/[\\\u0000-\u001f\u007f]/.test(v) &&
+      !/^\/(signin|register)(\/|\?|#|$)/.test(v) ? v : null;
+  }
+  function retourDe() {
+    try { var p = cheminSur(new URL(location.href).searchParams.get("retour")); if (p) return p; } catch (e) {}
+    try {
+      if (document.referrer) {
+        var r = new URL(document.referrer);
+        if (r.origin === location.origin) { var c = cheminSur(r.pathname + r.search + r.hash); if (c) return c; }
+      }
+    } catch (e) {}
+    return "/";
+  }
+  var RETOUR = retourDe();
+  var SUITE = RETOUR !== "/" ? "&retour=" + encodeURIComponent(RETOUR) : "";
+  var lienConnexion = document.getElementById("lienConnexion") as HTMLAnchorElement | null;
+  if (lienConnexion && RETOUR !== "/") lienConnexion.href = "/signin?retour=" + encodeURIComponent(RETOUR);
+
+  function showError(html: string) {
     if (!errorDiv) return;
-    errorDiv.textContent = msg;
+    errorDiv.innerHTML = html;
     errorDiv.classList.remove("hidden");
   }
+  function hideError() { if (errorDiv) { errorDiv.classList.add("hidden"); errorDiv.innerHTML = ""; } }
+  function esc(s: any) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" } as any)[c]; }); }
+  // l'erreur sous le bon champ
+  function champKo(input: HTMLInputElement | null, msg: string) {
+    if (!input) return;
+    input.classList.add("champ-ko");
+    var p = input.nextElementSibling;
+    if (!p || !p.classList.contains("champ-msg")) { p = document.createElement("p"); p.className = "champ-msg"; input.insertAdjacentElement("afterend", p); }
+    p.textContent = msg;
+  }
+  function champOk(input: HTMLInputElement | null) {
+    if (!input) return;
+    input.classList.remove("champ-ko");
+    var p = input.nextElementSibling;
+    if (p && p.classList.contains("champ-msg")) p.remove();
+  }
+  [nameInput, emailInput, passwordInput].forEach(function (i) { if (i) i.addEventListener("input", function () { champOk(i); }); });
 
+  // ── Google et Discord : le bouton dit ce qui se passe ──
+  var sociaux = Array.prototype.slice.call(document.querySelectorAll(".auth-social__btn")) as HTMLAnchorElement[];
+  sociaux.forEach(function (a) {
+    var f = a.dataset.fournisseur || "";
+    a.href = apiBase + "/auth/" + f + "?depuis=register" + SUITE;
+    a.addEventListener("click", function () {
+      var t = a.lastChild;
+      if (t) t.textContent = "Ouverture de " + NOMS[f] + "…";
+      a.classList.add("est-en-cours");
+    });
+  });
+  function remettreSociaux() {
+    sociaux.forEach(function (a) {
+      a.classList.remove("est-en-cours");
+      var t = a.lastChild;
+      if (t) t.textContent = "Continuer avec " + NOMS[a.dataset.fournisseur || ""];
+    });
+  }
+  window.addEventListener("pageshow", function (e) { if (e.persisted) { remettreSociaux(); finEnvoi(); } });
+
+  // ── ce que l'API annonce quand Google ou Discord n'a pas abouti (?erreur=<code>-<fournisseur>) ──
+  (function () {
+    try {
+      var u = new URL(location.href), g = u.searchParams.get("erreur");
+      if (g === null) return;
+      u.searchParams.delete("erreur");
+      history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+      var m = /^(annule|echec|email|indisponible|trop)-(google|discord)$/.exec(g);
+      if (!m) return;
+      var f = NOMS[m[2]];
+      var MSG: Record<string, string> = {
+        annule: "Connexion avec " + f + " annulée : rien n'a été changé.",
+        echec: "La connexion avec " + f + " n'a pas abouti. Réessaie dans un instant.",
+        email: m[2] === "discord" ? "Ton compte Discord n'a pas d'e-mail vérifié. Vérifie-le dans Discord, ou crée ton compte avec ton e-mail."
+                                  : "Ton adresse Google n'est pas vérifiée. Vérifie-la chez Google, ou crée ton compte avec ton e-mail.",
+        indisponible: "La connexion avec " + f + " n'est pas encore disponible : utilise ton e-mail.",
+        trop: "Trop d'essais : réessaie dans 15 minutes."
+      };
+      showError(esc(MSG[m[1]]));
+    } catch (e) {}
+  })();
+
+  // ── avec l'e-mail ──
+  function finEnvoi() {
+    if (!registerBtn) return;
+    registerBtn.disabled = false;
+    registerBtn.classList.remove("est-en-cours");
+    registerBtn.textContent = "Créer mon compte";
+  }
+  var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var CHAMPS: Record<string, HTMLInputElement | null> = { displayName: nameInput, email: emailInput, password: passwordInput };
+  var INVALIDE: Record<string, string> = { displayName: "Ce pseudo n'est pas valide.", email: "Cette adresse e-mail n'est pas valide.", password: "Ce mot de passe n'est pas valide." };
   async function doRegister() {
-    var name = nameInput ? nameInput.value.trim() : "";
+    if (!registerBtn || registerBtn.disabled) return;
+    var name = nameInput ? nameInput.value.trim().replace(/\s+/g, " ") : "";
     var email = emailInput ? emailInput.value.trim() : "";
     var password = passwordInput ? passwordInput.value : "";
-    if (!email || !password) { showError("Remplis tous les champs obligatoires."); return; }
-    if (password.length < 8) { showError("Le mot de passe doit faire 8 caractères minimum."); return; }
+    hideError(); champOk(nameInput); champOk(emailInput); champOk(passwordInput);
+    var bon = true;
+    if (name && name.length < 2) { champKo(nameInput, "Ton pseudo doit faire au moins 2 caractères."); bon = false; }
+    else if (name.length > 80) { champKo(nameInput, "Ton pseudo doit faire 80 caractères au plus."); bon = false; }
+    if (!email) { champKo(emailInput, "Saisis ton e-mail."); bon = false; }
+    else if (!EMAIL.test(email) || email.length > 190) { champKo(emailInput, "Cette adresse e-mail n'est pas valide."); bon = false; }
+    if (!password) { champKo(passwordInput, "Choisis un mot de passe."); bon = false; }
+    else if (password.length < 8) { var n = 8 - password.length; champKo(passwordInput, "8 caractères minimum : il en manque " + n + "."); bon = false; }
+    else if (password.length > 100) { champKo(passwordInput, "100 caractères au plus."); bon = false; }
+    if (!bon) return;
 
+    registerBtn.disabled = true;
+    registerBtn.classList.add("est-en-cours");
+    registerBtn.textContent = "Création…";
     try {
-      registerBtn.disabled = true;
-      registerBtn.textContent = "Création...";
       var res = await fetch(apiBase + "/auth/register", {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ email: email, password: password, displayName: name || null })
       });
-      var data = await res.json();
-      if (!res.ok) { showError(data.error || "Erreur d'inscription"); registerBtn.disabled = false; registerBtn.textContent = "Créer mon compte"; return; }
-      window.location.href = "/";
+      var data: any = await res.json().catch(function () { return {}; });
+      if (res.ok && data && data.ok) {
+        if ((window as any).gnRetourPlusTard) (window as any).gnRetourPlusTard("Bienvenue sur GameNime", { detail: "Confirme ton e-mail avec le lien qu'on vient de t'envoyer" });
+        window.location.href = RETOUR;
+        return;
+      }
+      finEnvoi();
+      if (res.status === 409) {
+        showError(esc(data.error || "Un compte existe déjà avec cet e-mail.") + ' <a href="' + esc(lienConnexion ? lienConnexion.getAttribute("href") : "/signin") + '">Se connecter</a>');
+      } else if (res.status === 400) {
+        // le champ refusé, d'après la réponse de l'API
+        var vus = 0;
+        (Array.isArray(data.details) ? data.details : []).forEach(function (d: any) {
+          var k = d && d.path && d.path[0];
+          if (k && CHAMPS[k]) { champKo(CHAMPS[k], INVALIDE[k]); vus++; }
+        });
+        if (!vus) showError(esc("Vérifie les champs : une valeur n'est pas valide."));
+      } else if (res.status === 429) {
+        showError(esc(data.error || "Trop de tentatives. Réessaie dans 15 minutes."));
+      } else {
+        showError(esc("Le serveur ne répond pas. Réessaie dans un instant."));
+      }
     } catch (e) {
-      showError("Impossible de créer le compte."); registerBtn.disabled = false; registerBtn.textContent = "Créer mon compte";
+      finEnvoi();
+      showError(esc("Le serveur ne répond pas. Réessaie dans un instant."));
     }
   }
 

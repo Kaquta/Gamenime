@@ -39,6 +39,8 @@ import {
   sansBonusEurope,
   sortByDate,
   getReleaseWindow,
+  estSorti,
+  estAVenir,
   isMissing,
   normalizeTitle,
   computeFieldCount,
@@ -85,80 +87,16 @@ function buildWideDateFilter(now: Date = new Date()): { start: string; end: stri
  */
 type ReleaseStatus = "released" | "upcoming" | "all";
 
-/**
- * Return true if the game has at least one DLC in the [start, end] window.
- * Used to keep older games that have a fresh DLC in the current window.
- * Safe against malformed JSON.
- */
-function hasDlcInWindow(
-  dlcsJson: string | null | undefined,
-  start: string,
-  end: string
-): boolean {
-  if (!dlcsJson) return false;
-  try {
-    const parsed = JSON.parse(dlcsJson);
-    if (!Array.isArray(parsed)) return false;
-    return parsed.some((dlc: any) => {
-      const d = dlc?.releaseDate;
-      return typeof d === "string" && d >= start && d <= end;
-    });
-  } catch {
-    return false;
-  }
-}
-
 function filterByStatus(
   items: GameNimeItem[],
   status: ReleaseStatus,
   now: Date = new Date()
 ): GameNimeItem[] {
   if (status === "all") return items;
-
-  const todayISO = now.toISOString().slice(0, 10);
-  const year = now.getUTCFullYear();
-  const windowStart = `${year}-01-01`;
-  const windowEnd = `${year + 1}-12-31`;
-
-  if (status === "released") {
-    return items.filter((i) => {
-      if (!i.releaseDate) return false;
-      // ETAT CLEAN: seule une date PRECISE (precision 'day') peut etre "sortie".
-      // year/month/null = on ne connait pas le JOUR exact (le 1er du mois stocke
-      // est une convention, pas une vraie date). Ces items restent en upcoming
-      // jusqu'a ce qu'une source fournisse le jour precis (precision 'day').
-      if (i.releasePrecision !== "day") return false;
-      const inWindow = i.releaseDate <= todayISO && i.releaseDate >= windowStart;
-      if (!inWindow && i.releaseDate < windowStart) {
-        // Older game/anime with a DLC released in the current window
-        return hasDlcInWindow(i.dlcs, windowStart, todayISO);
-      }
-      return inWindow;
-    });
-  }
-
-  if (status === "upcoming") {
-    return items.filter((i) => {
-      if (!i.releaseDate) return false;
-      // ETAT CLEAN: precision imprecise (year/month/null) = TOUJOURS a venir dans
-      // la fenetre, peu importe la date stockee (le 1er du mois/annee est une
-      // convention). On ne connait pas le jour exact => "Prevu [mois/annee]".
-      // Symetrique de released qui n'accepte QUE precision 'day'.
-      if (i.releasePrecision !== "day") {
-        return i.releaseDate >= windowStart && i.releaseDate <= windowEnd;
-      }
-      const inWindow = i.releaseDate > todayISO && i.releaseDate <= windowEnd;
-      // ETAT CLEAN: DLC fallback applies ONLY to games OUTSIDE current window
-      // (i.e. older games released BEFORE windowStart that have a DLC coming).
-      // A game already in the current window stays in 'released' only — its
-      // future Season Pass / DLC doesn't make the game itself 'upcoming'.
-      if (!inWindow && i.releaseDate < windowStart) {
-        return hasDlcInWindow(i.dlcs, todayISO, windowEnd);
-      }
-      return inWindow;
-    });
-  }
-
+  // La règle « sorti » / « à venir » (fenêtre de 3 ans, précision de la date, extensions) est dans core.ts (estSorti,
+  // estAVenir), écrite une seule fois pour les listes, les badges et le Top du moment (patch d'entretien, novembre 2026).
+  if (status === "released") return items.filter((i) => estSorti(i.releaseDate, i.releasePrecision, i.dlcs, now));
+  if (status === "upcoming") return items.filter((i) => estAVenir(i.releaseDate, i.releasePrecision, i.dlcs, now));
   return items;
 }
 
@@ -887,9 +825,11 @@ async function badgesOuRien(req: FastifyRequest): Promise<BadgesSite | null> {
     tableSemaine = prete;
     return prete;
   }
-  // les seuls champs de la semaine lus plus bas
+  // les seuls champs de la semaine lus plus bas, et ceux que lit suivi-favoris.ts pour annoncer un épisode aux abonnés :
+  // sorti ou pas (airingStatus), en retard (delayedFrom, delayedUntil), horaire des sous-titres ou japonais (airType)
   const compacter = (t: any[]) =>
-    t.map((a) => ({ route: a?.route ?? null, episodeDate: a?.episodeDate ?? null, episodeNumber: a?.episodeNumber ?? null, episodes: a?.episodes ?? null }));
+    t.map((a) => ({ route: a?.route ?? null, episodeDate: a?.episodeDate ?? null, episodeNumber: a?.episodeNumber ?? null, episodes: a?.episodes ?? null,
+      airingStatus: a?.airingStatus ?? null, airType: a?.airType ?? null, delayedFrom: a?.delayedFrom ?? null, delayedUntil: a?.delayedUntil ?? null }));
 
   function isoWeek(d: Date): { week: number; year: number } {
     const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

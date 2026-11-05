@@ -44,6 +44,13 @@
  *     premier Vampire Survivors est rangé par Wikidata dans les deux séries, et Vampire Crawlers est « d'après » lui) ;
  *     un nom d'un seul mot ne se lit qu'en tête du titre (« Warriors » ne passe pas devant « The Legend of Zelda » pour
  *     Hyrule Warriors).
+ * 12. règles 7 (Rey, 2 novembre) : pour un animé, la « série » Wikidata (P179) ne sert plus, ni comme clé ni pour le
+ *     passé : Wikidata y range aussi des cases de diffusion (Firefly Wedding et High School! Kimengumi, deux mangas
+ *     sans rapport, étaient réunis par la case Noitamina de Fuji TV, et Tsuritama entrait dans leur passé). Les jeux
+ *     gardent leurs séries. Contrôle à chaque passage : deux groupes d'animés d'œuvres d'origine différentes (mangas
+ *     AniList) ne sont réunis par une clé ou une franchise commune que si son nom se lit dans les titres de l'un d'eux ou
+ *     d'une fiche qui porte la clé ; sinon la réunion est refusée et notée, et ce nom ne nomme pas une licence dont les
+ *     titres ne le portent pas.
  * Les fiches à plusieurs franchises restent seules (la règle des parapluies, mesurée, est abandonnée : Rey, 22 octobre).
  * Ici, aucun accès à la base : les fiches arrivent du module, et le résultat lui est rendu.
  */
@@ -124,7 +131,7 @@ const motDuTitreVo = (vo: string, nom: string): boolean => {
 // ─────────────────────────────────────────────────────────────── règles
 
 /** Version des règles : le garde-fou contre une baisse anormale ne joue pas au premier passage d'une nouvelle version. */
-export const VERSION_REGLES = "6";
+export const VERSION_REGLES = "7";
 /** Seuils de popularité des repères : membres AniList pour un animé, notes IGDB pour un jeu. */
 export const SEUILS = { bas: { al: 5000, ig: 5 }, moyen: { al: 20000, ig: 20 } } as const;
 /** Repères montrés par le bloc d'une fiche. */
@@ -259,7 +266,9 @@ export interface Diagnostic {
   pontsNom: string[];
   pontsCatalogue: Array<{ licence: string; sens: "igdb" | "anilist"; nom: string; ajoutes: number; ambigu?: boolean }>;
   ambigusTitre: Array<{ dom: Dom; id: number; titre: string; nom: string }>;
-  refuses: Array<{ lien: string; cle: string; a: string; b: string }>;
+  /** Réunions refusées qui tiennent ; origine : par le contrôle des œuvres d'origine (règles 7), son id étant la clé et
+   *  les œuvres d'origine des deux licences (« wd:Q1|101|202 ») ; les autres : la paire de fiches (« anime:12|anime:40 »). */
+  refuses: Array<{ lien: string; cle: string; a: string; b: string; id: string; origine: boolean; paires: string[] }>;
   /** Clés IGDB ou Wikidata portées par plusieurs licences : sans passé. */
   partageesCles: string[];
 }
@@ -888,7 +897,9 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
       const l = lib(x);
       if (l) franchises[i].add(norm(l));
     }
-    for (const x of [...d.s, ...d.bs]) pose(i, "wd:" + x, "wd-serie");
+    // règles 7 : la série Wikidata d'un animé (ou de son œuvre d'origine) n'est pas une clé : Wikidata y range aussi des
+    // cases de diffusion (Noitamina). Celles des jeux restent (« The Legend of Zelda » est une série de jeux).
+    if (fiches[i].dom !== "anime") for (const x of [...d.s, ...d.bs]) pose(i, "wd:" + x, "wd-serie");
     for (const x of d.b) pose(i, "wd:" + x, "wd-origine");
   };
   const relations: Array<[number, number, string, string]> = [];
@@ -937,11 +948,46 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
     }
     return i;
   };
-  const refuses: Array<{ a: number; b: number; t: string; cle: string }> = [];
+  const refuses: Array<{ a: number; b: number; t: string; cle: string; k?: string; origine?: boolean }> = [];
+  /** Règles 7 : les clés dont une réunion a été refusée (œuvres d'origine différentes) : elles ne nomment une licence que
+   *  si ses titres portent leur nom. Refaites après les réunions : une réunion refusée puis faite par un autre chemin
+   *  (relation AniList, pont par le nom, franchise commune) ne conteste plus rien. */
+  const contestees = new Set<string>();
+  // règles 7 : les œuvres d'origine (mangas, AniList) de chaque groupe, suivies à chaque réunion. Deux groupes d'origines
+  // différentes ne sont réunis par une clé que si son nom (franchise, œuvre Wikidata) se lit dans les titres de l'un des
+  // deux ou d'une fiche qui porte la clé (« My Hero Academia: Vigilantes », autre manga, reste dans My Hero Academia ; une
+  // suite au seul titre japonais, « Mairimashita! Iruma-kun… », aussi) ; un nom lu dans aucun titre (Noitamina, une case
+  // de diffusion) ne réunit rien : la réunion est refusée et notée (Firefly Wedding et High School! Kimengumi). Les
+  // relations AniList ont leur propre règle (4 bis).
+  const origG = fiches.map((f) => new Set<number>(f.dom === "anime" && f.anilist ? (radarAl.get(f.anilist)?.rel || []).filter((e) => e.type === "SOURCE" && e.mtype === "MANGA").map((e) => e.id) : []));
+  const nomCompactCle = (cle: string): string | null => {
+    const n = cle.startsWith("wd:") ? lib(cle.slice(3)) : parCle.get(cle)?.nom ?? null;
+    const c = n ? norm(n).replace(/ /g, "") : "";
+    return c.length >= 3 ? c : null;
+  };
+  /** Le nom (compact) se lit dans le titre ou le titre original d'une fiche. */
+  const titrePorte = (i: number, c: string): boolean => [fiches[i].titre, fiches[i].titreVo].some((x) => !!x && norm(x).replace(/ /g, "").includes(c));
+  const porteLeNom = (r: number, c: string): boolean => fiches.some((_, i) => racine(i) === r && titrePorte(i, c));
+  /** Les titres (anglais, romaji) des œuvres d'origine, compacts : « Case Closed » se lit dans le titre anglais du manga
+   *  Meitantei Conan, pas dans celui de l'animé. */
+  const titresOrigine = new Map<number, string[]>();
+  for (const f of fiches) if (f.dom === "anime" && f.anilist) for (const e of radarAl.get(f.anilist)?.rel || []) {
+    if (e.type === "SOURCE" && e.mtype === "MANGA" && !titresOrigine.has(e.id)) titresOrigine.set(e.id, [e.titre, e.romaji].filter((x): x is string => !!x).map((x) => norm(x).replace(/ /g, "")));
+  }
+  const origineLeNom = (r: number, c: string): boolean => [...origG[r]].some((m) => (titresOrigine.get(m) || []).some((t) => t.includes(c)));
+  const originesDifferentes = (x: number, y: number, t: string, cle: string): boolean => {
+    if (t === "anilist-relation" || origG[x].size === 0 || origG[y].size === 0 || [...origG[x]].some((v) => origG[y].has(v))) return false;
+    // le nom se lit dans les titres de l'un des deux groupes ou de leurs œuvres d'origine, ou d'une fiche qui porte la
+    // clé : l'ordre des réunions n'y change rien (une suite au seul titre japonais rejoint sa franchise même si elle passe
+    // avant la saison au titre anglais)
+    const c = nomCompactCle(cle);
+    return !(c && (porteLeNom(x, c) || porteLeNom(y, c) || origineLeNom(x, c) || origineLeNom(y, c) || (parCle.get(cle)?.fiches || []).some((i) => titrePorte(i, c))));
+  };
   const unirRacines = (x: number, y: number) => {
     const [p, e] = x < y ? [x, y] : [y, x];
     parent[e] = p;
     idG[p] = reduire([...idG[p], ...idG[e]]);
+    for (const v of origG[e]) origG[p].add(v);
   };
   const unir = (a: number, b: number, t: string, cle: string): void => {
     if (multi.has(a) || multi.has(b)) return;
@@ -951,9 +997,15 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
       refuses.push({ a, b, t, cle });
       return;
     }
+    if (originesDifferentes(x, y, t, cle)) {
+      refuses.push({ a, b, t, cle: `${nomCle(cle)} : œuvres d'origine différentes`, k: cle, origine: true });
+      contestees.add(cle);
+      return;
+    }
     unirRacines(x, y);
   };
   const parCle = new Map<string, { k: string; t: string; nom: string | null; fiches: number[] }>();
+  const nomCle = (cle: string): string => asc((cle.startsWith("wd:") ? lib(cle.slice(3)) : parCle.get(cle)?.nom) || cle);
   cles.forEach((m, i) => {
     for (const c of m.values()) {
       let pc = parCle.get(c.k);
@@ -1205,9 +1257,17 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
       nb.set(nom, (nb.get(nom) || 0) + 1);
     };
     let franchise = false;
+    // règles 7 : une clé contestée (réunion refusée) ne nomme la licence que si ses titres portent son nom
+    const titresC = membres.flatMap((i) => [fiches[i].titre, fiches[i].titreVo]).filter((x): x is string => !!x).map((x) => norm(x).replace(/ /g, ""));
+    const nommeMal = (k: string): boolean => {
+      if (!contestees.has(k)) return false;
+      const c = nomCompactCle(k);
+      return !c || !titresC.some((t) => t.includes(c));
+    };
     for (const i of membres) {
       vus = new Set<string>();
       for (const c of cles[i].values()) {
+        if (nommeMal(c.k)) continue;
         const q = c.k.startsWith("wd:") ? c.k.slice(3) : null;
         if (c.t === "wd-franchise") {
           pousse(lib(q), 6);
@@ -1221,7 +1281,7 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
       }
     }
     vus = new Set<string>();
-    if (!franchise && r != null) for (const [q, k] of frPasse.get(r) || []) if (k >= 2 && lib(q)) pousse(lib(q), 4);
+    if (!franchise && r != null) for (const [q, k] of frPasse.get(r) || []) if (k >= 2 && lib(q) && !nommeMal("wd:" + q)) pousse(lib(q), 4);
     // à rang et nombre de fiches égaux, le nom qui se lit dans les titres des fiches de la licence (règles 6, Rey, 23
     // octobre : « Vampire Survivors », pas « Survivaton », la série Wikidata de leur œuvre d'origine), puis l'ordre
     // alphabétique
@@ -1620,6 +1680,13 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
     const reunir = (a: number, b: number, q: string) => {
       const x = racine(a), y = racine(b);
       if (x === y || !compatibles(idG[x], idG[y])) return;
+      // règles 7 : le même contrôle qu'aux clés (étape 4) : œuvres d'origine différentes et nom de la franchise lu dans
+      // aucun de leurs titres : pas de réunion
+      if (originesDifferentes(x, y, "wd-franchise", "wd:" + q)) {
+        refuses.push({ a: x, b: y, t: "wd-franchise", cle: `${nomCle("wd:" + q)} : œuvres d'origine différentes`, k: "wd:" + q, origine: true });
+        contestees.add("wd:" + q);
+        return;
+      }
       const noms = [titreDe(x), titreDe(y)];
       unirRacines(x, y);
       diag.reunies.push({ noms, franchise: lib(q) || q });
@@ -1751,6 +1818,9 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
     G = groupesDe();
     for (const m of G.values()) m.sort((a, b) => String(fiches[a].date || "9").localeCompare(String(fiches[b].date || "9")));
     nomsT.clear();
+    // règles 7 : les réunions sont faites ; une clé reste contestée si l'une de ses réunions refusées tient encore
+    contestees.clear();
+    for (const x of refuses) if (x.origine && x.k && racine(x.a) !== racine(x.b)) contestees.add(x.k);
     // à égale distance de deux licences : à la licence réunie si elles le sont maintenant, sinon à aucune
     for (const x of egauxR) {
       const rs = uniq(x.rs.map(racine));
@@ -2298,7 +2368,23 @@ export async function calculerLicences(ctx: Contexte): Promise<Calcul> {
       ...(nom !== nomAvant ? { nomRepli: nomAvant } : {}),
     });
   }
-  diag.refuses = refuses.map((x) => ({ lien: x.t, cle: x.cle, a: asc(fiches[x.a].titre || ""), b: asc(fiches[x.b].titre || "") }));
+  // les refus qui tiennent : deux fiches réunies quand même par un autre chemin ne sont pas un refus. Un refus du contrôle
+  // des origines (règles 7) a pour identifiant la clé et les œuvres d'origine des deux licences (le même d'une saison à
+  // l'autre, quelle que soit la fiche en tête) ; les autres, la paire de fiches. Une ligne par identifiant et par raison.
+  const vusRefus = new Set<string>();
+  const sigOrigines = (i: number): string => [...origG[racine(i)]].sort((p, q) => p - q).join(",");
+  // les paires (clé, œuvre d'origine de chaque côté) d'un refus du contrôle : un refus n'est « nouveau » que si aucune
+  // n'était notée (une suite d'un autre manga qui entre ou sort du radar ne le fait pas revenir)
+  const pairesOrigines = (k: string, a: number, b: number): string[] => {
+    const out: string[] = [];
+    for (const u of origG[racine(a)]) for (const v of origG[racine(b)]) out.push(`${k}|${Math.min(u, v)}|${Math.max(u, v)}`);
+    return out;
+  };
+  diag.refuses = refuses.filter((x) => racine(x.a) !== racine(x.b)).map((x) => ({
+    lien: x.t, cle: x.cle, a: asc(fiches[x.a].titre || ""), b: asc(fiches[x.b].titre || ""), origine: !!x.origine,
+    id: x.origine && x.k ? `${x.k}|${[sigOrigines(x.a), sigOrigines(x.b)].sort().join("|")}` : [x.a, x.b].map((i) => `${fiches[i].dom}:${fiches[i].id}`).sort().join("|"),
+    paires: x.origine && x.k ? pairesOrigines(x.k, x.a, x.b) : [],
+  })).filter((x) => !vusRefus.has(`${x.id} ${x.cle}`) && !!vusRefus.add(`${x.id} ${x.cle}`));
   // le diagnostic suit les noms définitifs (il a été écrit en route, avec les noms d'alors) : un nom donné en route
   // devient celui de la licence qui a pris ses fiches (réunions, nom de l'œuvre principale) ; porté en route par des
   // licences qui ont fini sous des noms différents, il reste tel quel. Deux licences réunies depuis ne sont plus «

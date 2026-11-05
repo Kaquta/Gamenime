@@ -8,6 +8,9 @@
  * Mêmes fonctions, mêmes paramètres et mêmes sujets qu'avant : seul le rendu change.
  */
 
+// Le N°1 de l'en-tête, joint à l'e-mail (email-n1.ts, 5 novembre 2026)
+import { N1_CID } from "./email-n1.js";
+
 const SITE_NAME = "GameNime";
 const SITE_URL = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
 // Adresse de contact du pied (« Une question ? »), et non l'adresse d'envoi (noreply@).
@@ -45,6 +48,7 @@ const C = {
   braiseFonce: "#d7501e",
   braisePlein: "#eb7635", // Outlook ne lit pas les degrades : la couleur du milieu
   surBraise: "#0e0e12",
+  n1Fond: "#17110c", // le fond du N°1 braise : la case le garde si l'image ne s'affiche pas
 };
 const DEGRADE = `linear-gradient(180deg, ${C.braise} 0%, ${C.braiseFonce} 100%)`;
 const POLICE = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
@@ -108,13 +112,15 @@ function wrap(title: string, apercu: string, contentHtml: string): string {
 }
 
 /**
- * La marque du site : le sceau 新 en braise, GameNime, ゲームニメ à la verticale, et la devise entre deux filets.
+ * La marque du site : le N°1 de l'en-tête du site (version braise, image jointe à l'e-mail : email-n1.ts),
+ * GameNime, ゲームニメ à la verticale, et la devise entre deux filets. Si l'image ne s'affiche pas : 新 en braise
+ * sur le fond sombre du N°1.
  */
 function marque(): string {
   const kana = ["ゲ", "｜", "ム", "ニ", "メ"].join("<br/>");
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center">
                 <tr>
-                  <td width="46" height="46" align="center" valign="middle" bgcolor="${C.braisePlein}" style="width:46px;height:46px;border-radius:23px;background:${C.braisePlein};background-image:${DEGRADE};font-family:${POLICE_JP};font-size:22px;font-weight:700;line-height:46px;color:${C.surBraise};text-align:center;">新</td>
+                  <td width="46" height="46" align="center" valign="middle" bgcolor="${C.n1Fond}" style="width:46px;height:46px;border-radius:23px;background:${C.n1Fond};font-size:0;line-height:0;"><img src="cid:${N1_CID}" width="46" height="46" alt="新" style="display:block;width:46px;height:46px;border:0;outline:none;text-decoration:none;border-radius:23px;color:${C.lien};font-family:${POLICE_JP};font-size:22px;font-weight:700;line-height:46px;text-align:center;"/></td>
                   <td class="gn-marque" style="padding:0 12px 0 13px;font-family:${POLICE_TITRE};font-size:34px;font-weight:700;line-height:1;letter-spacing:-0.5px;color:${C.marque};white-space:nowrap;">${SITE_NAME}</td>
                   <td aria-hidden="true" style="border-left:1px solid ${C.kanaFil};padding:0 0 0 9px;font-family:${POLICE_JP};font-size:9px;font-weight:700;line-height:10px;color:${C.kana};text-align:center;">${kana}</td>
                 </tr>

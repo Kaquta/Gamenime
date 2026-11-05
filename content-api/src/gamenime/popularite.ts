@@ -39,6 +39,7 @@ import { setInterval, setTimeout } from "node:timers";
 import { pushActivity, trackLastRun } from "./dashboard.js";
 import { planifier } from "./pilotage.js";
 import type { Journal, SqlPool } from "./presse.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 const PREMIER_PASSAGE_MS = 25 * 60 * 1000;
 const PASSAGE_MS = 3 * 60 * 60 * 1000;
@@ -84,6 +85,7 @@ const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Popularité et note de 50 animes au plus. Lève une erreur sur un 429, une erreur HTTP ou une réponse illisible. */
 export async function pagePopularite(cfg: PopulariteConfig, ids: number[]): Promise<Map<number, ValeursAnilist>> {
   const query = "query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids, type: ANIME) { id popularity averageScore } } }";
+  await tourAniList(); // la file AniList commune (file-anilist.ts)
   const r = await fetch(cfg.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
@@ -91,6 +93,7 @@ export async function pagePopularite(cfg: PopulariteConfig, ids: number[]): Prom
     signal: AbortSignal.timeout(30000),
   });
   if (r.status === 429) {
+    aniListRefuse(r.headers.get("retry-after"));
     const s = Number(r.headers.get("retry-after"));
     throw new TropDeRequetes(Number.isFinite(s) && s > 0 ? Math.min(s, 90) * 1000 : null);
   }

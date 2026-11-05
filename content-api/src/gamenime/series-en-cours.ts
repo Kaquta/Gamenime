@@ -21,6 +21,7 @@
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { sanitizePlatform } from "./core.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 const ANILIST_URL = process.env.SERIES_EN_COURS_ANILIST_URL || "https://graphql.anilist.co";
 const BULK_URL = process.env.SERIES_EN_COURS_BULK_URL || `http://127.0.0.1:${process.env.PORT || 3000}/anime/bulk`;
@@ -219,12 +220,14 @@ export async function passageSeriesEnCours(app: FastifyInstance): Promise<BilanS
     if (!pool) throw new Error("base introuvable");
     // 1. AniList : en cours, commencées avant le 1er janvier de l'année en cours, très suivies
     const annee = new Date().getUTCFullYear();
+    await tourAniList(); // la file AniList commune (file-anilist.ts)
     const r = await fetch(ANILIST_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ query: REQUETE, variables: { avant: annee * 10000 + 101, pop: cfg.popMin - 1 } }),
       signal: AbortSignal.timeout(30000),
     });
+    if (r.status === 429) aniListRefuse(r.headers.get("retry-after"));
     const d: any = await r.json().catch(() => null);
     if (!r.ok || !d || (Array.isArray(d.errors) && d.errors.length)) {
       throw new Error(`AniList : ${!r.ok ? "HTTP " + r.status : String(d?.errors?.[0]?.message ?? "reponse illisible").slice(0, 120)}`);

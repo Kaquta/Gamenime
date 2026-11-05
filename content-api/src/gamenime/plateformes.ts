@@ -38,6 +38,7 @@ import { mergePlatforms, sanitizePlatform } from "./core.js";
 import { pushActivity, trackLastRun } from "./dashboard.js";
 import { planifier } from "./pilotage.js";
 import type { Journal, SqlPool } from "./presse.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 const PREMIER_PASSAGE_MS = 30 * 60 * 1000; // après les premiers passages de la presse (3 min) et de TMDB (10 min)
 const PASSAGE_MS = 2 * 60 * 60 * 1000;
@@ -151,13 +152,17 @@ export interface MediaAnilist {
 
 async function pageAnilist(cfg: AnilistConfig, ids: number[]): Promise<MediaAnilist[]> {
   const query = `query ($ids: [Int]) { Page(page: 1, perPage: 50) { media(id_in: $ids, type: ANIME) { id countryOfOrigin externalLinks { site type } streamingEpisodes { site } } } }`;
+  await tourAniList(); // la file AniList commune (file-anilist.ts)
   const r = await fetch(cfg.url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ query, variables: { ids } }),
     signal: AbortSignal.timeout(30000),
   });
-  if (r.status === 429) throw new Error("AniList : trop de requêtes (repris au prochain passage)");
+  if (r.status === 429) {
+    aniListRefuse(r.headers.get("retry-after"));
+    throw new Error("AniList : trop de requêtes (repris au prochain passage)");
+  }
   if (!r.ok) throw new Error(`AniList : HTTP ${r.status}`);
   const d: any = await r.json();
   if (!Array.isArray(d?.data?.Page?.media)) throw new Error("AniList : réponse illisible");

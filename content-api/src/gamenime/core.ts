@@ -94,20 +94,90 @@ export type ReleasePrecision = "day" | "month" | "year";
 // ============================================================
 
 /**
- * Current visibility window: [year-01-01, year+1-12-31].
+ * Première année du catalogue : la fenêtre ne remonte jamais avant le 1er janvier de cette année-là
+ * (fenêtre de 3 ans, 5 novembre 2026 : sans ce plancher, 2025 s'ouvrirait tout de suite, sans données).
+ */
+export const PREMIERE_ANNEE = 2026;
+
+/**
+ * Visibility window (fenêtre de 3 ans, décision de Rey du 5 novembre 2026) :
+ * [année d'avant-01-01, année suivante-12-31], jamais avant PREMIERE_ANNEE.
  *
- * Example: in 2026, the window is [2026-01-01, 2027-12-31].
+ *   en 2026 : [2026-01-01, 2027-12-31] (le plancher : rien ne change avant le 1er janvier 2027)
+ *   en 2027 : [2026-01-01, 2028-12-31] ; en 2028 : [2027-01-01, 2029-12-31]
  *
- * On Jan 1st of next year (2027), the window slides to [2027, 2028].
- * The window is used for SQL filtering (WHERE release_date BETWEEN ...)
- * and date display logic — NOT for scoring (session 10 refactor).
+ * L'année d'avant sert de réserve aux « sortis » (Derniers sortis, Top, badges) pendant que la nouvelle année se
+ * remplit : sans elle, ces listes seraient vides au 1er janvier. « À venir » garde l'année en cours pour une date au
+ * mois ou à l'année (debutAVenir).
+ * The window is used for filtering (estSorti and estAVenir below, du-moment.ts) — NOT for scoring (session 10 refactor).
  */
 export function getReleaseWindow(now: Date = new Date()): ReleaseWindow {
   const year = now.getUTCFullYear();
   return {
-    start: `${year}-01-01`,
+    start: `${Math.max(year - 1, PREMIERE_ANNEE)}-01-01`,
     end: `${year + 1}-12-31`,
   };
+}
+
+/**
+ * Début de « À venir » pour une date connue au mois ou à l'année : le 1er janvier de l'année en cours.
+ * Un « prévu courant 2026 » toujours pas sorti au jour près ne reste pas « à venir » en 2027 (ce serait une fausse
+ * information) : il revient dès qu'une source le redate.
+ */
+export function debutAVenir(now: Date = new Date()): string {
+  return `${now.getUTCFullYear()}-01-01`;
+}
+
+/**
+ * « Sorti » (Derniers sortis, Top, badges, Top du moment des jeux) : une date au jour près (précision « day »), passée
+ * ou d'aujourd'hui, dans la fenêtre (getReleaseWindow) ; un item plus ancien que la fenêtre compte aussi si une de ses
+ * extensions (dlcs) est sortie dans la fenêtre. Une date au mois ou à l'année n'est jamais « sortie » : le jour n'est
+ * pas connu (le 1er du mois ou de l'année stocké est une convention) ; l'item reste « à venir » jusqu'à ce qu'une
+ * source donne le jour.
+ * La règle est écrite ici une seule fois (patch d'entretien, novembre 2026) : les listes (routes.ts, filterByStatus)
+ * et le Top du moment des jeux (du-moment.ts, jeuSorti) l'appellent ; tests/fenetre.test.mjs la vérifie à chaque build.
+ */
+export function estSorti(date: unknown, precision: unknown, dlcs: unknown, now: Date = new Date()): boolean {
+  if (typeof date !== "string" || !date || precision !== "day") return false;
+  const aujourdhui = now.toISOString().slice(0, 10);
+  const { start } = getReleaseWindow(now);
+  const dansLaFenetre = date <= aujourdhui && date >= start;
+  // un item plus ancien que la fenêtre : sorti si une de ses extensions est sortie dans la fenêtre
+  if (!dansLaFenetre && date < start) return extensionEntre(dlcs, start, aujourdhui);
+  return dansLaFenetre;
+}
+
+/**
+ * « À venir » : une date au mois ou à l'année entre le début de « À venir » (debutAVenir) et la fin de la fenêtre
+ * (« Prévu [mois/année] ») ; une date au jour près, future, dans la fenêtre ; un item plus ancien que la fenêtre avec
+ * une extension à venir dans la fenêtre. Un item de la fenêtre déjà sorti reste « sorti » même si une extension arrive.
+ * Même source que estSorti : un item sans extension n'est jamais les deux à la fois.
+ */
+export function estAVenir(date: unknown, precision: unknown, dlcs: unknown, now: Date = new Date()): boolean {
+  if (typeof date !== "string" || !date) return false;
+  const { start, end } = getReleaseWindow(now);
+  if (precision !== "day") return date >= debutAVenir(now) && date <= end;
+  const aujourdhui = now.toISOString().slice(0, 10);
+  const dansLaFenetre = date > aujourdhui && date <= end;
+  // un item plus ancien que la fenêtre : à venir si une de ses extensions arrive dans la fenêtre
+  if (!dansLaFenetre && date < start) return extensionEntre(dlcs, aujourdhui, end);
+  return dansLaFenetre;
+}
+
+/** Une extension datée entre debut et fin, bornes comprises (dlcs : texte JSON [{ name, releaseDate }], jeux
+ *  seulement ; un texte illisible ne compte pas). */
+function extensionEntre(dlcs: unknown, debut: string, fin: string): boolean {
+  if (!dlcs) return false;
+  try {
+    const l = JSON.parse(String(dlcs));
+    if (!Array.isArray(l)) return false;
+    return l.some((x: any) => {
+      const d = x?.releaseDate;
+      return typeof d === "string" && d >= debut && d <= fin;
+    });
+  } catch {
+    return false;
+  }
 }
 
 /**

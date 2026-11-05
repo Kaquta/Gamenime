@@ -6,6 +6,7 @@
 import type { FastifyInstance } from "fastify";
 import { trackLastRun, pushActivity } from "./dashboard.js";
 import { planifier } from "./pilotage.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 const LOOKUP_INTERVAL_MS = 60 * 60 * 1000;  // 1 heure
 const LOOKUP_DELAY_MS = 1500;
@@ -53,11 +54,16 @@ export async function lookupAniListByTitle(
           id idMal format startDate { year } title { romaji english }
         }
       }`;
+      await tourAniList(); // la file AniList commune (file-anilist.ts)
       const res = await fetch("https://graphql.anilist.co", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: malQuery, variables: { idMal: knownMalId } }),
       });
+      if (res.status === 429) {
+        aniListRefuse(res.headers.get("retry-after"));
+        return { match: null, reason: "rate_limit_429" };
+      }
       if (res.ok) {
         const data = (await res.json()) as any;
         const media = data?.data?.Media;
@@ -105,13 +111,17 @@ export async function lookupAniListByTitle(
 
   for (const searchTerm of searchVariants) {
    try {
+    await tourAniList(); // la file AniList commune (file-anilist.ts)
     const res = await fetch("https://graphql.anilist.co", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables: { search: searchTerm } }),
     });
 
-    if (res.status === 429) return { match: null, reason: "rate_limit_429" };
+    if (res.status === 429) {
+      aniListRefuse(res.headers.get("retry-after"));
+      return { match: null, reason: "rate_limit_429" };
+    }
     if (!res.ok) { lastReason = "http_" + res.status; continue; }
 
     const data = (await res.json()) as any;

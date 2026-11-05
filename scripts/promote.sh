@@ -17,6 +17,34 @@
 # — disque plein, build interrompu — viderait sinon la production.
 set -euo pipefail
 
+# Bouton Publier du dashboard (l'API depose une marque avec sa demande) : la
+# publication complete (copie, redemarrage de l'API, nginx, verification en
+# ligne) passe par publier.sh, qui rappelle ce script pour la copie et retire
+# la marque. Une marque de plus de 2 minutes n'est plus une demande : retiree ;
+# et si systemd prend cette demande si tard, rien n'est copie (le dashboard l'a
+# deja dite non prise en charge).
+MARQUE=/opt/stack/site/.publish/publication-complete
+if [ -z "${GN_PUBLIER:-}" ] && [ -e "$MARQUE" ]; then
+  if [ -n "$(find "$MARQUE" -mmin -2 2>/dev/null)" ]; then
+    exec env GN_PUBLIER=1 GN_PAR=dashboard GN_MARQUE="$MARQUE" bash /opt/stack/scripts/publier.sh
+  fi
+  rm -f "$MARQUE" 2>/dev/null || true
+  if [ -n "${INVOCATION_ID:-}" ]; then
+    echo "x demande du bouton Publier de plus de 2 minutes : rien n'est copie"
+    exit 1
+  fi
+fi
+# Lance a la main pendant une publication (bouton ou publier.sh) : deux copies
+# en meme temps, non ; rien n'est copie. Le verrou est pris pour toute la copie.
+if [ -z "${GN_PUBLIER:-}" ]; then
+  VERROU_PUB=/opt/stack/site/.build-report/.publication.lock
+  [ -e "$VERROU_PUB" ] || { : > "$VERROU_PUB"; } 2>/dev/null || true
+  if [ -r "$VERROU_PUB" ] && exec 7<"$VERROU_PUB" && ! flock -n 7; then
+    echo "x une publication tourne deja (bouton Publier ou publier.sh) : rien n'est copie"
+    exit 1
+  fi
+fi
+
 SITE=/opt/stack/site
 RAP=$SITE/.build-report
 JSON=$RAP/report.json
@@ -67,6 +95,10 @@ fi
 
 # ── La promotion ─────────────────────────────────────────────────────────────
 dire "promotion en cours — rsync staging -> dist"
+# pendant et apres une copie coupee, la production n'est plus celle d'aucun rapport
+rm -f "$RAP/report-production.json" 2>/dev/null || true
 rsync -a --delete "$SITE/dist-staging/" "$SITE/dist/"
 AP=$(compte "$SITE/dist")
+# le rapport du build copie : ce qui est en production (lu par le dashboard)
+cp -f "$JSON" "$RAP/report-production.json" 2>/dev/null || true
 dire "v promotion terminee — $AP fiches en production"

@@ -5,8 +5,9 @@
  *   Chaque fiche y a un vrai lien <a href> ecrit au build : Google trouve ainsi toutes les fiches.
  * - Pour chaque mois : la jaquette, la plateforme et la popularite, lues dans /feed/anime et /feed/games
  *   (status=all, bornes du mois). Une fiche absente de ces flux garde son titre et son lien, sans jaquette.
- * - La fenetre : l'annee en cours et la suivante, 24 mois, comme l'API.
- * Les lectures sont gardees en memoire le temps du build : les 25 pages lisent les memes donnees.
+ * - La fenetre : celle de l'API (core.ts, getReleaseWindow), lue une fois par build dans /feed/anime (champ « window ») :
+ *   l'annee d'avant (jamais avant 2026), l'annee en cours et la suivante, 24 mois en 2026, 36 ensuite (fenetre de 3 ans).
+ * Les lectures sont gardees en memoire le temps du build : toutes les pages lisent les memes donnees.
  * Si l'API ne repond pas, le build s'arrete : un calendrier vide serait le bug qu'on corrige.
  */
 import { displayTitle, formatPlatforms } from "./api";
@@ -136,12 +137,37 @@ function vignette(src: string): string {
   return src;
 }
 
-// ── la fenetre : l'annee en cours et la suivante (comme l'API)
-export function moisDeLaFenetre(maintenant: Date = new Date()): string[] {
-  const a = maintenant.getFullYear();
+// ── la fenetre : celle de l'API (core.ts, getReleaseWindow), envoyee avec chaque liste (champ « window » de /feed/anime)
+// et lue une fois par build : une seule regle pour tout le site (patch d'entretien, novembre 2026). Du 1er janvier de
+// l'annee d'avant (jamais avant 2026) au 31 decembre de l'annee suivante : 24 mois en 2026, 36 ensuite ; les pages de
+// l'annee d'avant restent en ligne. Sans fenetre lisible, le build s'arrete (comme sans fiches).
+let fenetreP: Promise<string[]> | null = null;
+
+async function chargerFenetre(): Promise<string[]> {
+  const data = await lireJson("/feed/anime?status=all&limit=1");
+  const jourIso = /^(\d{4})-(0[1-9]|1[0-2])-\d{2}$/;
+  const debut = jourIso.exec(String(data?.window?.start ?? ""));
+  const fin = jourIso.exec(String(data?.window?.end ?? ""));
+  if (!debut || !fin) throw new Error("Calendrier : /feed/anime ne donne pas la fenetre (champ window)");
   const l: string[] = [];
-  for (const an of [a, a + 1]) for (let m = 1; m <= 12; m++) l.push(`${an}-${String(m).padStart(2, "0")}`);
+  let a = Number(debut[1]), m = Number(debut[2]);
+  const aFin = Number(fin[1]), mFin = Number(fin[2]);
+  while ((a < aFin || (a === aFin && m <= mFin)) && l.length <= 120) {
+    l.push(`${a}-${String(m).padStart(2, "0")}`);
+    if (++m > 12) { m = 1; a++; }
+  }
+  if (l.length === 0 || l.length > 120) throw new Error(`Calendrier : fenetre de l'API inattendue (${debut[0]} au ${fin[0]})`);
   return l;
+}
+
+export function moisDeLaFenetre(): Promise<string[]> {
+  if (!fenetreP) fenetreP = chargerFenetre();
+  return fenetreP;
+}
+
+/** Les annees de la fenetre, dans l'ordre (le choix « Annee » des filtres : 2026 et 2027 en 2026 ; 2026 a 2028 en 2027). */
+export async function anneesDeLaFenetre(): Promise<string[]> {
+  return [...new Set((await moisDeLaFenetre()).map((k) => k.slice(0, 4)))];
 }
 
 export function moisCourant(maintenant: Date = new Date()): string {
@@ -208,7 +234,7 @@ export async function leMois(cle: string, maintenant: Date = new Date()): Promis
 
   // la fenetre : une fiche datee avant ou apres (encore au catalogue) a aussi son lien, sur le premier ou le dernier mois ;
   // une fiche sans date, sur le mois en cours
-  const fenetre = moisDeLaFenetre(maintenant);
+  const fenetre = await moisDeLaFenetre();
   const premierMois = fenetre[0], dernierMois = fenetre[fenetre.length - 1];
   const parJour = new Map<string, Sortie[]>();
   const auMois: Sortie[] = [], aLAnnee: Sortie[] = [], avant: Sortie[] = [], apres: Sortie[] = [], sansDate: Sortie[] = [];

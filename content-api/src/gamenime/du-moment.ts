@@ -25,7 +25,7 @@
  * module est coupé ou que ses mesures datent (animés : plus de 24 h ; jeux : plus de 12 h) : jamais de Top figé.
  *
  * Passages (un verrou de la base par domaine : un seul à la fois, y compris celui de l'installateur) :
- *  - animés : 40 min après le démarrage, puis toutes les 3 h ; mesurés : tous les animés de l'année déjà sortis avec
+ *  - animés : 40 min après le démarrage, puis toutes les 3 h ; mesurés : tous les animés déjà sortis de la fenêtre (core.ts) avec
  *    un identifiant AniList (un peu plus que ceux que montre routes.ts : un changement de ses règles ne laisse jamais
  *    un titre montré sans mesure). Une requête toutes les 3 s, lots de 20 (moins si AniList trouve la requête trop
  *    lourde), jamais entre h:56 et h:04 (n8n interroge AniList : la requête attend h:04) ; une erreur : le lot est
@@ -50,9 +50,10 @@
 import { clearTimeout, setInterval, setTimeout } from "node:timers";
 import { pushActivity, trackLastRun } from "./dashboard.js";
 import { interrupteur, planifier, type RetourPassage } from "./pilotage.js";
-import { sortForGameNimeTop, type GameNimeItem, type ScoredItem } from "./core.js";
+import { estSorti, getReleaseWindow, sortForGameNimeTop, type GameNimeItem, type ScoredItem } from "./core.js";
 import { getTwitchToken, igdbFetch, invalidateTwitchToken } from "./twitch.js";
 import type { Journal, SqlPool } from "./presse.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 // ─────────────────────────────────────────────────────────────── réglages
 const HEURE = 60 * 60 * 1000;
@@ -328,13 +329,14 @@ export function trierDuMoment(domaine: Domaine, items: GameNimeItem[], limit: nu
 
 // ─────────────────────────────────────────────────────────────── animés (AniList)
 /**
- * Les animés de l'année déjà sortis (date de sortie, ou de cinéma en France, entre le 1er janvier et aujourd'hui) avec
+ * Les animés déjà sortis de la fenêtre (date de sortie, ou de cinéma en France, entre le début de la fenêtre des sortis,
+ * core.ts getReleaseWindow : le 1er janvier de l'année d'avant, jamais avant 2026, et aujourd'hui) avec
  * un identifiant AniList : tous ceux que routes.ts montre comme sortis, et un peu plus (sans ses règles de visibilité
  * ni de précision de la date). Les valeurs des animés ne dépendent pas des autres : mesurer plus ne change rien au tri.
  */
 const SQL_ANIMES =
   "SELECT CAST(id AS UNSIGNED) AS id, CAST(anilist_id AS UNSIGNED) AS al FROM anime_items WHERE anilist_id > 0 " +
-  "AND (release_date BETWEEN MAKEDATE(YEAR(UTC_DATE()), 1) AND UTC_DATE() OR fr_cinema BETWEEN MAKEDATE(YEAR(UTC_DATE()), 1) AND UTC_DATE())";
+  "AND (release_date BETWEEN ? AND UTC_DATE() OR fr_cinema BETWEEN ? AND UTC_DATE())";
 const Q_TENDANCES =
   "query ($ids: [Int], $n: Int) { Page(page: 1, perPage: $n) { media(id_in: $ids, type: ANIME) { id " +
   "trends(sort: DATE_DESC, perPage: 12) { nodes { date trending } } } } }";
@@ -349,6 +351,7 @@ class TropDeRequetes extends Error {
 
 /** Une page AniList ; lève TropDeRequetes sur un 429, une erreur sinon (le message d'AniList pour une requête trop lourde). */
 async function pageAniList(cfg: DuMomentConfig, ids: number[]): Promise<any[]> {
+  await tourAniList(); // la file AniList commune (file-anilist.ts)
   const r = await fetch(cfg.anilist, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": UA },
@@ -356,6 +359,7 @@ async function pageAniList(cfg: DuMomentConfig, ids: number[]): Promise<any[]> {
     signal: AbortSignal.timeout(30000),
   });
   if (r.status === 429) {
+    aniListRefuse(r.headers.get("retry-after"));
     const s = Number(r.headers.get("retry-after"));
     await r.body?.cancel().catch(() => {});
     throw new TropDeRequetes(Number.isFinite(s) && s > 0 ? s * 1000 : null);
@@ -391,7 +395,7 @@ export function activite7(nodes: Array<{ date?: unknown; trending?: unknown }>, 
 }
 
 export interface BilanAnimes {
-  /** Animés de l'année déjà sortis avec un identifiant AniList. */
+  /** Animés déjà sortis de la fenêtre avec un identifiant AniList. */
   animes: number;
   /** Identifiants AniList demandés et rendus. */
   demandes: number;
@@ -409,7 +413,8 @@ export async function passageAnimes(deps: DuMomentDeps, cfg: DuMomentConfig = co
   if (!rendre) return { ...res, occupe: true };
   try {
     await creerTables(deps.pool);
-    const lignes: any[] = await deps.pool.query(SQL_ANIMES);
+    const debutFenetre = getReleaseWindow().start;
+    const lignes: any[] = await deps.pool.query(SQL_ANIMES, [debutFenetre, debutFenetre]);
     const parAl = new Map<number, number[]>();
     for (const l of lignes) {
       const al = Number(l.al), id = Number(l.id);
@@ -485,25 +490,14 @@ export async function passageAnimes(deps: DuMomentDeps, cfg: DuMomentConfig = co
 }
 
 // ─────────────────────────────────────────────────────────────── jeux (Twitch, Steam, IGDB)
-/** Les jeux de la fenêtre large de routes.ts ; « sortis » comme filterByStatus (date au jour près, passée, dans
- * l'année ; un ancien jeu avec une extension sortie dans l'année). */
+/** Les jeux de la fenêtre large de routes.ts ; « sortis » : la règle des listes, core.ts estSorti (date au jour près,
+ * passée, dans la fenêtre des sortis ; un ancien jeu avec une extension sortie dans cette fenêtre). */
 const SQL_JEUX =
   "SELECT CAST(id AS UNSIGNED) AS id, CAST(IFNULL(igdb_id, 0) AS UNSIGNED) AS igdb, DATE_FORMAT(release_date, '%Y-%m-%d') AS d, " +
   "release_precision AS p, dlcs FROM game_items WHERE release_date BETWEEN ? AND ? AND cover IS NOT NULL AND cover <> '' " +
   "AND title IS NOT NULL AND title <> ''";
 export function jeuSorti(x: { d?: unknown; p?: unknown; dlcs?: unknown }, maintenant: Date = new Date()): boolean {
-  const auj = maintenant.toISOString().slice(0, 10);
-  const debut = `${maintenant.getUTCFullYear()}-01-01`;
-  const d = typeof x.d === "string" ? x.d : "";
-  if (!d || x.p !== "day") return false;
-  if (d <= auj && d >= debut) return true;
-  if (d >= debut || !x.dlcs) return false;
-  try {
-    const l = JSON.parse(String(x.dlcs));
-    return Array.isArray(l) && l.some((y: any) => typeof y?.releaseDate === "string" && y.releaseDate >= debut && y.releaseDate <= auj);
-  } catch {
-    return false;
-  }
+  return estSorti(x.d, x.p, x.dlcs, maintenant); // la règle des listes (core.ts), écrite une seule fois
 }
 
 class Arret extends Error {}

@@ -22,8 +22,8 @@ export const GET: APIRoute = async () => {
     { loc: `${SITE}/games/`, freq: "daily", prio: "0.9" },
     { loc: `${SITE}/upcoming/`, freq: "daily", prio: "0.9" },
   ];
-  // le calendrier des sorties : un mois par page, sur les 24 mois de la fenetre
-  const calendrier = moisDeLaFenetre().map((m) => ({ loc: `${SITE}/calendrier/${m}/`, freq: "daily", prio: "0.8" }));
+  // le calendrier des sorties : un mois par page, sur tous les mois de la fenetre (celle de l'API : 24 en 2026, 36 ensuite)
+  const calendrier = (await moisDeLaFenetre()).map((m) => ({ loc: `${SITE}/calendrier/${m}/`, freq: "daily", prio: "0.8" }));
 
   const fiches = items.map((it: { slug: string; type: string; updatedAt: string }) => ({
     // Barre oblique finale : nginx sert le dossier avec, et redirige sinon.

@@ -32,7 +32,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 <!-- Favoris Drawer -->
 <div id="favOverlay" class="drawer-overlay"></div>
 <aside id="favDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8Z"/></svg>Mes favoris</h2><button id="favDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><button class="drawer-panel__close dp-retour" type="button" aria-label="Retour au menu" title="Retour au menu">←</button><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8Z"/></svg>Mes favoris</h2><button id="favDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
   <div id="favDrawerCount" class="drawer-panel__meta"></div>
   <div class="fav-topbar">
     <button type="button" class="fav-lnk" id="favSelMode">Sélectionner</button>
@@ -48,7 +48,7 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 <!-- Compte Drawer -->
 <div id="accountOverlay" class="drawer-overlay"></div>
 <aside id="accountDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Mon compte</h2><button id="accountDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
+  <div class="drawer-panel__header"><button class="drawer-panel__close dp-retour" type="button" aria-label="Retour au menu" title="Retour au menu">←</button><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Mon compte</h2><button id="accountDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
   <div id="accountDrawerContent" class="drawer-panel__content"></div>
 </aside>
 
@@ -61,19 +61,6 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
   <div id="notifPContent" class="drawer-panel__content"></div>
 </aside>
 
-<!-- Reset Password Drawer -->
-<div id="resetOverlay" class="drawer-overlay"></div>
-<aside id="resetDrawer" class="drawer-panel" aria-hidden="true">
-  <div class="drawer-panel__header"><h2><svg class="dp-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Mot de passe oublié</h2><button id="resetDrawerClose" class="drawer-panel__close" type="button">✕</button></div>
-  <div id="resetDrawerContent" class="drawer-panel__content">
-    <div id="resetError" class="auth-card__error hidden"></div>
-    <div id="resetSuccess" class="account-success hidden"></div>
-    <div class="account-field"><label>Email</label><input type="email" id="resetEmail" placeholder="ton@email.com" class="account-input" /></div>
-    <div class="account-field"><label>Pseudo</label><input type="text" id="resetPseudo" placeholder="Ton pseudo" class="account-input" /></div>
-    <div id="resetNewPwBlock" class="hidden"><div class="account-field"><label>Nouveau mot de passe</label><input type="password" id="resetNewPw" placeholder="8 caractères minimum" class="account-input" /></div></div>
-    <button id="resetBtn" class="account-btn" type="button">Vérifier</button>
-  </div>
-</aside>
 
 <script>
   var AVATARS = [
@@ -82,25 +69,36 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     { id:"avatar_03", name:"Panda", img:"/avatar_03.webp" },
     { id:"avatar_04", name:"Ours", img:"/avatar_04.webp" },
     { id:"avatar_05", name:"Lapin", img:"/avatar_05.webp" },
-    { id:"avatar_06", name:"Raton", img:"/avatar_06.webp" },
-    { id:"avatar_07", name:"Panda roux", img:"/avatar_07.webp" },
+    { id:"avatar_06", name:"Shiba", img:"/avatar_06.webp" },
+    { id:"avatar_07", name:"Raton", img:"/avatar_07.webp" },
     { id:"avatar_08", name:"Hibou", img:"/avatar_08.webp" },
     { id:"avatar_09", name:"Pingouin", img:"/avatar_09.webp" },
     { id:"avatar_10", name:"Koala", img:"/avatar_10.webp" }
   ];
+  // les logos des comptes lies (patch du 4 novembre 2026) : le « G » de Google est celui du fichier officiel de Google,
+  // pose par le patch ; celui de Discord est celui de l'en-tete
+  var LOGO_GOOGLE='<img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjEwIDEwIDIwIDIwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxtYXNrIGlkPSJtYXNrMF8xMjk4XzEyNTEwIiBzdHlsZT0ibWFzay10eXBlOmFscGhhIiBtYXNrVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4PSIxMCIgeT0iMTAiIHdpZHRoPSIyMCIgaGVpZ2h0PSIyMCI+PHBhdGggZD0iTTI5LjM5ODcgMTguMTgxNEgxOS45ODQ5VjIyLjA0NDVIMjUuMzU5OEMyNS4xMjg2IDIzLjI5NCAyNC40Mjk0IDI0LjM1OTYgMjMuMzY3NiAyNS4wNzEyQzIyLjQ3NDYgMjUuNjcxNiAyMS4zMjY2IDI2LjAyMTEgMTkuOTg0OSAyNi4wMjExQzE3LjM4NjQgMjYuMDIxMSAxNS4xODIzIDI0LjI2NjYgMTQuMzk0NyAyMS45MDA0QzE0LjE5NTIgMjEuMjk4OSAxNC4wODUzIDIwLjY1OTkgMTQuMDg1MyAxOS45OTgzQzE0LjA4NTMgMTkuMzM2NyAxNC4xOTUyIDE4LjY5NjYgMTQuMzk0NyAxOC4wOTYyQzE1LjE4MjMgMTUuNzMxMSAxNy4zODY0IDEzLjk3NTUgMTkuOTg0OSAxMy45NzU1QzIxLjQ1MjQgMTMuOTc1NSAyMi43NjcgMTQuNDgxNiAyMy44MDM5IDE1LjQ3MTNMMjYuNjY1MyAxMi42MDU3QzI0LjkzNiAxMC45OTA4IDIyLjY3ODYgMTAgMTkuOTg0OSAxMEMxNi4wODMyIDEwIDEyLjcwNSAxMi4yNDE0IDExLjA2MTggMTUuNTA3NkMxMC4zODMgMTYuODU5MiAxMCAxOC4zODM0IDEwIDE5Ljk5OTRDMTAgMjEuNjE1NSAxMC4zODMgMjMuMTM5NiAxMS4wNjE4IDI0LjQ5MTNDMTIuNzA1IDI3Ljc1OTcgMTYuMDgzMiAzMCAxOS45ODQ5IDMwQzIyLjY3OTcgMzAgMjQuOTQ4NSAyOS4xMTM3IDI2LjYwMTggMjcuNTg2MUMyOC40ODg3IDI1Ljg0NTIgMjkuNTczMiAyMy4yNzAyIDI5LjU3MzIgMjAuMjI3NUMyOS41NzMyIDE5LjUxODIgMjkuNTEzMSAxOC44MzUgMjkuMzk4NyAxOC4xODI1VjE4LjE4MTRaIiBmaWxsPSIjRTk0RkZGIi8+PC9tYXNrPjxnIG1hc2s9InVybCgjbWFzazBfMTI5OF8xMjUxMCkiPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIwX2ZfMTI5OF8xMjUxMCkiPjxnIGNsaXAtcGF0aD0idXJsKCNwYWludDBfYW5ndWxhcl8xMjk4XzEyNTEwX2NsaXBfcGF0aCkiPjxnIHRyYW5zZm9ybT0ibWF0cml4KDAuMDA4MDQxMjkgLTAuMDA4MDUxODYgMC4wMDgwNDEyOCAwLjAwODA1MTg2IDE5LjY4MTkgMTkuNzkyNykiPjxmb3JlaWduT2JqZWN0IHg9Ii0yMTA1LjY0IiB5PSItMjEwNS42NCIgd2lkdGg9IjQyMTEuMjkiIGhlaWdodD0iNDIxMS4yOSI+PGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImJhY2tncm91bmQ6Y29uaWMtZ3JhZGllbnQoZnJvbSA5MGRlZyxyZ2JhKDI1NSwgNzAsIDY1LCAxKSAwZGVnLHJnYmEoMjU1LCA3MCwgNjUsIDEpIDQuMTQ1NTVkZWcscmdiYSg0OSwgMTM0LCAyNTUsIDEpIDM5LjE1NGRlZyxyZ2JhKDQ5LCAxMzQsIDI1NSwgMSkgNzIuMDA0NGRlZyxyZ2JhKDAsIDE2NSwgMTgzLCAxKSA5Ni43NDYzZGVnLHJnYmEoMTQsIDE4OCwgOTUsIDEpIDEyMC44OTdkZWcscmdiYSgxNCwgMTg4LCA5NSwgMSkgMTU0LjcyMmRlZyxyZ2JhKDEwOCwgMTk2LCAwLCAxKSAxNzkuMTM2ZGVnLHJnYmEoMjU1LCAyMDQsIDAsIDEpIDIwMy41ODhkZWcscmdiYSgyNTUsIDIxMSwgMjAsIDEpIDIyNi45MTVkZWcscmdiYSgyNTUsIDIwNCwgMCwgMSkgMjUxLjY4OGRlZyxyZ2JhKDI1NSwgMTA2LCA0MywgMSkgMjczLjEyOWRlZyxyZ2JhKDI1MywgNzAsIDY1LCAxKSAyODkuMzA1ZGVnLHJnYmEoMjU1LCA3MCwgNjUsIDEpIDM1OS41OTNkZWcscmdiYSgyNTUsIDcwLCA2NSwgMSkgMzYwZGVnKTtoZWlnaHQ6MTAwJTt3aWR0aDoxMDAlO29wYWNpdHk6MSI+PC9kaXY+PC9mb3JlaWduT2JqZWN0PjwvZz48L2c+PC9nPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIxX2ZfMTI5OF8xMjUxMCkiPjxlbGxpcHNlIGN4PSIyMC4wNDk2IiBjeT0iMjAuMjQxMyIgcng9IjUuMzk2MzQiIHJ5PSIyLjgzNTM3IiB0cmFuc2Zvcm09InJvdGF0ZSgyNC40NDczIDIwLjA0OTYgMjAuMjQxMykiIGZpbGw9IiMzMTg2RkYiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjJfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjMzLjM1MzgiIGN5PSIxOC4yMTU1IiByeD0iNy40MzkxOCIgcnk9IjMuMDkzNTciIGZpbGw9IiMzMTg2RkYiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjNfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI1LjI3NDQiIGN5PSIxNi4yMTk1IiByeD0iNy40MDg1NCIgcnk9IjIuMzc4MDUiIGZpbGw9IiNGRjQ2NDEiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjRfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI5LjU0MjciIGN5PSIxMi45MjY4IiByeD0iNy40MDg1NCIgcnk9IjIuMzc4MDUiIGZpbGw9IiNGRjVCOEIiLz48L2c+PGcgZmlsdGVyPSJ1cmwoI2ZpbHRlcjVfZl8xMjk4XzEyNTEwKSI+PGVsbGlwc2UgY3g9IjI0LjQ4MTciIGN5PSIxOS44NzgiIHJ4PSI4LjUwNjEiIHJ5PSIzLjEwOTc2IiBmaWxsPSIjMzE4NkZGIi8+PC9nPjxnIGZpbHRlcj0idXJsKCNmaWx0ZXI2X2ZfMTI5OF8xMjUxMCkiPjxlbGxpcHNlIGN4PSIyNS4xODQyIiBjeT0iMTQuMDE5NyIgcng9IjQuNTM4ODIiIHJ5PSIyLjM3ODA1IiB0cmFuc2Zvcm09InJvdGF0ZSgtMjguNjU5OSAyNS4xODQyIDE0LjAxOTcpIiBmaWxsPSIjRkY0NjQxIi8+PC9nPjwvZz48ZGVmcz48ZmlsdGVyIGlkPSJmaWx0ZXIwX2ZfMTI5OF8xMjUxMCIgeD0iNS4yNTkyMiIgeT0iNC45MDY2OCIgd2lkdGg9IjI5LjczODEiIGhlaWdodD0iMjkuNzcyIiBmaWx0ZXJVbml0cz0idXNlclNwYWNlT25Vc2UiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiI+PGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz48ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluPSJTb3VyY2VHcmFwaGljIiBpbjI9IkJhY2tncm91bmRJbWFnZUZpeCIgcmVzdWx0PSJzaGFwZSIvPjxmZUdhdXNzaWFuQmx1ciBzdGREZXZpYXRpb249IjEiIHJlc3VsdD0iZWZmZWN0MV9mb3JlZ3JvdW5kQmx1cl8xMjk4XzEyNTEwIi8+PC9maWx0ZXI+PGNsaXBQYXRoIGlkPSJwYWludDBfYW5ndWxhcl8xMjk4XzEyNTEwX2NsaXBfcGF0aCI+PHBhdGggZD0iTTcuMjU5MjIgMTkuNzkyN0M3LjI1OTIyIDEyLjY3NTkgMTMuMDIwOSA2LjkwNjY4IDIwLjEyODMgNi45MDY2OEMyNy4yMzU3IDYuOTA2NjggMzIuOTk3MyAxMi42NzU5IDMyLjk5NzMgMTkuNzkyN0MzMi45OTczIDI2LjkwOTQgMjcuMjM1NyAzMi42Nzg2IDIwLjEyODMgMzIuNjc4NkMxMy4wMjA5IDMyLjY3ODYgNy4yNTkyMSAyNi45MDk0IDcuMjU5MjIgMTkuNzkyN1oiLz48L2NsaXBQYXRoPjxmaWx0ZXIgaWQ9ImZpbHRlcjFfZl8xMjk4XzEyNTEwIiB4PSIxMi45OTc3IiB5PSIxNC44MjgiIHdpZHRoPSIxNC4xMDM4IiBoZWlnaHQ9IjEwLjgyNjUiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXIyX2ZfMTI5OF8xMjUxMCIgeD0iMjMuOTE0NiIgeT0iMTMuMTIxOSIgd2lkdGg9IjE4Ljg3ODQiIGhlaWdodD0iMTAuMTg3MSIgZmlsdGVyVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZUZsb29kIGZsb29kLW9wYWNpdHk9IjAiIHJlc3VsdD0iQmFja2dyb3VuZEltYWdlRml4Ii8+PGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJCYWNrZ3JvdW5kSW1hZ2VGaXgiIHJlc3VsdD0ic2hhcGUiLz48ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIxIiByZXN1bHQ9ImVmZmVjdDFfZm9yZWdyb3VuZEJsdXJfMTI5OF8xMjUxMCIvPjwvZmlsdGVyPjxmaWx0ZXIgaWQ9ImZpbHRlcjNfZl8xMjk4XzEyNTEwIiB4PSIxNS44NjU5IiB5PSIxMS44NDE1IiB3aWR0aD0iMTguODE3MSIgaGVpZ2h0PSI4Ljc1NjEiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXI0X2ZfMTI5OF8xMjUxMCIgeD0iMjAuMTM0MSIgeT0iOC41NDg3OCIgd2lkdGg9IjE4LjgxNzEiIGhlaWdodD0iOC43NTYxIiBmaWx0ZXJVbml0cz0idXNlclNwYWNlT25Vc2UiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiI+PGZlRmxvb2QgZmxvb2Qtb3BhY2l0eT0iMCIgcmVzdWx0PSJCYWNrZ3JvdW5kSW1hZ2VGaXgiLz48ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluPSJTb3VyY2VHcmFwaGljIiBpbjI9IkJhY2tncm91bmRJbWFnZUZpeCIgcmVzdWx0PSJzaGFwZSIvPjxmZUdhdXNzaWFuQmx1ciBzdGREZXZpYXRpb249IjEiIHJlc3VsdD0iZWZmZWN0MV9mb3JlZ3JvdW5kQmx1cl8xMjk4XzEyNTEwIi8+PC9maWx0ZXI+PGZpbHRlciBpZD0iZmlsdGVyNV9mXzEyOThfMTI1MTAiIHg9IjEzLjk3NTYiIHk9IjE0Ljc2ODMiIHdpZHRoPSIyMS4wMTIyIiBoZWlnaHQ9IjEwLjIxOTUiIGZpbHRlclVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVGbG9vZCBmbG9vZC1vcGFjaXR5PSIwIiByZXN1bHQ9IkJhY2tncm91bmRJbWFnZUZpeCIvPjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+PGZlR2F1c3NpYW5CbHVyIHN0ZERldmlhdGlvbj0iMSIgcmVzdWx0PSJlZmZlY3QxX2ZvcmVncm91bmRCbHVyXzEyOThfMTI1MTAiLz48L2ZpbHRlcj48ZmlsdGVyIGlkPSJmaWx0ZXI2X2ZfMTI5OF8xMjUxMCIgeD0iMTkuMDQwNCIgeT0iOS4wMDQxOSIgd2lkdGg9IjEyLjI4NzgiIGhlaWdodD0iMTAuMDMwOSIgZmlsdGVyVW5pdHM9InVzZXJTcGFjZU9uVXNlIiBjb2xvci1pbnRlcnBvbGF0aW9uLWZpbHRlcnM9InNSR0IiPjxmZUZsb29kIGZsb29kLW9wYWNpdHk9IjAiIHJlc3VsdD0iQmFja2dyb3VuZEltYWdlRml4Ii8+PGZlQmxlbmQgbW9kZT0ibm9ybWFsIiBpbj0iU291cmNlR3JhcGhpYyIgaW4yPSJCYWNrZ3JvdW5kSW1hZ2VGaXgiIHJlc3VsdD0ic2hhcGUiLz48ZmVHYXVzc2lhbkJsdXIgc3RkRGV2aWF0aW9uPSIxIiByZXN1bHQ9ImVmZmVjdDFfZm9yZWdyb3VuZEJsdXJfMTI5OF8xMjUxMCIvPjwvZmlsdGVyPjwvZGVmcz48L3N2Zz4=" alt="" width="18" height="18">';
+  var LOGO_DISCORD='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/></svg>';
+  var NOMS_F={google:"Google",discord:"Discord"};
 
   var authRoot=document.querySelector(".auth-ui");var authApiBase=authRoot?authRoot.dataset.apiBase||"":"";
   var authGuest=document.getElementById("authGuest"),authUser=document.getElementById("authUser"),authDisplayName=document.getElementById("authDisplayName"),authAvatar=document.getElementById("authAvatar"),authUserButton=document.getElementById("authUserButton"),authDropdown=document.getElementById("authUserDropdown"),authLogoutBtn=document.getElementById("authLogoutBtn");
   var currentUser=null;
   function authEndpoint(p){return authApiBase+p;}
   function getAv(id){for(var i=0;i<AVATARS.length;i++)if(AVATARS[i].id===id)return AVATARS[i];return AVATARS[0];}
+  // ── la photo d'un compte lie comme avatar (patch du 5 novembre 2026, copie de la maquette validee) : l'API la garde
+  // et la sert au seul titulaire, a /auth/photo/<f>?v=<empreinte> ; sans photo, l'avatar est un animal ──
+  function photoDe(u,f){var l=u&&Array.isArray(u.identites)?u.identites:[];for(var i=0;i<l.length;i++)if(l[i]&&l[i].fournisseur===f&&/^[0-9a-f]{16}$/.test(String(l[i].photo||"")))return authEndpoint("/auth/photo/"+f+"?v="+l[i].photo);return null;}
+  function avDe(u){var id=(u&&u.avatar)||"avatar_01";if(id==="google"||id==="discord"){var p=photoDe(u,id);return p?{id:id,name:"ta photo "+NOMS_F[id],img:p,photo:true}:AVATARS[0];}return getAv(id);}
+  // l'image d'un avatar ; une photo jamais agrandie (les animaux le sont, pour cacher leur bord), et un animal si elle ne vient pas
+  function imgAv(av){return av.photo?'<img src="'+escapeHtml(av.img)+'" alt="" class="avatar-img avatar-img--photo" onerror="this.onerror=null;this.classList.remove(\'avatar-img--photo\');this.src=\'/avatar_01.webp\'"/>':'<img src="'+av.img+'" alt="" class="avatar-img"/>';}
   function showGuest(){if(authGuest)authGuest.classList.remove("hidden");if(authUser)authUser.classList.add("hidden");}
   function showUser(name,email,avatar,isPremium){
     if(authGuest)authGuest.classList.add("hidden");if(authUser)authUser.classList.remove("hidden");
     var safeName=name&&String(name).trim()?String(name).trim():email.split("@")[0];
     if(authDisplayName)authDisplayName.textContent=safeName;
-    var av=getAv(avatar||"avatar_01");
-    if(authAvatar){authAvatar.innerHTML='<img src="'+av.img+'" alt="" class="avatar-img"/>';if(isPremium){authAvatar.classList.add("is-premium");}else{authAvatar.classList.remove("is-premium");}}
+    var av=avDe({avatar:avatar,identites:currentUser&&currentUser.identites});
+    if(authAvatar){authAvatar.innerHTML=imgAv(av);if(isPremium){authAvatar.classList.add("is-premium");}else{authAvatar.classList.remove("is-premium");}}
     var oldPill=document.getElementById("premiumPill");if(oldPill)oldPill.remove();
     if(isPremium&&authDisplayName){var pill=document.createElement("span");pill.id="premiumPill";pill.className="premium-pill";pill.innerHTML="<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><polygon points=\"12 2 15 8 22 9 17 14 18 21 12 18 6 21 7 14 2 9 9 8\"/></svg><span class=\"premium-pill__text\">"+escapeHtml(safeName)+"</span>";authDisplayName.after(pill);authDisplayName.style.display="none";}else if(authDisplayName){authDisplayName.style.display="";}
     var premBtn=null; /* Premium desactive (session 33) : pas d'offre en place */
@@ -108,30 +106,73 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
   }
   async function fetchMe(){
     try{var res=await fetch(authEndpoint("/auth/me"),{method:"GET",credentials:"include",headers:{Accept:"application/json"}});
-    if(res.status===401){showGuest();return;}if(!res.ok)throw new Error("HTTP "+res.status);
-    var data=await res.json();if(!data.user){showGuest();return;}
+    if(res.status===401){showGuest();return null;}if(!res.ok)throw new Error("HTTP "+res.status);
+    var data=await res.json();if(!data.user){showGuest();return null;}
     currentUser=data.user;showUser(data.user.displayName,data.user.email,data.user.avatar,data.user.isPremium);
-    }catch(e){showGuest();}
+    return currentUser;
+    }catch(e){showGuest();return null;}
   }
   function toggleDropdown(){if(authDropdown)authDropdown.classList.toggle("is-open");}
   function closeDropdown(){if(authDropdown)authDropdown.classList.remove("is-open");}
-  async function authLogout(){try{await fetch(authEndpoint("/auth/logout"),{method:"POST",credentials:"include"});closeDropdown();showGuest();window.location.reload();}catch(e){}}
+  async function authLogout(){try{await fetch(authEndpoint("/auth/logout"),{method:"POST",credentials:"include"});closeDropdown();showGuest();if(typeof window.gnRetourPlusTard==="function")window.gnRetourPlusTard("Tu es déconnecté");window.location.reload();}catch(e){retour("Déconnexion impossible : le serveur ne répond pas",{type:"ko",detail:"Tu es toujours connecté",action:"Réessayer",surAction:authLogout});}}
   if(authUserButton)authUserButton.addEventListener("click",function(e){e.stopPropagation();toggleDropdown();});
   if(authLogoutBtn)authLogoutBtn.addEventListener("click",function(){authLogout();});
   document.addEventListener("click",function(e){if(!e.target.closest(".auth-user-menu"))closeDropdown();});
-  document.addEventListener("keydown",function(e){if(e.key==="Escape"){closeDropdown();closeFavDrawer();closeAccountDrawer();closeNotifPageDrawer();closeResetDrawer();}});
+  document.addEventListener("keydown",function(e){if(e.key==="Escape"){closeDropdown();fermerTout("favDrawer");fermerTout("accountDrawer");closeNotifPageDrawer();}});
 
   function openDrawer(d,o){if(!d||!o)return;d.classList.add("is-open");o.classList.add("is-open");d.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";}
   function closeDrawerEl(d,o){if(!d||!o)return;d.classList.remove("is-open");o.classList.remove("is-open");d.setAttribute("aria-hidden","true");document.body.style.overflow="";}
   function escapeHtml(v){return String(v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
   function timeAgo(s){if(!s)return"";var d=Math.floor((Date.now()-new Date(s).getTime())/1000);if(d<60)return"À l'instant";if(d<3600)return Math.floor(d/60)+" min";if(d<86400)return Math.floor(d/3600)+"h";if(d<604800)return Math.floor(d/86400)+"j";return new Intl.DateTimeFormat("fr-FR",{day:"2-digit",month:"short"}).format(new Date(s));}
+  // ── les retours apres une action (patch du 4 novembre 2026, copie de la maquette validee) ──
+  // la pastille (public/retour.js) ; sans elle, rien ne casse
+  function retour(t,o){if(typeof window.gnRetour==="function")window.gnRetour(t,o||{});}
+  var MUET="Pas enregistré : le serveur ne répond pas";
+  // le titre d'une pastille quand l'API a refuse : son message s'il est fait pour etre lu, sinon « le serveur ne repond pas »
+  function echecDe(res,data,quoi){
+    var e=data&&typeof data.error==="string"?data.error.trim():"";
+    if(res&&res.status>=400&&res.status<500&&e&&/\s/.test(e))return quoi+" : "+e.charAt(0).toLowerCase()+e.slice(1).replace(/\.$/,"");
+    return quoi+" : le serveur ne répond pas";
+  }
+  function sessionFinie(){retour("Ta session a expiré",{type:"ko",detail:"Reconnecte-toi pour continuer",action:"Se connecter",surAction:function(){window.location.href="/signin?retour="+encodeURIComponent(location.pathname+location.search+location.hash);}});}
+  // un bouton qui travaille : il le dit, et ne prend plus de clic
+  function enCours(b,oui){if(!b)return;b.classList.toggle("est-en-cours",!!oui);if(b.tagName==="BUTTON")b.disabled=!!oui;}
+  // l'erreur sous le champ concerne (sous sa ligne, si le champ partage la ligne d'un bouton)
+  function champKo(input,msg,apres){if(!input)return;input.classList.add("champ-ko");var a=apres||input;var p=a.nextElementSibling;if(!p||!p.classList.contains("champ-msg")){p=document.createElement("p");p.className="champ-msg";a.insertAdjacentElement("afterend",p);}p.textContent=msg;}
+  function champOk(input,apres){if(!input)return;input.classList.remove("champ-ko");var a=apres||input;var p=a.nextElementSibling;if(p&&p.classList.contains("champ-msg"))p.remove();}
+  function lienLier(f){return authEndpoint("/auth/"+f+"?mode=lier&retour="+encodeURIComponent(location.pathname+location.search+location.hash));}
+  var verifEnvoyee=false,avatarEnCours=false;
+
+  // ── le retour au menu (patch du 4 novembre 2026) : la fleche de Mes favoris et de Mon compte, et le bouton retour du
+  //    telephone, ferment le tiroir et rouvrent le menu ; la croix, le fond et Echap ferment tout, comme avant ──
+  var TIROIRS={favDrawer:"favOverlay",accountDrawer:"accountOverlay"};
+  function estOuvert(id){var d=document.getElementById(id);return !!(d&&d.classList.contains("is-open"));}
+  function tiroirOuvert(){for(var k in TIROIRS)if(estOuvert(k))return k;return null;}
+  function etatTiroir(){var st=history.state;return st&&typeof st==="object"&&st.gnTiroir?st.gnTiroir:null;}
+  function fermerVisuel(id){closeDrawerEl(document.getElementById(id),document.getElementById(TIROIRS[id]));}
+  function ouvrirMenu(){if(authDropdown&&authUser&&!authUser.classList.contains("hidden"))authDropdown.classList.add("is-open");}
+  // ouvert depuis le menu : une entree d'historique, que le bouton retour du telephone referme
+  function marquerTiroir(id){try{if(etatTiroir()!==id)history.pushState({gnTiroir:id},"");}catch(e){}}
+  function fermerTout(id){if(!estOuvert(id))return;fermerVisuel(id);if(etatTiroir()===id){try{history.back();}catch(e){}}}
+  // la fleche : le tiroir se ferme tout de suite, le menu se rouvre au retour de l'historique (au plus 600 ms) ; un
+  // deuxieme appui rapide ne recule donc pas d'une page de plus
+  var retourEnCours=0;
+  function retourMenu(id){if(!estOuvert(id)||retourEnCours)return;fermerVisuel(id);if(etatTiroir()===id){retourEnCours=setTimeout(function(){retourEnCours=0;ouvrirMenu();},600);try{history.back();return;}catch(e){}clearTimeout(retourEnCours);retourEnCours=0;}ouvrirMenu();}
+  window.addEventListener("popstate",function(){if(retourEnCours){clearTimeout(retourEnCours);retourEnCours=0;ouvrirMenu();return;}var k=tiroirOuvert();if(!k||etatTiroir()===k)return;fermerVisuel(k);ouvrirMenu();});
+  document.querySelectorAll(".dp-retour").forEach(function(b){b.addEventListener("click",function(e){e.stopPropagation();var d=b.closest(".drawer-panel");if(d)retourMenu(d.id);});});
+  // « ← Retour » de Mes preferences : la page d'avant se rouvre, menu ouvert (une demande de moins de 30 s)
+  function menuDemande(){try{var t=Number(sessionStorage.getItem("gn-menu")||0);if(!t)return;sessionStorage.removeItem("gn-menu");if(Date.now()-t<30000)ouvrirMenu();}catch(e){}}
+  window.addEventListener("pageshow",function(e){if(!e.persisted||!currentUser)return;menuDemande();if(estOuvert("accountDrawer"))renderAccountDrawer();});
+
   function simplifyPlatform(p){if(!p)return"";return p.replace(/PC \(Microsoft Windows\)/gi,"PC").replace(/PlayStation 5/gi,"PlayStation").replace(/PlayStation 4/gi,"PlayStation").replace(/Xbox Series X\|S/gi,"Xbox").replace(/Xbox One/gi,"Xbox").replace(/Nintendo Switch/gi,"Nintendo");}
 
   // ── FAVORIS ──────────────────────────────────────
   var favDrawer=document.getElementById("favDrawer"),favOverlay=document.getElementById("favOverlay"),favDrawerClose=document.getElementById("favDrawerClose"),favDrawerContent=document.getElementById("favDrawerContent"),favDrawerCount=document.getElementById("favDrawerCount");
   function closeFavDrawer(){closeDrawerEl(favDrawer,favOverlay);}
+  var sousModal=false;   // Mes favoris ferme le temps d'une fiche ouverte depuis lui
   async function openFavDrawerFn(){
     closeDropdown();openDrawer(favDrawer,favOverlay);
+    if(sousModal){sousModal=false;marquerTiroir("favDrawer");}
     if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Chargement...</div>';
     try{var res=await fetch(authEndpoint("/favorites/"),{credentials:"include",headers:{Accept:"application/json"}});if(!res.ok)throw new Error("HTTP "+res.status);var data=await res.json();var items=data.items||[];
     if(favDrawerCount)favDrawerCount.textContent=items.length+" favori"+(items.length>1?"s":"");
@@ -182,9 +223,9 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     }catch(e){if(favDrawerContent)favDrawerContent.innerHTML='<div class="drawer-state">Erreur.</div>';}
   }
   (window).__openFavDrawer=function(){openFavDrawerFn();};
-  if(favDrawerClose)favDrawerClose.addEventListener("click",closeFavDrawer);
-  if(favOverlay)favOverlay.addEventListener("click",closeFavDrawer);
-  document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();});
+  if(favDrawerClose)favDrawerClose.addEventListener("click",function(){fermerTout("favDrawer");});
+  if(favOverlay)favOverlay.addEventListener("click",function(){fermerTout("favDrawer");});
+  document.getElementById("openFavDrawer")?.addEventListener("click",function(){openFavDrawerFn();marquerTiroir("favDrawer");});
   if(favDrawerContent)favDrawerContent.addEventListener("click",async function(e){
     // Mode selection : le clic choisit la carte au lieu d'ouvrir le modal.
     if(favSel){
@@ -202,7 +243,11 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var btn=e.target.closest(".drawer-card__remove");
     if(btn){
       e.stopPropagation();
-      try{var res=await fetch(authEndpoint("/favorites/"+btn.dataset.type+"/"+btn.dataset.id),{method:"DELETE",credentials:"include",headers:{Accept:"application/json"}});if(res.ok){var card=btn.closest(".drawer-card");if(card)card.remove();document.dispatchEvent(new CustomEvent("favChanged",{detail:{type:btn.dataset.type,id:btn.dataset.id,action:"remove"}}));var rem=favDrawerContent.querySelectorAll(".drawer-card").length;if(favDrawerCount)favDrawerCount.textContent=rem+" favori"+(rem>1?"s":"");if(!rem)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.</div>';}}catch(err){}
+      if(btn.disabled)return;
+      var carte=btn.closest(".drawer-card"),titre=carte?((carte.querySelector(".f-t")||{}).textContent||""):"";
+      var pasRetire=function(){btn.disabled=false;retour("Pas retiré : le serveur ne répond pas",{type:"ko",detail:"Ce favori reste dans ta liste",action:"Réessayer",surAction:function(){if(btn.isConnected)btn.click();}});};
+      btn.disabled=true;
+      try{var res=await fetch(authEndpoint("/favorites/"+btn.dataset.type+"/"+btn.dataset.id),{method:"DELETE",credentials:"include",headers:{Accept:"application/json"}});if(res.ok){var card=btn.closest(".drawer-card");if(card)card.remove();document.dispatchEvent(new CustomEvent("favChanged",{detail:{type:btn.dataset.type,id:btn.dataset.id,action:"remove"}}));var rem=favDrawerContent.querySelectorAll(".drawer-card").length;if(favDrawerCount)favDrawerCount.textContent=rem+" favori"+(rem>1?"s":"");if(!rem)favDrawerContent.innerHTML='<div class="drawer-state">Aucun favori.</div>';retour("Retiré de tes favoris",titre?{detail:titre}:{});}else if(res.status===401){btn.disabled=false;sessionFinie();}else pasRetire();}catch(err){pasRetire();}
       return;
     }
     // Cas 2: click sur la card -> fermer drawer + ouvrir modal INSTANTANEMENT
@@ -212,13 +257,16 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     var itemId=card.dataset.id;
     var domain=itemType==="game"?"games":"anime";
     (window).__reopenFavDrawer=true;
+    sousModal=etatTiroir()==="favDrawer";
     closeFavDrawer();
     if(typeof window.__openItemModal==="function"){
       window.__openItemModal(domain,itemId);
     }else{
-      // Fallback si SectionBlock pas charge sur la page actuelle
+      // Fallback si SectionBlock pas charge sur la page actuelle (l'entree d'historique du tiroir est remplacee :
+      // le bouton retour ramene a la page, pas a un tiroir deja ferme)
       var targetPage=itemType==="anime"?"/anime":"/games";
-      window.location.href=targetPage+"#item-"+itemId;
+      if(etatTiroir()==="favDrawer")window.location.replace(targetPage+"#item-"+itemId);
+      else window.location.href=targetPage+"#item-"+itemId;
     }
   });
 
@@ -273,18 +321,23 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     if(!cles.length) return;
     favDelBtn.disabled = true;
     favDelBtn.textContent = "Suppression\u2026";
+    var faits = 0, rates = 0;
     for(var i=0;i<cles.length;i++){
       var parts = cles[i].split(":");
       try{
-        await fetch(authEndpoint("/favorites/" + parts[0] + "/" + parts[1]), { method:"DELETE", credentials:"include", headers:{ Accept:"application/json" } });
-        document.dispatchEvent(new CustomEvent("favChanged",{ detail:{ type:parts[0], id:parts[1], action:"remove" } }));
-      }catch(e){}
+        var rr = await fetch(authEndpoint("/favorites/" + parts[0] + "/" + parts[1]), { method:"DELETE", credentials:"include", headers:{ Accept:"application/json" } });
+        if(rr.ok){ faits++; document.dispatchEvent(new CustomEvent("favChanged",{ detail:{ type:parts[0], id:parts[1], action:"remove" } })); }
+        else rates++;
+      }catch(e){ rates++; }
     }
     favPicked = {};
     favSel = false;
     if(favDrawer) favDrawer.classList.remove("fav-selecting");
     if(favModeBtn){ favModeBtn.textContent = "S\u00e9lectionner"; favModeBtn.classList.remove("on"); }
-    openFavDrawer();
+    // la liste relue (avant : openFavDrawer(), inexistante, laissait les cartes retirees affichees)
+    openFavDrawerFn();
+    if(faits) retour(faits + " favori" + (faits>1?"s":"") + " retiré" + (faits>1?"s":""), rates ? { detail: rates + " pas retiré" + (rates>1?"s":"") + " : réessaie" } : {});
+    else retour("Pas retiré : le serveur ne répond pas", { type:"ko", detail:"Tes favoris n'ont pas changé" });
   });
 
   // ── COMPTE ───────────────────────────────────────
@@ -293,11 +346,28 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
 
   function renderAccountDrawer(){
     if(!currentUser||!accountDrawerContent)return;
-    var u=currentUser;var av=getAv(u.avatar||"avatar_01");
+    var u=currentUser;var av=avDe(u);
+    // les façons de se connecter, d'après l'API (patch du 4 novembre 2026) ; une API d'avant : « avec mot de passe », rien de lié
+    var aMdp=u.motDePasse!==false;
+    var ids=Array.isArray(u.identites)?u.identites:null;
+    function lieA(f){if(!ids)return null;for(var i=0;i<ids.length;i++)if(ids[i]&&ids[i].fournisseur===f)return ids[i];return null;}
+    var lies=["google","discord"].filter(function(f){return !!lieA(f);});
+    var photos=lies.filter(function(f){return !!photoDe(u,f);});
+    var nomsLies=lies.map(function(f){return NOMS_F[f];});
+    var seul=!aMdp&&lies.length===1;   // la seule façon de se connecter : ce compte-là ne se délie pas
+    var aConfirmer=u.emailVerified===false;   // adresse pas encore confirmée : pas de liaison (l'API refuse aussi)
+    function ligneLien(f){
+      var l=lieA(f),nom=NOMS_F[f],logo=f==="google"?LOGO_GOOGLE:LOGO_DISCORD;
+      return '<div class="acc-row acc-lien" data-fournisseur="'+f+'"><span class="acc-lien__logo" aria-hidden="true">'+logo+'</span>'+
+        '<span class="acc-rb"><span class="acc-rt">'+nom+'</span><span class="acc-rs">'+(l?'<i></i>'+escapeHtml(l.libelle||"Lié"):"Pas encore lié")+'</span></span>'+
+        (l?'<button type="button" class="acc-act" data-delier="'+f+'"'+(seul?" disabled":"")+'>Délier</button>'
+          :aConfirmer?'<button type="button" class="acc-act acc-act--plein" disabled>Lier</button>'
+          :'<a class="acc-act acc-act--plein" href="'+escapeHtml(lienLier(f))+'" data-lier="'+f+'">Lier</a>')+'</div>';
+    }
 
     accountDrawerContent.innerHTML=
       // En-tete : avatar cliquable (crayon en pastille), pseudo, email + etat
-      '<div class="acc-head"><button type="button" class="acc-av" id="accAvDisp" title="Changer d\'avatar"><img src="'+av.img+'" alt="" class="avatar-img"/></button>'+
+      '<div class="acc-head"><button type="button" class="acc-av" id="accAvDisp" title="Changer d\'avatar">'+imgAv(av)+'</button>'+
       '<div class="acc-hb"><div class="acc-name" id="accNameDisp">'+escapeHtml(u.displayName||u.email.split("@")[0])+(u.isPremium?' <span class="premium-text-badge">PREMIUM</span>':'')+'</div>'+
       '<div class="acc-mailrow"><span class="acc-mail">'+escapeHtml(u.email)+'</span>'+
       (u.emailVerified===false
@@ -309,24 +379,38 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
       '<button type="button" class="acc-pen" data-toggle="avatarForm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>Changer d\'avatar</button>'+
       '</div></div>'+
 
-      '<div id="avatarForm" class="account-subform hidden"><div class="avatar-grid">'+AVATARS.map(function(a){var sel=(u.avatar||"avatar_01")===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'"><img src="'+a.img+'" alt="" class="avatar-img"/></button>';}).join("")+'</div></div>'+
+      '<div id="avatarForm" class="account-subform hidden">'+
+      // Ta photo (des comptes lies qui en ont une), puis Les animaux ; sans photo, les animaux seuls, comme avant
+      (photos.length?'<div class="av-titre">Ta photo <small>des comptes liés</small></div><div class="av-photos">'+photos.map(function(f){var sel=av.id===f?" avatar-pick--selected":"";
+        return '<div class="av-case"><div class="av-rond"><button class="avatar-pick'+sel+'" data-avatar="'+f+'" type="button" title="Ta photo '+NOMS_F[f]+'">'+imgAv({img:photoDe(u,f),photo:true})+'</button>'+
+          '<span class="av-badge av-badge--'+(f==="google"?"g":"d")+'" aria-hidden="true">'+(f==="google"?LOGO_GOOGLE:LOGO_DISCORD)+'</span></div><div class="av-photo-nom">'+NOMS_F[f]+'</div></div>';}).join("")+
+        '</div><div class="av-titre">Les animaux</div>':'')+
+      '<div class="avatar-grid">'+AVATARS.map(function(a){var sel=av.id===a.id?" avatar-pick--selected":"";return'<button class="avatar-pick'+sel+'" data-avatar="'+a.id+'" type="button" title="'+a.name+'"><img src="'+a.img+'" alt="" class="avatar-img"/></button>';}).join("")+'</div></div>'+
 
       '<div class="acc-sec">Profil</div>'+
-      '<button class="acc-row" data-toggle="pseudoForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="acc-rb"><span class="acc-rt">Pseudo</span><span class="acc-rs">'+escapeHtml(u.displayName||"Non défini")+'</span></span><span class="acc-chev">\u203a</span></button>'+
-      '<div id="pseudoForm" class="account-subform hidden"><div class="account-field-row"><input type="text" id="accountPseudo" value="'+escapeHtml(u.displayName||"")+'" placeholder="Ton pseudo" class="account-input" /><button id="savePseudo" class="account-btn-sm" type="button">Sauver</button></div><div id="pseudoMsg" class="account-msg hidden"></div></div>'+
+      '<button class="acc-row" data-toggle="pseudoForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="acc-rb"><span class="acc-rt">Pseudo</span><span class="acc-rs">'+escapeHtml(u.displayName||"Non défini")+'</span></span><span class="acc-chev">›</span></button>'+
+      '<div id="pseudoForm" class="account-subform hidden"><div class="account-field-row"><input type="text" id="accountPseudo" value="'+escapeHtml(u.displayName||"")+'" placeholder="Ton pseudo" class="account-input" maxlength="80" /><button id="savePseudo" class="account-btn-sm" type="button">Sauver</button></div></div>'+
 
       '<div class="acc-sec">Sécurité</div>'+
-      '<button class="acc-row" data-toggle="pwForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="acc-rb"><span class="acc-rt">Mot de passe</span><span class="acc-rs">Modifier ou réinitialiser</span></span><span class="acc-chev">\u203a</span></button>'+
-      '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button><div id="pwMsg" class="account-msg hidden"></div>'+
-      // Sortie de secours : sans l\'ancien mot de passe, le formulaire ci-dessus
-      // est inutilisable. Le lien reste donc a portee, mais dans son contexte.
-      '<button type="button" id="openResetFromAccount" class="acc-forgot">Mot de passe oublié ?</button></div>'+
+      '<button class="acc-row" data-toggle="pwForm" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><span class="acc-rb"><span class="acc-rt">Mot de passe</span><span class="acc-rs">'+(aMdp?'Modifier ou réinitialiser':'Pas encore créé')+'</span></span><span class="acc-chev">›</span></button>'+
+      (aMdp
+        ? '<div id="pwForm" class="account-subform hidden"><div class="account-field"><input type="password" id="currentPw" placeholder="Mot de passe actuel" class="account-input" autocomplete="current-password" /></div><div class="account-field"><input type="password" id="newPw" placeholder="Nouveau (8 car. min)" class="account-input" autocomplete="new-password" /></div><button id="savePw" class="account-btn-sm" type="button">Changer</button>'+
+          // Sortie de secours : sans l\'ancien mot de passe, le formulaire ci-dessus
+          // est inutilisable. Le lien part a l\'adresse du compte.
+          '<button type="button" id="openResetFromAccount" class="acc-forgot">Mot de passe oublié ? Recevoir un lien par e-mail</button></div>'
+        // compte cree avec Google ou Discord : pas encore de mot de passe, il se cree par le lien envoye a l'adresse du compte
+        : '<div id="pwForm" class="account-subform hidden"><p class="acc-note">'+(nomsLies.length?'Tu te connectes avec '+nomsLies.join(" et ")+'. Pour te connecter aussi avec ton e-mail':'Pour te connecter avec ton e-mail')+', crée un mot de passe : on t\'envoie un lien.</p>'+
+          '<button id="sendPwLink" class="account-btn-sm" type="button">Recevoir le lien</button></div>')+
+
+      (ids?'<div class="acc-sec">Se connecter avec</div>'+ligneLien("google")+ligneLien("discord")+
+        (seul?'<p class="acc-note">Pour délier '+NOMS_F[lies[0]]+', crée d\'abord un mot de passe ou lie un autre compte.</p>':'')+
+        (aConfirmer&&lies.length<2?'<p class="acc-note">Pour lier Google ou Discord, confirme d\'abord ton adresse e-mail : touche « À confirmer » pour recevoir le lien.</p>':''):'')+
 
       '<div class="acc-sec">Notifications</div>'+
       '<label class="acc-tog"><span class="acc-tb">Sur le site<small>Cloche et badges</small></span><input type="checkbox" id="toggleNotif" '+(u.notificationsEnabled?'checked':'')+' /><span class="acc-sw"></span></label>'+
       '<label class="acc-tog"><span class="acc-tb">Par email<small>Rappels de sortie</small></span><input type="checkbox" id="toggleEmail" '+(u.emailNotificationsEnabled?'checked':'')+' /><span class="acc-sw"></span></label>'+
 
-      (u.isPremium?'<div class="acc-sec">Abonnement</div><a href="/account" class="acc-row acc-row--prem"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3 6.5 7 1-5 5 1.2 7L12 18l-6.2 3.5L7 14.5l-5-5 7-1Z"/></svg><span class="acc-rb"><span class="acc-rt">Gérer mon abonnement</span><span class="acc-rs">Premium actif</span></span><span class="acc-chev">\u203a</span></a>':'')+
+      (u.isPremium?'<div class="acc-sec">Abonnement</div><a href="/account" class="acc-row acc-row--prem"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 3 6.5 7 1-5 5 1.2 7L12 18l-6.2 3.5L7 14.5l-5-5 7-1Z"/></svg><span class="acc-rb"><span class="acc-rt">Gérer mon abonnement</span><span class="acc-rs">Premium actif</span></span><span class="acc-chev">›</span></a>':'')+
 
       '<button class="acc-out" id="accountLogout" type="button"><svg class="acc-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Se déconnecter</button>';
     // Toggle sections
@@ -336,28 +420,20 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     // Email verification - resend link on click
     var unverifiedBtn=document.getElementById("emailUnverifiedBtn");
     if(unverifiedBtn){
-      unverifiedBtn.addEventListener("click",async function(){
-        if(unverifiedBtn.classList.contains("account-email-unverified--sent"))return;
-        var originalText=unverifiedBtn.textContent;
-        unverifiedBtn.textContent="Envoi…";
-        unverifiedBtn.disabled=true;
+      unverifiedBtn.addEventListener("click",async function renvoyer(){
+        var mail=currentUser?currentUser.email:"";
+        if(verifEnvoyee){retour("Lien déjà envoyé à "+mail,{detail:"Regarde aussi dans tes courriers indésirables"});return;}
+        if(unverifiedBtn.classList.contains("est-en-cours"))return;
+        var rate=function(){retour("Pas envoyé : le serveur ne répond pas",{type:"ko",detail:"Aucun lien n'est parti",action:"Réessayer",surAction:function(){unverifiedBtn.click();}});};
+        enCours(unverifiedBtn,true);
         try{
-          var res=await fetch(authEndpoint("/auth/resend-verification"),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:currentUser.email})});
-          var data=await res.json();
-          if(res.ok&&data.ok){
-            unverifiedBtn.textContent="✅ Email envoyé, vérifie ta boîte";
-            unverifiedBtn.classList.add("account-email-unverified--sent");
-          }else if(res.status===429){
-            unverifiedBtn.textContent="Trop de tentatives, réessaie plus tard";
-            setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},5000);
-          }else{
-            unverifiedBtn.textContent="Erreur, réessaie";
-            setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},3000);
-          }
-        }catch(e){
-          unverifiedBtn.textContent="Erreur réseau";
-          setTimeout(function(){unverifiedBtn.textContent=originalText;unverifiedBtn.disabled=false;},3000);
-        }
+          var res=await fetch(authEndpoint("/auth/resend-verification"),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:mail})});
+          var data=await res.json().catch(function(){return {};});
+          if(res.ok&&data.ok){verifEnvoyee=true;retour("Lien envoyé à "+mail,{detail:"Ouvre-le pour confirmer ton adresse"});}
+          else if(res.status===429){retour("Trop de demandes : réessaie dans 15 minutes",{type:"ko"});}
+          else rate();
+        }catch(e){rate();}
+        finally{enCours(unverifiedBtn,false);}
       });
     }
 
@@ -365,95 +441,152 @@ const apiBase = import.meta.env.PUBLIC_API_BASE ?? "";
     accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(btn){
       btn.addEventListener("click",async function(){
         var avId=btn.dataset.avatar;
+        if(avatarEnCours||btn.classList.contains("avatar-pick--selected"))return;
+        avatarEnCours=true;
+        var rate=function(t){retour(t,{type:"ko",detail:"Rien n'a été changé",action:"Réessayer",surAction:function(){btn.click();}});};
         try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({avatar:avId})});
-        if(res.ok){var data=await res.json();currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);
+        var data=await res.json().catch(function(){return {};});
+        if(res.ok&&data.user){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);
         accountDrawerContent.querySelectorAll(".avatar-pick").forEach(function(b){b.classList.remove("avatar-pick--selected");});btn.classList.add("avatar-pick--selected");
-        var disp=document.getElementById("accAvDisp");if(disp)var _gv=getAv(avId);disp.innerHTML='<img src="'+_gv.img+'" alt="" class="avatar-img"/>';}}catch(e){}
+        var _gv=avDe(currentUser);var disp=document.getElementById("accAvDisp");if(disp)disp.innerHTML=imgAv(_gv);
+        retour("Avatar changé",{detail:_gv.photo?"C'est maintenant ta photo "+NOMS_F[_gv.id]:"Tu es maintenant "+_gv.name});}
+        else if(res.status===401)sessionFinie();
+        else rate(echecDe(res,data,"Pas enregistré"));
+        }catch(e){rate(MUET);}
+        finally{avatarEnCours=false;}
       });
     });
 
     // Save pseudo
-    document.getElementById("savePseudo")?.addEventListener("click",async function(){
-      var input=document.getElementById("accountPseudo"),msg=document.getElementById("pseudoMsg"),name=input?input.value.trim():"";if(!name)return;
-      try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({displayName:name})});var data=await res.json();
-      if(res.ok){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);var nd=document.getElementById("accNameDisp");if(nd)nd.textContent=name;if(msg){msg.textContent="✅ Pseudo mis à jour";msg.classList.remove("hidden","account-msg--error");}}
-      else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
-    });
+    var pseudoInput=document.getElementById("accountPseudo"),savePseudo=document.getElementById("savePseudo"),pseudoLigne=accountDrawerContent.querySelector("#pseudoForm .account-field-row");
+    async function enregistrerPseudo(){
+      if(!pseudoInput||!savePseudo||savePseudo.disabled)return;
+      var name=pseudoInput.value.trim().replace(/\s+/g," ");
+      champOk(pseudoInput,pseudoLigne);
+      if(name.length<2){champKo(pseudoInput,"Ton pseudo doit faire au moins 2 caractères.",pseudoLigne);return;}
+      if(name.length>80){champKo(pseudoInput,"Ton pseudo doit faire 80 caractères au plus.",pseudoLigne);return;}
+      if(currentUser&&name===String(currentUser.displayName||"")){var pf=document.getElementById("pseudoForm");if(pf)pf.classList.add("hidden");return;}
+      var rate=function(t){retour(t,{type:"ko",detail:"Rien n'a été changé",action:"Réessayer",surAction:enregistrerPseudo});};
+      enCours(savePseudo,true);
+      try{var res=await fetch(authEndpoint("/auth/profile"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({displayName:name})});var data=await res.json().catch(function(){return {};});
+      if(res.ok&&data.user){currentUser=data.user;showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);renderAccountDrawer();retour("Pseudo enregistré",{detail:"Tu t'appelles maintenant "+(currentUser.displayName||name)});return;}
+      enCours(savePseudo,false);
+      if(res.status===401)sessionFinie();
+      else if(res.status===400&&data.error)champKo(pseudoInput,String(data.error),pseudoLigne);
+      else rate(echecDe(res,data,"Pas enregistré"));
+      }catch(e){enCours(savePseudo,false);rate(MUET);}
+    }
+    if(savePseudo)savePseudo.addEventListener("click",enregistrerPseudo);
+    if(pseudoInput){pseudoInput.addEventListener("keydown",function(e){if(e.key==="Enter")enregistrerPseudo();});pseudoInput.addEventListener("input",function(){champOk(pseudoInput,pseudoLigne);});}
 
     // Change password
-    document.getElementById("savePw")?.addEventListener("click",async function(){
-      var cur=document.getElementById("currentPw"),nw=document.getElementById("newPw"),msg=document.getElementById("pwMsg");
-      if(!cur||!nw||!cur.value||!nw.value)return;if(nw.value.length<8){if(msg){msg.textContent="❌ 8 caractères minimum";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}return;}
-      try{var res=await fetch(authEndpoint("/auth/password"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({currentPassword:cur.value,newPassword:nw.value})});var data=await res.json();
-      if(res.ok){cur.value="";nw.value="";if(msg){msg.textContent="✅ Mot de passe changé";msg.classList.remove("hidden","account-msg--error");}}
-      else{if(msg){msg.textContent="❌ "+(data.error||"Erreur");msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}}catch(e){if(msg){msg.textContent="❌ Erreur";msg.classList.remove("hidden");msg.classList.add("account-msg--error");}}
+    var cur=document.getElementById("currentPw"),nw=document.getElementById("newPw"),savePw=document.getElementById("savePw");
+    async function changerMdp(){
+      if(!cur||!nw||!savePw||savePw.disabled)return;
+      champOk(cur);champOk(nw);
+      var bon=true;
+      if(!cur.value){champKo(cur,"Saisis ton mot de passe actuel.");bon=false;}
+      if(!nw.value){champKo(nw,"Choisis le nouveau mot de passe.");bon=false;}
+      else if(nw.value.length<8){champKo(nw,"8 caractères minimum : il en manque "+(8-nw.value.length)+".");bon=false;}
+      else if(nw.value.length>100){champKo(nw,"100 caractères au plus.");bon=false;}
+      if(!bon)return;
+      var rate=function(t){retour(t,{type:"ko",detail:"Ton mot de passe reste le même",action:"Réessayer",surAction:changerMdp});};
+      enCours(savePw,true);
+      try{var res=await fetch(authEndpoint("/auth/password"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({currentPassword:cur.value,newPassword:nw.value})});var data=await res.json().catch(function(){return {};});
+      enCours(savePw,false);
+      if(res.ok){cur.value="";nw.value="";var pf=document.getElementById("pwForm");if(pf)pf.classList.add("hidden");retour("Mot de passe changé",{detail:"Tes autres appareils sont déconnectés"});return;}
+      if(res.status===401&&data.error&&data.error!=="Non authentifié"){champKo(cur,String(data.error));return;}
+      if(res.status===401){sessionFinie();return;}
+      if(res.status===400&&data.error){champKo(nw,String(data.error));return;}
+      if((res.status===429||res.status===409)&&data.error){retour(String(data.error),{type:"ko"});return;}
+      rate(echecDe(res,data,"Pas changé"));
+      }catch(e){enCours(savePw,false);rate("Pas changé : le serveur ne répond pas");}
+    }
+    if(savePw)savePw.addEventListener("click",changerMdp);
+    if(nw)nw.addEventListener("keydown",function(e){if(e.key==="Enter")changerMdp();});
+    [cur,nw].forEach(function(i){if(i)i.addEventListener("input",function(){champOk(i);});});
+
+    // Mot de passe oublie, ou a creer : un lien envoye a l'adresse du compte
+    async function envoyerLien(btn,pourCreer){
+      if(!btn||!currentUser||btn.classList.contains("est-en-cours"))return;
+      var mail=currentUser.email;
+      var rate=function(t){retour(t,{type:"ko",detail:"Aucun lien n'est parti",action:"Réessayer",surAction:function(){envoyerLien(btn,pourCreer);}});};
+      enCours(btn,true);
+      try{var res=await fetch(authEndpoint("/auth/request-password-reset"),{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:mail})});var data=await res.json().catch(function(){return {};});
+      enCours(btn,false);
+      if(res.ok&&data.ok){retour("Lien envoyé à "+mail,{detail:pourCreer?"Ouvre-le pour créer ton mot de passe":"Ouvre-le pour choisir un nouveau mot de passe"});return;}
+      if(res.status===429){retour("Trop de demandes : réessaie dans 15 minutes",{type:"ko"});return;}
+      rate(echecDe(res,data,"Pas envoyé"));
+      }catch(e){enCours(btn,false);rate("Pas envoyé : le serveur ne répond pas");}
+    }
+    var oubli=document.getElementById("openResetFromAccount");if(oubli)oubli.addEventListener("click",function(){envoyerLien(oubli,false);});
+    var creer=document.getElementById("sendPwLink");if(creer)creer.addEventListener("click",function(){envoyerLien(creer,true);});
+
+    // Se connecter avec : lier (vers Google ou Discord, retour ici), delier (apres confirmation)
+    accountDrawerContent.querySelectorAll("[data-lier]").forEach(function(a){
+      a.addEventListener("click",function(){a.setAttribute("href",lienLier(a.dataset.lier));a.classList.add("est-en-cours");a.textContent="Ouverture…";});
     });
+    accountDrawerContent.querySelectorAll("[data-delier]").forEach(function(b){
+      b.addEventListener("click",function(){
+        if(b.disabled)return;
+        var f=b.dataset.delier,ligne=b.closest(".acc-lien");if(!ligne)return;
+        var deja=ligne.nextElementSibling;
+        if(deja&&deja.classList.contains("acc-conf")){deja.remove();return;}
+        var nom=NOMS_F[f],autre=lies.filter(function(x){return x!==f;}).map(function(x){return NOMS_F[x];})[0];
+        ligne.insertAdjacentHTML("afterend",'<div class="acc-conf">Délier '+nom+' ? Tu ne pourras plus te connecter avec '+nom+'. '+(aMdp?"Ton e-mail et ton mot de passe restent valables.":"Tu pourras toujours te connecter avec "+autre+".")+
+          '<div class="acc-conf__acts"><button class="acc-act" type="button" data-conf-non>Annuler</button><button class="acc-act acc-act--dg" type="button" data-conf-oui>Délier</button></div></div>');
+        var conf=ligne.nextElementSibling;
+        conf.querySelector("[data-conf-non]").addEventListener("click",function(){conf.remove();});
+        var oui=conf.querySelector("[data-conf-oui]");
+        oui.addEventListener("click",function(){delier(f,oui);});
+      });
+    });
+
     // SESSION 13: brancher les 2 toggles in-app/email du drawer Compte sur l'API
     // Source de vérité = /me/notification-channels (même que page /account/preferences)
-    document.getElementById("toggleNotif")?.addEventListener("change", async function(){
-      var t = this;
-      try {
-        var res = await fetch(authEndpoint("/me/notification-channels"), {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ notificationsEnabled: t.checked })
-        });
-        if (res.ok) {
-          var d = await res.json();
-          if (currentUser) { currentUser.notificationsEnabled = d.notificationsEnabled; }
-          t.checked = d.notificationsEnabled;
-        } else {
-          t.checked = !t.checked; // rollback visuel si erreur
-        }
-      } catch(e) { t.checked = !t.checked; }
-    });
-    document.getElementById("toggleEmail")?.addEventListener("change", async function(){
-      var t = this;
-      try {
-        var res = await fetch(authEndpoint("/me/notification-channels"), {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ emailNotificationsEnabled: t.checked })
-        });
-        if (res.ok) {
-          var d = await res.json();
-          if (currentUser) { currentUser.emailNotificationsEnabled = d.emailNotificationsEnabled; }
-          // Backend peut forcer à false si user pas Premium — refléter dans l'UI
-          t.checked = d.emailNotificationsEnabled;
-        } else {
-          t.checked = !t.checked;
-        }
-      } catch(e) { t.checked = !t.checked; }
-    });
+    // Une bascule ratee revient a sa place, avec « Reessayer » (patch du 4 novembre 2026).
+    brancherBascule("toggleNotif","notificationsEnabled","Notifications sur le site");
+    brancherBascule("toggleEmail","emailNotificationsEnabled","Notifications par e-mail");
 
     document.getElementById("accountLogout")?.addEventListener("click",function(){closeAccountDrawer();authLogout();});
-    document.getElementById("openResetFromAccount")?.addEventListener("click",function(){closeAccountDrawer();openResetDrawerFn();});
   }
+  function brancherBascule(id,champ,libelle){
+    var t=document.getElementById(id);if(!t)return;
+    t.addEventListener("change",async function(){
+      var voulu=t.checked;
+      var rate=function(x){retour(x,{type:"ko",detail:"Rien n'a été changé",action:"Réessayer",surAction:function(){if(!t.isConnected)return;t.checked=voulu;t.dispatchEvent(new Event("change"));}});};
+      t.disabled=true;
+      var body={};body[champ]=voulu;
+      try{
+        var res=await fetch(authEndpoint("/me/notification-channels"),{method:"PATCH",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify(body)});
+        var d=await res.json().catch(function(){return {};});
+        t.disabled=false;
+        if(res.ok&&typeof d[champ]==="boolean"){t.checked=d[champ];if(currentUser)currentUser[champ]=d[champ];retour(libelle+(d[champ]?" activées":" coupées"));return;}
+        t.checked=!voulu;
+        if(res.status===401){sessionFinie();return;}
+        rate(echecDe(res,d,"Pas enregistré"));
+      }catch(e){t.disabled=false;t.checked=!voulu;rate(MUET);}
+    });
+  }
+  async function delier(f,btn){
+    if(!btn||btn.disabled)return;
+    var nom=NOMS_F[f];
+    var rate=function(t){retour(t,{type:"ko",detail:"Rien n'a été changé",action:"Réessayer",surAction:function(){if(btn.isConnected)delier(f,btn);}});};
+    enCours(btn,true);
+    try{var res=await fetch(authEndpoint("/auth/identites/"+f+"/delier"),{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:"{}"});var data=await res.json().catch(function(){return {};});
+    if(res.ok&&data.ok){majConnexion(data);if(currentUser&&currentUser.avatar===f){currentUser.avatar="avatar_01";}if(currentUser)showUser(currentUser.displayName,currentUser.email,currentUser.avatar,currentUser.isPremium);renderAccountDrawer();retour(nom+" délié",{detail:"Tu ne peux plus te connecter avec "+nom});return;}
+    enCours(btn,false);
+    if(res.status===401){sessionFinie();return;}
+    if(res.status===409){majConnexion(data);renderAccountDrawer();retour(String(data.error||"C'est ta seule façon de te connecter"),{type:"ko"});return;}
+    rate(echecDe(res,data,"Pas délié"));
+    }catch(e){enCours(btn,false);rate("Pas délié : le serveur ne répond pas");}
+  }
+  function majConnexion(d){if(!currentUser||!d)return;if(Array.isArray(d.identites))currentUser.identites=d.identites;if(typeof d.motDePasse==="boolean")currentUser.motDePasse=d.motDePasse;}
 
   function openAccountDrawerFn(){closeDropdown();openDrawer(accountDrawer,accountOverlay);renderAccountDrawer();}
-  if(accountDrawerClose)accountDrawerClose.addEventListener("click",closeAccountDrawer);
-  if(accountOverlay)accountOverlay.addEventListener("click",closeAccountDrawer);
-  document.getElementById("openAccountDrawer")?.addEventListener("click",function(){openAccountDrawerFn();});
-
-  // ── RESET PASSWORD ───────────────────────────────
-  var resetDrawer=document.getElementById("resetDrawer"),resetOverlay=document.getElementById("resetOverlay"),resetDrawerClose=document.getElementById("resetDrawerClose");
-  function closeResetDrawer(){closeDrawerEl(resetDrawer,resetOverlay);}
-  function openResetDrawerFn(){openDrawer(resetDrawer,resetOverlay);}
-  if(resetDrawerClose)resetDrawerClose.addEventListener("click",closeResetDrawer);
-  if(resetOverlay)resetOverlay.addEventListener("click",closeResetDrawer);
-  document.getElementById("resetBtn")?.addEventListener("click",async function(){
-    var email=document.getElementById("resetEmail"),pseudo=document.getElementById("resetPseudo"),newPwBlock=document.getElementById("resetNewPwBlock"),newPw=document.getElementById("resetNewPw"),errDiv=document.getElementById("resetError"),successDiv=document.getElementById("resetSuccess"),btn=document.getElementById("resetBtn");
-    if(!email||!pseudo)return;
-    if(newPwBlock&&!newPwBlock.classList.contains("hidden")){
-      if(!newPw||newPw.value.length<8){if(errDiv){errDiv.textContent="8 caractères minimum";errDiv.classList.remove("hidden");}return;}
-      try{var res=await fetch(authEndpoint("/auth/reset-password"),{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({email:email.value.trim(),displayName:pseudo.value.trim(),newPassword:newPw.value})});var data=await res.json();
-      if(res.ok){if(errDiv)errDiv.classList.add("hidden");if(successDiv){successDiv.textContent="✅ Mot de passe réinitialisé !";successDiv.classList.remove("hidden");}if(btn)btn.classList.add("hidden");}
-      else{if(errDiv){errDiv.textContent=data.error||"Erreur";errDiv.classList.remove("hidden");}}}catch(e){if(errDiv){errDiv.textContent="Erreur serveur";errDiv.classList.remove("hidden");}}
-      return;
-    }
-    if(!email.value.trim()||!pseudo.value.trim()){if(errDiv){errDiv.textContent="Remplis email et pseudo";errDiv.classList.remove("hidden");}return;}
-    if(errDiv)errDiv.classList.add("hidden");if(newPwBlock)newPwBlock.classList.remove("hidden");if(btn)btn.textContent="Réinitialiser";
-  });
+  if(accountDrawerClose)accountDrawerClose.addEventListener("click",function(){fermerTout("accountDrawer");});
+  if(accountOverlay)accountOverlay.addEventListener("click",function(){fermerTout("accountDrawer");});
+  document.getElementById("openAccountDrawer")?.addEventListener("click",function(){openAccountDrawerFn();marquerTiroir("accountDrawer");});
 
   // ── NOTIFICATIONS ────────────────────────────────
   var notifPDrawer=document.getElementById("notifPageDrawer"),notifPOverlay=document.getElementById("notifPageOverlay"),notifPClose=document.getElementById("notifPageClose"),notifPContent=document.getElementById("notifPContent"),notifPMeta=document.getElementById("notifPMeta"),notifPReadAll=document.getElementById("notifPReadAll");
@@ -516,7 +649,15 @@ if(notifPContent)notifPContent.innerHTML=items.map(function(item){var p=item.pay
     }
   });
 
-  fetchMe();
+  var moiPret=fetchMe();
+  (window).__gnMoi=moiPret;
+  moiPret.then(function(u){
+    if(!u)return;
+    // retour de Google ou de Discord apres « Lier » : Mon compte se rouvre, la pastille dit ce qui s'est passe
+    var c=(window).__gnCode;
+    if(c&&["lie","deja-lie","annule","echec","email","indisponible","confirmer","trop"].indexOf(c.code)!==-1){openAccountDrawerFn();marquerTiroir("accountDrawer");return;}
+    menuDemande();
+  });
 </script>
 
 <style>

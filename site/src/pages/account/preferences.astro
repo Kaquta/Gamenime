@@ -8,7 +8,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
 
   <main class="prefs-page container">
     <div class="prefs-breadcrumb">
-      <a href="/account">← Mon abonnement</a>
+      <a href="/">← Retour</a>
     </div>
 
     <h1 class="prefs-page__title">Mes préférences d'alertes</h1>
@@ -160,6 +160,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
       </section>
       <button type="submit" class="prefs-save-btn">Enregistrer mes préférences</button>
       <div id="prefsMsg" class="prefs-msg hidden"></div>
+      <div class="prefs-encours" id="prefsEncours" role="status" hidden><span class="prefs-encours__txt">Modifications non enregistrées<small id="prefsEncoursDetail"></small></span><button type="button" class="prefs-encours__non" id="prefsAnnuler">Annuler</button><button type="button" class="prefs-encours__oui" id="prefsEnregistrer">Enregistrer</button></div>
     </form>
 
   </main>
@@ -199,7 +200,20 @@ import HeroHeader from "../../components/HeroHeader.astro";
         }
       }
 
-      async function saveChannel(field, value) {
+      // ── les retours apres une action (patch du 4 novembre 2026, copie de la maquette validee) ──
+      function retour(t, o) { if (typeof window.gnRetour === "function") window.gnRetour(t, o || {}); }
+      function sessionFinie() {
+        retour("Ta session a expiré", { type: "ko", detail: "Reconnecte-toi pour continuer", action: "Se connecter",
+          surAction: function () { window.location.href = "/signin?retour=" + encodeURIComponent(location.pathname); } });
+      }
+      var LIBELLES = { notificationsEnabled: "Notifications sur le site", emailNotificationsEnabled: "Notifications par e-mail" };
+      async function saveChannel(field, value, input) {
+        var rate = function () {
+          if (input) input.checked = !value;
+          retour("Pas enregistré : le serveur ne répond pas", { type: "ko", detail: "Rien n'a été changé", action: "Réessayer",
+            surAction: function () { if (input) input.checked = value; saveChannel(field, value, input); } });
+        };
+        if (input) input.disabled = true;
         try {
           var body = {};
           body[field] = value;
@@ -209,28 +223,24 @@ import HeroHeader from "../../components/HeroHeader.astro";
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body)
           });
-          var data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Erreur");
-          if (channelsMsg) {
-            channelsMsg.textContent = "✅ Préférence enregistrée";
-            channelsMsg.classList.remove("hidden", "prefs-msg--error");
-            setTimeout(function(){ if(channelsMsg) channelsMsg.classList.add("hidden"); }, 2500);
-          }
+          var data = await res.json().catch(function () { return {}; });
+          if (input) input.disabled = false;
+          if (res.status === 401) { if (input) input.checked = !value; sessionFinie(); return; }
+          if (!res.ok || typeof data[field] !== "boolean") { rate(); return; }
+          if (input) input.checked = data[field];
+          retour(LIBELLES[field] + (data[field] ? " activées" : " coupées"));
         } catch (e) {
-          if (channelsMsg) {
-            channelsMsg.textContent = "❌ Erreur : " + (e.message || "réseau");
-            channelsMsg.classList.remove("hidden");
-            channelsMsg.classList.add("prefs-msg--error");
-          }
+          if (input) input.disabled = false;
+          rate();
         }
       }
 
       if (toggleInApp) toggleInApp.addEventListener("change", function(){
-        saveChannel("notificationsEnabled", toggleInApp.checked);
+        saveChannel("notificationsEnabled", toggleInApp.checked, toggleInApp);
       });
       if (toggleEmail) toggleEmail.addEventListener("change", function(){
         if (toggleEmail.disabled) return;
-        saveChannel("emailNotificationsEnabled", toggleEmail.checked);
+        saveChannel("emailNotificationsEnabled", toggleEmail.checked, toggleEmail);
       });
 
       loadChannels();
@@ -259,14 +269,17 @@ import HeroHeader from "../../components/HeroHeader.astro";
           if (copyBtn) {
             copyBtn.addEventListener("click", function() {
               var val = urlInput ? urlInput.value : "";
-              if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(val);
-              } else if (urlInput) {
-                urlInput.select();
-                try { document.execCommand("copy"); } catch (e) {}
-              }
-              copyBtn.textContent = "✓ Copié";
-              setTimeout(function(){ copyBtn.textContent = "Copier"; }, 1500);
+              var copie = function () {
+                copyBtn.textContent = "✓ Copié";
+                setTimeout(function(){ copyBtn.textContent = "Copier"; }, 1500);
+              };
+              var aLaMain = function () {
+                if (urlInput) { urlInput.focus(); urlInput.select(); }
+                try { if (document.execCommand("copy")) { copie(); return; } } catch (e) {}
+                retour("Copie impossible", { type: "ko", detail: "Le lien est sélectionné : copie-le à la main" });
+              };
+              if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(val).then(copie, aLaMain);
+              else aLaMain();
             });
           }
         } catch (e) {
@@ -317,6 +330,41 @@ import HeroHeader from "../../components/HeroHeader.astro";
         // anneaux des numeros de cartes
         var cardG = document.querySelector(".prefs-card--genres .prefs-card__num"); setRing(cardG, nG / totalGenres);
         var cardP = document.querySelector(".prefs-card--platforms .prefs-card__num"); setRing(cardP, nP / totalPlatforms);
+        majBarre();
+      }
+
+      // ── la barre « Modifications non enregistrées » (variante B validee par Rey le 4 novembre 2026) ──
+      var barre = document.getElementById("prefsEncours");
+      var barreDetail = document.getElementById("prefsEncoursDetail");
+      var sauve = null;   // ce que l'API a : depuis la lecture, ou le dernier enregistrement
+      function rappelsCoches() {
+        return reminderGrid ? Array.from(reminderGrid.querySelectorAll("input[type=checkbox]:checked")).map(function(i){ return Number(i.value); }) : [];
+      }
+      function garder() { sauve = { g: selectedGenres.slice(), p: selectedPlatforms.slice(), r: rappelsCoches() }; }
+      // « 2 genres et 1 plateforme en plus » ; rien si tout est comme dans l'API
+      function ecart() {
+        if (!sauve) return "";
+        var plus = [], moins = [];
+        function compter(nom, noms, avant, apres) {
+          var p = apres.filter(function(x){ return avant.indexOf(x) === -1; }).length;
+          var m = avant.filter(function(x){ return apres.indexOf(x) === -1; }).length;
+          if (p) plus.push(p + " " + (p > 1 ? noms : nom));
+          if (m) moins.push(m + " " + (m > 1 ? noms : nom));
+        }
+        compter("genre", "genres", sauve.g, selectedGenres);
+        compter("plateforme", "plateformes", sauve.p, selectedPlatforms);
+        compter("rappel", "rappels", sauve.r, rappelsCoches());
+        function liste(a) { return a.length > 1 ? a.slice(0, -1).join(", ") + " et " + a[a.length - 1] : a[0]; }
+        var t = [];
+        if (plus.length) t.push(liste(plus) + " en plus");
+        if (moins.length) t.push(liste(moins) + " en moins");
+        return t.join(", ");
+      }
+      function majBarre() {
+        if (!barre) return;
+        var e = ecart();
+        if (e && barreDetail) barreDetail.textContent = e;
+        barre.hidden = !e;
       }
       var REMINDERS = [
         { value: 7, label: "7 jours avant" },
@@ -408,6 +456,7 @@ import HeroHeader from "../../components/HeroHeader.astro";
           renderGenres();
           renderPlatforms2();
           renderReminders(data.reminderDaysBefore || [7, 0]);
+          garder();
           updateSummary();
           wireContentPills(".prefs-seg[data-for=genres]", function(v){ genresContentFilter = v; renderGenres(); });
           wireContentPills(".prefs-seg[data-for=platforms]", function(v){ platformsContentFilter = v; renderPlatforms2(); });
@@ -416,11 +465,24 @@ import HeroHeader from "../../components/HeroHeader.astro";
         }
       }
 
+      var enregistrement = false;
       async function save(e) {
-        e.preventDefault();
+        if (e) e.preventDefault();
+        if (enregistrement) return;
         var alertGenres = selectedGenres.slice();
         var alertPlatforms = selectedPlatforms.slice();
-        var reminderDaysBefore = Array.from(reminderGrid.querySelectorAll("input:checked")).map(function(i){ return Number(i.value); });
+        var reminderDaysBefore = rappelsCoches();
+        var detail = ecart();
+        var boutons = [document.querySelector(".prefs-save-btn"), document.getElementById("prefsEnregistrer")];
+        var fin = function () {
+          enregistrement = false;
+          boutons.forEach(function(b){ if (b) { b.classList.remove("est-en-cours"); b.disabled = false; } });
+        };
+        var rate = function (t) {
+          retour(t, { type: "ko", detail: "Tes choix restent affichés", action: "Réessayer", surAction: function(){ save(null); } });
+        };
+        enregistrement = true;
+        boutons.forEach(function(b){ if (b) { b.classList.add("est-en-cours"); b.disabled = true; } });
 
         try {
           var res = await fetch(apiBase + "/api/premium/preferences", {
@@ -429,27 +491,48 @@ import HeroHeader from "../../components/HeroHeader.astro";
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ alertGenres: alertGenres, alertPlatforms: alertPlatforms, reminderDaysBefore: reminderDaysBefore })
           });
-          var data = await res.json();
+          var data = await res.json().catch(function(){ return {}; });
+          fin();
           if (res.ok) {
-            if (msgEl) {
-              msgEl.textContent = "✅ Préférences enregistrées";
-              msgEl.classList.remove("hidden", "prefs-msg--error");
-            }
+            sauve = { g: alertGenres, p: alertPlatforms, r: reminderDaysBefore };
+            majBarre();
+            retour("Préférences enregistrées", detail ? { detail: detail } : {});
+          } else if (res.status === 401) {
+            sessionFinie();
           } else {
-            if (msgEl) {
-              msgEl.textContent = "❌ " + (data.error || "Erreur");
-              msgEl.classList.remove("hidden");
-              msgEl.classList.add("prefs-msg--error");
-            }
+            // le message de l'API s'il est fait pour etre lu (un refus), sinon « le serveur ne repond pas »
+            var refus = res.status >= 400 && res.status < 500 && typeof data.error === "string" && /\s/.test(data.error) ? data.error.trim() : "";
+            rate("Pas enregistré : " + (refus ? refus.charAt(0).toLowerCase() + refus.slice(1).replace(/\.$/, "") : "le serveur ne répond pas"));
           }
         } catch (err) {
-          if (msgEl) {
-            msgEl.textContent = "❌ Erreur réseau";
-            msgEl.classList.remove("hidden");
-            msgEl.classList.add("prefs-msg--error");
-          }
+          fin();
+          rate("Pas enregistré : le serveur ne répond pas");
         }
       }
+      var annulerBtn = document.getElementById("prefsAnnuler");
+      if (annulerBtn) annulerBtn.addEventListener("click", function(){
+        if (!sauve) return;
+        selectedGenres = sauve.g.slice();
+        selectedPlatforms = sauve.p.slice();
+        renderGenres();
+        renderPlatforms2();
+        renderReminders(sauve.r);
+        updateSummary();
+      });
+      var enregistrerBtn = document.getElementById("prefsEnregistrer");
+      if (enregistrerBtn) enregistrerBtn.addEventListener("click", function(){ save(null); });
+      // une page quittee avec des choix pas enregistres : le navigateur demande d'abord
+      window.addEventListener("beforeunload", function (ev) {
+        if (!enregistrement && ecart()) { ev.preventDefault(); ev.returnValue = ""; }
+      });
+      // « ← Retour » : la page d'avant, avec le menu ouvert (le menu du compte lit la demande)
+      var retourLien = document.querySelector(".prefs-breadcrumb a");
+      if (retourLien) retourLien.addEventListener("click", function (ev) {
+        try { sessionStorage.setItem("gn-menu", String(Date.now())); } catch (x) {}
+        var dIci = false;
+        try { dIci = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (x) {}
+        if (dIci && history.length > 1) { ev.preventDefault(); history.back(); }
+      });
 
       if (formEl) formEl.addEventListener("submit", save);
       load();

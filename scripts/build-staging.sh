@@ -56,14 +56,18 @@ liens_uniques() {
     | grep -vE 'href="/(anime|games)/"' | sort -u | wc -l
 }
 
+# Une fiche est reliee si au moins une page du site (accueil, listes, A venir,
+# calendrier...) y mene ; les fiches elles-memes ne comptent pas : une fiche
+# reliee seulement par une autre fiche reste introuvable depuis les listes.
 orphelines() {
   local d=$1
   TMP_PAGES=$(mktemp); TMP_LIENS=$(mktemp)
   { ls -1d "$d"/anime/*/ 2>/dev/null | sed 's|.*/anime/|anime/|; s|/$||'
     ls -1d "$d"/games/*/ 2>/dev/null | sed 's|.*/games/|games/|; s|/$||'; } | sort -u > "$TMP_PAGES"
-  cat "$d/anime/index.html" "$d/games/index.html" "$d/upcoming/index.html" "$d/index.html" 2>/dev/null \
-    | grep -o 'href="/\(anime\|games\)/[^"]\+/"' \
-    | sed 's|href="/||; s|/"$||' | sort -u > "$TMP_LIENS"
+  ( cd "$d" && find . -name '*.html' -not -path './_astro/*' -not -path './anime/*/*' -not -path './games/*/*' \
+      -exec cat {} + 2>/dev/null ) \
+    | grep -oE 'href="/(anime|games)/[^"/?#]+/?([?#][^"]*)?"' \
+    | sed -E 's#^href="/(anime|games)/([^"/?#]+).*#\1/\2#' | sort -u > "$TMP_LIENS"
   comm -23 "$TMP_PAGES" "$TMP_LIENS" | wc -l
 }
 

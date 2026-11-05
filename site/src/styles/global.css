@@ -7214,3 +7214,208 @@ html[data-gn~="cameleon"] :is(body,#_):not(#_) .uv-fv-an + .uv-fv-av { margin-to
 html[data-gn~="cameleon"] :is(body,#_):not(#_) .uv-fv-av + .uv-fv-an, html[data-gn~="cameleon"] :is(body,#_):not(#_) .uv-fv-av + .uv-f-etiq { margin-top: 6px; }
 }
 /* UNIVERS-FIN */
+
+/* N1-ENTETE-DEBUT : le logo N°1 « 新 couleur », sans le mot, a la place du sceau 新 de l'en-tete (2 novembre 2026).
+   Copie du canevas « Logo rond GameNime » (Badge-C-shin-couleur), sans le mot ni les kana ; mesures rapportees
+   a la boite du sceau (512 px du canevas = 100cqw), qui garde sa taille et sa place sur chaque page.
+   Couleur : la regle du site, celle du sceau (Cameleon : --ep-a ; pages braise : braise ; Encre noir et or : vermillon).
+   Sans couleurs relatives (navigateurs anciens) : le N°1 braise. */
+@font-face { font-family: "GN N1"; font-style: normal; font-weight: 900; font-display: block; src: url("/fonts/gn-n1-shin.woff2") format("woff2"); }
+html :is(body,#_):not(#_):not(#_) .brand-kanji.brand-n1 {
+  position: relative; overflow: hidden; isolation: isolate; container-type: size;
+  padding: 0; border-radius: 50%; background: none; box-shadow: none; color: transparent; text-shadow: none;
+  transform: none; -webkit-mask-image: none; mask-image: none;
+  --n1-c: var(--ep-a);
+  --n1-f1: hsla(28, 78%, 50%, .58); --n1-f1z: hsla(28, 78%, 50%, 0);
+  --n1-f2: hsla(28, 88%, 62%, .32); --n1-f2z: hsla(28, 88%, 62%, 0);
+  --n1-nuit: hsl(28, 30%, 7%); --n1-bord: hsla(28, 90%, 70%, .3); --n1-verre: hsla(28, 90%, 78%, .22);
+  --n1-s1: hsla(28, 92%, 62%, .55); --n1-s2: hsla(28, 92%, 62%, .16); --n1-s3: hsla(28, 92%, 62%, .05);
+}
+html[data-gn~=braise] :is(body,#_):not(#_):not(#_) .brand-kanji.brand-n1 { --n1-c: hsl(28, 85%, 72%); }
+html[data-gn~=noir-or] :is(body,#_):not(#_):not(#_) .brand-kanji.brand-n1 { --n1-c: hsl(8, 85%, 72%); }
+@supports (color: hsl(from red h calc(s * 1) l)) {
+  html :is(body,#_):not(#_):not(#_) .brand-kanji.brand-n1 {
+    --n1-f1: hsl(from var(--n1-c) h calc(s * 78 / 85) 50% / .58); --n1-f1z: hsl(from var(--n1-c) h calc(s * 78 / 85) 50% / 0);
+    --n1-f2: hsl(from var(--n1-c) h calc(s * 88 / 85) 62% / .32); --n1-f2z: hsl(from var(--n1-c) h calc(s * 88 / 85) 62% / 0);
+    --n1-nuit: hsl(from var(--n1-c) h calc(s * 30 / 85) 7%); --n1-bord: hsl(from var(--n1-c) h calc(s * 90 / 85) 70% / .3);
+    --n1-verre: hsl(from var(--n1-c) h calc(s * 90 / 85) 78% / .22);
+    --n1-s1: hsl(from var(--n1-c) h calc(s * 92 / 85) 62% / .55); --n1-s2: hsl(from var(--n1-c) h calc(s * 92 / 85) 62% / .16);
+    --n1-s3: hsl(from var(--n1-c) h calc(s * 92 / 85) 62% / .05);
+  }
+}
+html :is(body,#_):not(#_):not(#_) .brand-n1 > .n1-fond { position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(72% 56% at 50% 104%, var(--n1-f1), var(--n1-f1z) 70%), radial-gradient(52% 44% at 78% 16%, var(--n1-f2), var(--n1-f2z) 70%), var(--n1-nuit);
+  box-shadow: inset 0 0 0 .29296875cqw var(--n1-bord); }
+html :is(body,#_):not(#_):not(#_) .brand-n1 > .n1-shin { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: "GN N1", "Noto Sans JP", sans-serif; font-style: normal; font-weight: 900; font-size: 74.21875cqw; line-height: 1; letter-spacing: normal; }
+html :is(body,#_):not(#_):not(#_) .brand-n1 > .n1-shin > span {
+  background-image: linear-gradient(to top, var(--n1-s1) 0%, var(--n1-s2) 62%, var(--n1-s3) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+html :is(body,#_):not(#_):not(#_) .brand-n1 > .n1-verre { position: absolute; inset: 5.859375%; border-radius: 50%;
+  background: linear-gradient(150deg, rgba(255,255,255,.11) 0%, rgba(255,255,255,.045) 36%, rgba(255,255,255,.02) 62%, rgba(255,255,255,.06) 100%);
+  box-shadow: inset 0 0 0 .1953125cqw var(--n1-verre), inset 0 .29296875cqw 0 rgba(255,255,255,.34), inset 0 -.1953125cqw 0 rgba(255,255,255,.06), 0 4.6875cqw 9.375cqw -4.6875cqw rgba(0,0,0,.8); }
+html :is(body,#_):not(#_):not(#_) .brand-n1 > .n1-reflets { position: absolute; inset: 5.859375%; border-radius: 50%;
+  background: linear-gradient(118deg, rgba(255,255,255,0) 0 21%, rgba(255,255,255,.075) 21% 29%, rgba(255,255,255,0) 29% 33%, rgba(255,255,255,.04) 33% 36%, rgba(255,255,255,0) 36%); }
+/* N1-ENTETE-FIN */
+
+/* COMPTE-OAUTH-DEBUT : Google et Discord, comptes lies, retours apres une action (maquette du 4 novembre 2026) */
+
+/* ── Connexion / Inscription : les deux boutons, le separateur, la mention ── */
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social { display: grid; gap: 10px; margin: 0 0 18px; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__btn {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 12px;
+  box-sizing: border-box; width: 100%; height: 50px; padding: 0 18px; border-radius: 999px;
+  background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); color: var(--t-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 10px 26px -16px rgba(0, 0, 0, .9);
+  font: 600 15px/1 Inter, sans-serif; text-decoration: none; cursor: pointer;
+  transition: background .16s ease, border-color .16s ease;
+}
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__btn:hover { background: var(--t-survol); border-color: var(--t-voir-bord); }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__btn:focus-visible { outline: 2px solid var(--t-acc); outline-offset: 2px; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__logo { flex: none; width: 20px; height: 20px; display: grid; place-items: center; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__logo svg { width: 20px; height: 20px; display: block; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-social__btn--discord .auth-social__logo svg { fill: #5865f2; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-sep {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 16px;
+  color: var(--t-ink3); font: 500 12.5px/1 Inter, sans-serif;
+}
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-sep::before,
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-sep::after { content: ""; flex: 1; height: 1px; background: var(--t-tete-fil); }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-legal {
+  margin: 14px 0 0; text-align: center; color: var(--t-ink3); font: 400 12px/1.5 Inter, sans-serif;
+}
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-legal a { color: var(--t-ink2); text-decoration: none; border-bottom: 1px dotted var(--t-voir-bord); }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-legal a:hover { color: var(--t-acc-clair); }
+/* l'erreur sous un champ (le champ passe en rouge doux) */
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-card__field input.champ-ko { border-color: rgba(240, 139, 127, .6); box-shadow: 0 0 0 4px rgba(240, 139, 127, .14); }
+html[data-gn~=connexion] :is(body,#_):not(#_) .champ-msg { margin: 7px 0 0; color: #f2a093; font: 500 12.5px/1.4 Inter, sans-serif; }
+html[data-gn~=connexion] :is(body,#_):not(#_) .auth-card__error a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ── Mon compte : « Se connecter avec » (Google, Discord) ── */
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien { cursor: default; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien:hover { background: rgba(255, 255, 255, .035); border-color: rgba(255, 255, 255, .07); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien__logo { flex: none; width: 18px; height: 18px; display: grid; place-items: center; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien__logo svg { width: 18px; height: 18px; display: block; fill: #5865f2; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien .acc-rs { display: flex; align-items: center; gap: 6px; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-lien .acc-rs i { flex: none; width: 6px; height: 6px; border-radius: 50%; background: #6fd99a; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; text-decoration: none;
+  flex: none; height: 32px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+  background: var(--t-pastille-bg); border: 1px solid var(--t-pastille-bord); color: var(--t-ink); font: 600 12.5px/1 Inter, sans-serif;
+  transition: background .16s ease, border-color .16s ease;
+}
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act:hover:not(:disabled) { background: var(--t-survol); border-color: var(--t-voir-bord); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act--plein { border: 0; background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act--plein:hover:not(:disabled) { background: var(--t-grad); filter: brightness(1.05); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act--dg { color: #f2a093; border-color: rgba(240, 139, 127, .42); background: rgba(240, 139, 127, .05); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act--dg:hover:not(:disabled) { background: rgba(240, 139, 127, .12); border-color: rgba(240, 139, 127, .7); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-act:disabled { opacity: .45; cursor: not-allowed; }
+/* la confirmation sous la ligne (delier) */
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-conf {
+  margin: -2px 0 8px; padding: 12px 13px; border-radius: 12px;
+  background: rgba(240, 139, 127, .06); border: 1px solid rgba(240, 139, 127, .28);
+  color: var(--t-ink2); font: 500 12.5px/1.45 Inter, sans-serif;
+}
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-conf__acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+/* la note sous un formulaire (mot de passe a creer, lien envoye) */
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .acc-note { margin: 2px 0 10px; color: var(--t-ink3); font: 500 12.5px/1.45 Inter, sans-serif; }
+/* l'erreur sous un champ du tiroir */
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .account-input.champ-ko { border-color: rgba(240, 139, 127, .6); box-shadow: 0 0 0 4px rgba(240, 139, 127, .14); }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .champ-msg { margin: 6px 2px 0; color: #f2a093; font: 500 12.5px/1.4 Inter, sans-serif; }
+
+/* ── le retour au menu : la fleche en tete des tiroirs ouverts depuis le menu (Mes favoris, Mon compte) ── */
+.drawer-panel__header .dp-retour { flex: none; margin-right: 12px; font-size: 17px; }
+.drawer-panel__header .dp-retour + h2 { flex: 1; min-width: 0; }
+html[data-gn~=cameleon] :is(body,#_):not(#_) :is(.drawer-panel, .notif-drawer) .drawer-panel__header .dp-retour { font-size: 16px; }
+
+/* ── Mes preferences : la barre « Modifications non enregistrees » (variante B) ── */
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours {
+  position: sticky; bottom: max(16px, env(safe-area-inset-bottom)); z-index: 30;
+  display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: min(100%, 560px); margin: 16px auto 0; padding: 8px 8px 8px 18px;
+  border-radius: 999px; background: linear-gradient(180deg, rgba(36, 36, 38, .98), rgba(16, 16, 18, .99)); border: 1px solid var(--t-voir-bord);
+  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, .95), 0 0 0 1px rgba(0, 0, 0, .4); color: var(--t-ink);
+}
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours[hidden] { display: none; }
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__txt { flex: 1; min-width: 0; font: 600 14px/1.25 Inter, sans-serif; }
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__txt small { display: block; margin-top: 2px; color: var(--t-ink3); font: 500 12px/1.3 Inter, sans-serif; }
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__non { flex: none; height: 40px; padding: 0 12px; border: 0; background: none; color: var(--t-ink3); font: 500 13.5px/1 Inter, sans-serif; cursor: pointer; }
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__non:hover { color: var(--t-ink); }
+html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__oui {
+  flex: none; height: 40px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--t-grad); color: var(--t-sur-acc); box-shadow: var(--t-acc-ombre); font: 600 14px/1 Inter, sans-serif;
+}
+@media (max-width: 480px) {
+  html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours { padding-left: 14px; }
+  html[data-gn~=prefs] :is(body,#_):not(#_) .prefs-encours__txt small { display: none; }
+}
+
+/* ── un bouton qui travaille : le texte dit ce qui se passe, le bouton ne prend plus de clic ── */
+.est-en-cours { pointer-events: none; }
+.est-en-cours::before {
+  content: ""; display: inline-block; flex: none; width: 14px; height: 14px; margin-right: 9px; vertical-align: -2px;
+  border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: gn-tourne .7s linear infinite;
+}
+@keyframes gn-tourne { to { transform: rotate(360deg); } }
+
+/* ── le retour apres une action : une pastille en bas de l'ecran, au-dessus de tout ── */
+.gn-retour {
+  position: fixed; left: 50%; bottom: max(22px, calc(env(safe-area-inset-bottom) + 12px)); z-index: 3000;
+  display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: max-content; max-width: min(calc(100vw - 24px), 460px); padding: 9px 16px 9px 9px;
+  border-radius: 999px; background: linear-gradient(180deg, #262628, #121214); border: 1px solid rgba(255, 255, 255, .1);
+  box-shadow: 0 18px 44px -16px rgba(0, 0, 0, .95), 0 0 0 1px rgba(0, 0, 0, .45);
+  color: #f5f5f7; font: 600 14px/1.3 Inter, sans-serif;
+  opacity: 0; transform: translate(-50%, 14px); pointer-events: none; transition: opacity .2s ease, transform .2s ease;
+}
+.gn-retour.est-la { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.gn-retour__ic { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--t-grad, linear-gradient(180deg, #ff9c4c, #d7501e)); color: #0e0e12; }
+.gn-retour__ic svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.gn-retour--ko .gn-retour__ic { background: rgba(240, 139, 127, .16); box-shadow: inset 0 0 0 1px rgba(240, 139, 127, .55); color: #f2a093; font: 800 14px/1 Inter, sans-serif; }
+.gn-retour__tx { min-width: 0; }
+.gn-retour__tx small { display: block; margin-top: 1px; color: #a9abb3; font: 500 12px/1.3 Inter, sans-serif; }
+.gn-retour__act {
+  flex: none; margin-left: 4px; height: 30px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .16); color: #f5f5f7; font: 600 12.5px/1 Inter, sans-serif;
+}
+.gn-retour__act:hover { background: rgba(255, 255, 255, .12); }
+@media (prefers-reduced-motion: reduce) {
+  .gn-retour { transition: opacity .2s ease; transform: translate(-50%, 0); }
+  .est-en-cours::before { animation-duration: 2s; }
+}
+/* COMPTE-OAUTH-FIN */
+
+/* AVATAR-PHOTO-DEBUT : la photo des comptes lies comme avatar (patch du 5 novembre 2026, copie de la maquette validee) */
+#avatarForm .av-titre { margin: 4px 2px 10px; font: 700 11.5px/1 Inter, sans-serif; letter-spacing: .09em; color: rgba(255,255,255,.46);
+  text-transform: uppercase; display: flex; align-items: center; gap: 10px; }
+#avatarForm .av-titre::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.08); }
+#avatarForm .av-titre small { font: 500 11px/1 Inter, sans-serif; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,.34); }
+#avatarForm .av-photos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 18px; }
+#avatarForm .av-case { position: relative; } #avatarForm .av-rond { position: relative; }
+#avatarForm .av-badge { position: absolute; right: 2%; bottom: 2%; width: 30%; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  box-shadow: 0 0 0 2px #161616; z-index: 2; pointer-events: none; }
+#avatarForm .av-badge img { width: 62%; height: 62%; display: block; }
+#avatarForm .av-badge--g { background: #fff; } #avatarForm .av-badge--d { background: #5865f2; }
+#avatarForm .av-photo-nom { margin-top: 6px; font: 500 11px/1.2 Inter, sans-serif; color: rgba(255,255,255,.55); text-align: center; }
+/* le logo de Discord en ligne (celui de l'en-tete), en blanc, comme l'image de la maquette */
+#avatarForm .av-badge svg { width: 62%; height: 62%; display: block; fill: #fff; }
+/* une photo n'est jamais agrandie (les animaux le sont, pour cacher leur bord) : dans le choix, l'en-tete et Mon compte */
+:is(.avatar-pick, .auth-user-menu__avatar, .acc-av) img.avatar-img--photo { transform: none; }
+/* AVATAR-PHOTO-FIN */
+
+/* RESEAUX-DEBUT : TikTok et Instagram avec Discord (patch du 5 novembre 2026, copie de la maquette validee) */
+/* ordinateur : en colonne sous Discord, hors du flux (l'en-tete ne bouge pas) */
+.reseaux-colonne { position: absolute; top: calc(100% + 10px); left: 0; display: flex; flex-direction: column; gap: 10px; }
+.discord-link { position: relative; }
+.discord-link .res-ic { display: none; }
+/* telephone : un seul rond ; son logo change toutes les 2 s (Discord, TikTok, Instagram), jamais deux logos l'un sur l'autre */
+@media (max-width: 760px) {
+  .reseaux-colonne { display: none; }
+  .discord-link > svg:not(.res-ic) { display: none; }
+  .discord-link .res-ic { display: block; position: absolute; inset: 0; margin: auto; opacity: 0; transform: scale(.6);
+    transition: opacity .15s ease, transform .15s ease; }
+  .discord-link .res-ic.est-la { opacity: 1; transform: none;
+    transition: opacity .2s ease .15s, transform .28s cubic-bezier(.2, .9, .3, 1.3) .15s; }
+}
+@media (max-width: 760px) and (prefers-reduced-motion: reduce) {
+  .discord-link .res-ic, .discord-link .res-ic.est-la { transition: none; }
+}
+/* RESEAUX-FIN */

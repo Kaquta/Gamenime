@@ -28,7 +28,7 @@ const {
   title = "GameNime",
   description = "Nouveautés animés et jeux vidéo : trailers, plateformes, dates.",
   canonical = new URL(Astro.url.pathname, "https://gamenime.fr").href,
-  image = "https://gamenime.fr/og-image.jpg?v=2",
+  image = "https://gamenime.fr/og-image.jpg?v=4",
   ogType = "website",
   accueil = false,
   catalogue = false,
@@ -65,13 +65,13 @@ const gn = accueil ? "fond encre verre bleu vitre cameleon" : catalogue ? "fond 
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={image} />
     {noindex ? <meta name="robots" content="noindex, follow" /> : <link rel="canonical" href={canonical} />}
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
-    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=5" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=5" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=5" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png?v=5" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png?v=5" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#d9a978" />
+    <meta name="theme-color" content="#ff9c4c" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -83,6 +83,11 @@ const gn = accueil ? "fond encre verre bleu vitre cameleon" : catalogue ? "fond 
         });
       }
     </script>
+    <!-- notifications sur l'appareil (patch du 31 octobre 2026, copie de la maquette validee) -->
+    <link rel="stylesheet" href="/push.css?v=1" />
+    <script is:inline src="/push.js?v=1" defer></script>
+    <!-- retours apres une action (patch du 4 novembre 2026, copie de la maquette validee) -->
+    <script is:inline src="/retour.js?v=1" defer></script>
   {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/shippori-mincho-b1-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin />}
   {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/shippori-mincho-b1-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />}
   {!accueil && !catalogue && !jetons && <link rel="preload" href="/fonts/gn-pinceau.woff2" as="font" type="font/woff2" crossorigin />}

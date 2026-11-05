@@ -687,7 +687,7 @@ export function rapprocher(calc: Calcul, anciennes: Ancienne[]): Plan {
 }
 
 /** Le passage écrit, tout ou rien (une transaction). */
-async function ecrire(pool: LicencesDeps["pool"], plan: Plan, annee: number, mesures: Record<string, number>): Promise<void> {
+async function ecrire(pool: LicencesDeps["pool"], plan: Plan, annee: number, mesures: Record<string, number>, refus: string[]): Promise<void> {
   const conn = typeof pool.getConnection === "function" ? await pool.getConnection() : null;
   const q = (sql: string, params?: unknown[]): Promise<any> => (conn ? conn.query(sql, params) : pool.query(sql, params));
   let fini = false;
@@ -728,7 +728,7 @@ async function ecrire(pool: LicencesDeps["pool"], plan: Plan, annee: number, mes
       plan.lignes.flatMap((l) => l.calc.reperes.map((x) => [x.source, x.id, l.id, x.dom, String(x.titre).slice(0, 300), txt(x.format, 30), x.annee, Math.min(Math.round(x.pop), 2147483647), x.principal ? 1 : 0, String(x.par).slice(0, 20)])));
     await parLots("licences_directs", ["domaine", "item_id", "source", "source_id", "nature"],
       plan.lignes.flatMap((l) => l.calc.directs.map((x) => [x.dom, x.id, x.source, x.sourceId, String(x.nature).slice(0, 20)])));
-    for (const [cle, valeur] of [["regles", VERSION_REGLES], ["annee", String(annee)], ["mesures", JSON.stringify(mesures)]]) {
+    for (const [cle, valeur] of [["regles", VERSION_REGLES], ["annee", String(annee)], ["mesures", JSON.stringify(mesures)], ["refus", JSON.stringify(refus.slice(0, 5000))]]) {
       await q("INSERT INTO licences_etat (cle, valeur, le) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE valeur = VALUES(valeur), le = VALUES(le)", [cle, valeur]);
     }
     await q("DELETE FROM licences_etat WHERE cle = 'garde'");
@@ -786,6 +786,12 @@ export interface BilanLicences {
   /** Les changements, 30 au plus par liste ; comptes : le nombre de chaque sorte. */
   changements: (Plan["changements"] & { comptes: Record<string, number> }) | null;
   aVerifier: Record<string, string[]>;
+  /** Règles 7 : les réunions refusées par le contrôle des œuvres d'origine ; nouvelles : absentes du dernier passage écrit
+   *  (10 au plus) ; premier : aucun passage écrit ne les avait encore notées (toutes sont « nouvelles »). */
+  refusees: number;
+  refusNouveaux: string[];
+  refusNouveauxN: number;
+  refusPremier: boolean;
 }
 
 /** Les changements pour le bilan : 30 au plus par liste (le bilan est gardé au Pilotage), et le compte de chaque sorte. */
@@ -829,6 +835,23 @@ async function gardePrecedente(pool: SqlPool): Promise<Baisses> {
   }
   return out;
 }
+/** Les réunions refusées au dernier passage écrit (paires clé et œuvres d'origine) ; null : jamais notées. */
+async function refusPrecedents(pool: SqlPool): Promise<Set<string> | null> {
+  let l: any[];
+  try {
+    l = await pool.query("SELECT valeur FROM licences_etat WHERE cle = 'refus'");
+  } catch (e) {
+    if (tableAbsente(e)) return null;
+    throw e;
+  }
+  if (!l.length) return null;
+  try {
+    const v = JSON.parse(String(l[0].valeur || ""));
+    return new Set(Array.isArray(v) ? v.map(String) : []);
+  } catch {
+    return null;
+  }
+}
 async function noterGarde(pool: SqlPool, m: Baisses): Promise<void> {
   await pool.query("INSERT INTO licences_etat (cle, valeur, le) VALUES ('garde', ?, NOW()) ON DUPLICATE KEY UPDATE valeur = VALUES(valeur), le = VALUES(le)", [JSON.stringify({ m })]);
 }
@@ -844,6 +867,7 @@ export async function passageLicences(deps: LicencesDeps, cfg: LicencesConfig, o
   const bilan: BilanLicences = {
     fiches: 0, animes: 0, jeux: 0, licences: 0, licences2: 0, blocs: 0, croisees: 0, reperes: 0, pontsTitre: 0, pontsNom: 0, pontsCatalogue: 0,
     requetes: { al: 0, ig: 0, wd: 0 }, pausesN8n: 0, duree: 0, ecrit: false, replis: [], changements: null, aVerifier: {},
+    refusees: 0, refusNouveaux: [], refusNouveauxN: 0, refusPremier: false,
   };
   let rendre: (() => Promise<void>) | null;
   try {
@@ -881,7 +905,20 @@ export async function passageLicences(deps: LicencesDeps, cfg: LicencesConfig, o
       egaux: L30(calc.diag.egaux, (x) => `${x.titre} : ${x.licences.join(" / ")}`),
       partages: L30(calc.diag.partages, (x) => `${x.titre} : ${x.licences.join(" / ")}`),
       multi: L30(calc.diag.multi, (x) => `${x.titre} (${x.franchises.join(", ")})`),
+      refuses: L30(calc.diag.refuses, (x) => `${x.a} / ${x.b} (${x.lien} : ${x.cle})`.slice(0, 160)),
     };
+    // règles 7 : les réunions refusées par les contrôles, et celles que le dernier passage écrit n'avait pas
+    // (ceux du contrôle des œuvres d'origine seulement : les autres refus, des règles d'avant, restent au diagnostic)
+    const dejaRefus = await refusPrecedents(deps.pool);
+    const refusC = calc.diag.refuses.filter((x) => x.origine);
+    // en base : les paires (clé, œuvre d'origine de chaque côté) des refus ; un refus est nouveau si aucune de ses paires
+    // n'était notée au dernier passage écrit. Une ligne par refus (un même refus peut venir de deux étapes).
+    const refusIds = [...new Set(refusC.flatMap((x) => x.paires))];
+    const nouveauxRefus = refusC.filter((x, k, l) => !x.paires.some((p) => dejaRefus?.has(p)) && l.findIndex((y) => y.id === x.id) === k);
+    bilan.refusPremier = dejaRefus === null;
+    bilan.refusees = new Set(refusC.map((x) => x.id)).size;
+    bilan.refusNouveauxN = nouveauxRefus.length;
+    bilan.refusNouveaux = nouveauxRefus.slice(0, 10).map((x) => `${x.a} / ${x.b} (${x.cle})`.slice(0, 160));
     ancienne = await chargerMemoire(deps.pool);
     plan = rapprocher(calc, await lireAnciennes(deps.pool));
     bilan.changements = changementsBilan(plan.changements);
@@ -922,7 +959,7 @@ export async function passageLicences(deps: LicencesDeps, cfg: LicencesConfig, o
       } else if (o.ecrire && JSON.stringify(note) !== JSON.stringify(prec)) await noterGarde(deps.pool, note);
     }
     if (o.ecrire && !bilan.garde) {
-      await ecrire(deps.pool, plan, annee, mes);
+      await ecrire(deps.pool, plan, annee, mes, refusIds);
       bilan.ecrit = true;
       if (leve) {
         deps.log.warn({ module: "licences", garde: leve }, "licences : baisse confirmée, écrite");
@@ -979,7 +1016,7 @@ export function startLicencesCron(deps: LicencesDeps, env: Record<string, string
           deps.log.info({ module: "licences" }, "licences : un passage tourne déjà (essai à blanc ?), nouvel essai dans 30 min");
           return { bilan: { occupe: true }, reessayerDansMs: 30 * MIN };
         }
-        const resume = { fiches: bilan.fiches, licences: bilan.licences, licences2: bilan.licences2, blocs: bilan.blocs, reperes: bilan.reperes, requetes: bilan.requetes, duree: bilan.duree };
+        const resume = { fiches: bilan.fiches, licences: bilan.licences, licences2: bilan.licences2, blocs: bilan.blocs, reperes: bilan.reperes, refusees: bilan.refusees, requetes: bilan.requetes, duree: bilan.duree };
         const ch = bilan.changements;
         // les comptes entiers (les listes du bilan sont coupées à 30)
         const nb = (k: string): number => (ch ? Number(ch.comptes?.[k] ?? (ch as any)[k]?.length ?? 0) : 0);
@@ -992,6 +1029,17 @@ export function startLicencesCron(deps: LicencesDeps, env: Record<string, string
         }
         deps.log.info({ module: "licences", ...resume }, "licences : passage terminé");
         if (nChg) pushActivity({ type: "licences", message: `Licences : ${nChg} changement${nChg > 1 ? "s" : ""}`, detail: `${bilan.blocs} blocs remplis sur ${bilan.fiches} fiches`, level: "info" });
+        // règles 7 : le contrôle a refusé des réunions que le dernier passage écrit n'avait pas vues (au premier passage
+        // qui les note, toutes : le message le dit)
+        const nR = N(bilan.refusNouveauxN), s = nR > 1 ? "s" : "";
+        if (nR) {
+          pushActivity({
+            type: "licences",
+            message: bilan.refusPremier ? `Univers : contrôle en place, ${nR} réunion${s} refusée${s} (premier relevé)` : `Univers : ${nR} nouvelle${s} réunion${s} refusée${s} par le contrôle`,
+            detail: bilan.refusNouveaux.slice(0, 3).join(" ; ").slice(0, 300),
+            level: "info",
+          });
+        }
         return { bilan: bilan as any };
       } finally {
         enCours = false;

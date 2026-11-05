@@ -49,6 +49,10 @@ services:
       TAVILY_ENABLED: "0"
       TAVILY_API_KEY: ${TAVILY_API_KEY}
       STEAM_API_KEY: ${STEAM_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
     volumes:
       # Le rapport et le journal du build, en lecture seule : l'API les affiche,
       # elle ne les ecrit jamais.

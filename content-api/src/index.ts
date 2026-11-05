@@ -14,6 +14,7 @@ import { isMissing as gnIsMissing, normalizeTitle as gnNormalizeTitle, sanitizeP
 import { startRefetchCron, adminRefetchHandler, refetchOneAnimeItem, fetchAniList, fetchKitsu, matchAnimeRoutesCycle, applyFranchiseFloorsCycle } from "./gamenime/refetch-cron.js";
 import { startRefetchGamesCron, refetchOneGameItem, fetchIgdb, matchOrphanGamesCycle } from "./gamenime/refetch-games-cron.js";
 import { startHealthCheckCron, runHealthCheck } from "./gamenime/health-check-cron.js";
+import { noterDeconnexion, noterVisite, registerComptes } from "./gamenime/comptes.js";
 import { adminLookupHandler, startLookupCron } from "./gamenime/lookup-cron.js";
 import { expandSearchTerm } from "./gamenime/search-aliases.js";
 import { adminQualityCheckHandler, startQualityCron } from "./gamenime/quality-cron.js";
@@ -31,6 +32,9 @@ import { startEuropeCron } from "./gamenime/europe.js";
 import { startIgdbJeuxCron, igdbJeuxActif } from "./gamenime/igdb-jeux.js";
 import { registerPilotage } from "./gamenime/pilotage.js";
 import { registerLicencesRoutes, startLicencesCron, universDe } from "./gamenime/licences.js";
+import { registerSuiviFavoris, startSuiviFavoris } from "./gamenime/suivi-favoris.js";
+import { oublierAppareils, registerPush, startPush } from "./gamenime/push.js";
+import { registerOauth, etatConnexion, ipClient, photoDe } from "./gamenime/oauth.js";
 
 const app = Fastify({ logger: true, bodyLimit: 1024 * 1024, ignoreTrailingSlash: true });
 
@@ -75,6 +79,8 @@ const pool = mariadb.createPool({
 // les hooks doivent exister avant l'enregistrement des routes qu'ils couvrent.
 await registerAdminRuns(app, pool);
 registerPublication(app);
+// la section Comptes du dashboard : liste, fiche et gestes (routes à clé), table des visites (comptes.ts)
+await registerComptes(app, pool);
 // Pilotage (dashboard, 17 octobre 2026) : interrupteurs, lancements et journal des modules automatiques. Branché ici,
 // avant les routes et les modules : ses crochets doivent exister avant les routes qu'ils regardent, et ses
 // interrupteurs (relus en base) avant les cycles qu'il planifie.
@@ -155,6 +161,8 @@ async function getAuthenticatedUser(req: any) {
     return null;
   }
   await pool.query(`UPDATE user_sessions SET last_seen_at = NOW() WHERE id = ?`, [user.sessionId]);
+  // la dernière visite du compte (section Comptes du dashboard) : au plus une écriture par heure, sans attendre
+  noterVisite(pool, user.id);
   // Auto-expire premium if expired
   const isPremiumActive = user.isPremium && (!user.premiumExpiresAt || new Date(user.premiumExpiresAt).getTime() > Date.now());
   if (user.isPremium && !isPremiumActive) {
@@ -176,6 +184,36 @@ async function getAuthenticatedUser(req: any) {
   };
 }
 
+
+// Une session pour ce compte, comme à la connexion par mot de passe (connexion par Google ou Discord : oauth.ts).
+async function ouvrirSession(reply: any, userId: number) {
+  const sessionToken = createSessionToken();
+  await pool.query(
+    `INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)`,
+    [userId, sha256(sessionToken), getSessionExpiresAt()]
+  );
+  noterVisite(pool, userId, true);
+  setAuthCookie(reply, sessionToken);
+}
+// Le compte tel que le site le lit (GET /auth/me, et la réponse de PATCH /auth/profile) : avec les comptes liés
+// (Google, Discord) et l'existence d'un mot de passe. Toujours la même forme : Mon compte ne voit jamais un champ manquer.
+async function compteDe(user: any) {
+  const c = await etatConnexion(pool, user.id);
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    notificationsEnabled: user.notificationsEnabled,
+    emailNotificationsEnabled: user.emailNotificationsEnabled,
+    emailVerified: user.emailVerified,
+    avatar: user.avatar,
+    isPremium: user.isPremium,
+    premiumPlan: user.premiumPlan,
+    premiumExpiresAt: user.premiumExpiresAt,
+    identites: c.identites,
+    motDePasse: c.motDePasse,
+  };
+}
 
 // ── Premium helpers ────────────────────────────────
 async function requireAuth(req: any, reply: any) {
@@ -365,7 +403,7 @@ app.post("/auth/register", async (req, reply) => {
     const email = normalizeEmail(body.email);
     const displayName = body.displayName?.trim() || null;
     const existing: any = await pool.query(`SELECT id FROM users WHERE email = ? LIMIT 1`, [email]);
-    if (existing.length) return reply.code(409).send({ error: "Email déjà utilisé" });
+    if (existing.length) return reply.code(409).send({ error: "Un compte existe déjà avec cet e-mail." });
 
     const passwordHash = await bcrypt.hash(body.password, 12);
     const result: any = await pool.query(
@@ -380,10 +418,11 @@ app.post("/auth/register", async (req, reply) => {
       `INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)`,
       [userId, sha256(sessionToken), getSessionExpiresAt()]
     );
+    noterVisite(pool, userId, true);
 
     setAuthCookie(reply, sessionToken);
 
-    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const ip = ipClient(req);
     const userAgent = String(req.headers["user-agent"] || "");
 
     // Fire-and-forget : l'envoi ne doit jamais bloquer l'inscription.
@@ -411,22 +450,33 @@ app.post("/auth/login", async (req, reply) => {
   try {
     const body = loginBodySchema.parse(req.body);
     const email = normalizeEmail(body.email);
+    // par visiteur (IP) : 10 essais pour une même adresse e-mail et 50 en tout, sur 15 minutes : un mot de passe ne se
+    // devine plus à la chaîne
+    const ipLogin = ipClient(req);
+    if (!checkRateLimit(`login:${ipLogin}`, 50, 15 * 60 * 1000) || !checkRateLimit(`login:${ipLogin}:${email}`, 10, 15 * 60 * 1000)) {
+      return reply.code(429).send({ error: "Trop de tentatives. Réessaie dans 15 minutes." });
+    }
     const rows: any = await pool.query(
       `SELECT id, email, password_hash, display_name FROM users WHERE email = ? LIMIT 1`,
       [email]
     );
-    if (!rows.length) return reply.code(401).send({ error: "Identifiants invalides" });
+    if (!rows.length) return reply.code(401).send({ error: "E-mail ou mot de passe incorrect." });
 
     const user = rows[0];
+    // un compte créé avec Google ou Discord n'a pas de mot de passe (password_hash vide) : bcrypt le refuse toujours
     const ok = await bcrypt.compare(body.password, user.password_hash);
-    if (!ok) return reply.code(401).send({ error: "Identifiants invalides" });
+    if (!ok) return reply.code(401).send({ error: "E-mail ou mot de passe incorrect." });
 
     const sessionToken = createSessionToken();
 
-    await pool.query(
-      `INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (?, ?, ?)`,
-      [user.id, sha256(sessionToken), getSessionExpiresAt()]
+    // la session ne s'ouvre que si le mot de passe vérifié est toujours celui du compte (une reprise par Google ou
+    // Discord, ou un mot de passe changé pendant la vérification, l'emporte)
+    const ouverte: any = await pool.query(
+      `INSERT INTO user_sessions (user_id, token_hash, expires_at) SELECT id, ?, ? FROM users WHERE id = ? AND password_hash = ?`,
+      [sha256(sessionToken), getSessionExpiresAt(), user.id, user.password_hash]
     );
+    if (!ouverte.affectedRows) return reply.code(401).send({ error: "E-mail ou mot de passe incorrect." });
+    noterVisite(pool, user.id, true);
 
     setAuthCookie(reply, sessionToken);
     return reply.send({
@@ -452,7 +502,7 @@ app.post("/auth/request-password-reset", async (req, reply) => {
   try {
     const body = requestPasswordResetSchema.parse(req.body);
     const email = normalizeEmail(body.email);
-    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const ip = ipClient(req);
 
     // Rate limit: max 3 requests per 15 minutes per IP+email
     const rlKey = `pwreset:${ip}:${email}`;
@@ -494,7 +544,7 @@ app.post("/auth/request-password-reset", async (req, reply) => {
 app.post("/auth/reset-password", async (req, reply) => {
   try {
     const body = resetPasswordSchema.parse(req.body);
-    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const ip = ipClient(req);
 
     // Rate limit: max 5 attempts per 15 minutes per IP (defense against token brute force)
     const rlKey = `pwconsume:${ip}`;
@@ -513,10 +563,12 @@ app.post("/auth/reset-password", async (req, reply) => {
       return reply.code(400).send({ error: msg });
     }
 
-    // Update password
+    // Update password ; le lien recu prouve l'adresse : un compte qui ne l'avait pas encore confirmee l'est maintenant
+    // (sinon « Continuer avec Google » reprendrait plus tard ce compte et retirerait ce nouveau mot de passe) ; on ne sait
+    // pas qui l'avait cree : son pseudo et son lien d'agenda sont retires (le pseudo servait a l'ancienne route)
     const passwordHash = await bcrypt.hash(body.newPassword, 12);
     await pool.query(
-      `UPDATE users SET password_hash = ? WHERE id = ?`,
+      `UPDATE users SET password_hash = ?, display_name = IF(email_verified = 0, NULL, display_name), calendar_token = IF(email_verified = 0, NULL, calendar_token), email_verified = 1, email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ?`,
       [passwordHash, result.userId]
     );
 
@@ -525,6 +577,10 @@ app.post("/auth/reset-password", async (req, reply) => {
       `DELETE FROM user_sessions WHERE user_id = ?`,
       [result.userId]
     );
+    // les sessions effacées : la visite du compte est gardée (section Comptes du dashboard)
+    noterVisite(pool, result.userId, true);
+    // les appareils activés pour les notifications : oubliés aussi (push.ts ; jamais d'erreur ici)
+    void oublierAppareils(pool, result.userId);
 
     return reply.send({ ok: true, message: "Mot de passe mis à jour. Reconnecte-toi." });
   } catch (err: any) {
@@ -543,7 +599,7 @@ app.post("/auth/reset-password", async (req, reply) => {
 app.post("/auth/verify-email", async (req, reply) => {
   try {
     const body = verifyEmailSchema.parse(req.body);
-    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const ip = ipClient(req);
 
     // Rate limit: max 5 attempts per 15 minutes per IP
     const rlKey = `verifyemail:${ip}`;
@@ -575,7 +631,7 @@ app.post("/auth/resend-verification", async (req, reply) => {
   try {
     const body = resendVerificationSchema.parse(req.body);
     const email = normalizeEmail(body.email);
-    const ip = (req.headers["x-forwarded-for"]?.toString().split(",")[0].trim()) || req.ip || "unknown";
+    const ip = ipClient(req);
 
     // Rate limit: max 2 resends per 15 minutes per IP+email
     const rlKey = `resendverify:${ip}:${email}`;
@@ -623,6 +679,8 @@ app.post("/auth/logout", async (req, reply) => {
   try {
     const token = getAuthToken(req);
     if (token) {
+      // la visite du compte est gardée avant d'effacer la session (section Comptes du dashboard ; jamais en erreur)
+      await noterDeconnexion(pool, sha256(token));
       await pool.query(`DELETE FROM user_sessions WHERE token_hash = ?`, [sha256(token)]);
     }
     clearAuthCookie(reply);
@@ -637,20 +695,7 @@ app.get("/auth/me", async (req, reply) => {
   try {
     const user = await getAuthenticatedUser(req);
     if (!user) return reply.code(401).send({ error: "Non authentifié" });
-    return reply.send({
-      user: {
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        notificationsEnabled: user.notificationsEnabled,
-        emailNotificationsEnabled: user.emailNotificationsEnabled,
-        emailVerified: user.emailVerified,
-        avatar: user.avatar,
-        isPremium: user.isPremium,
-        premiumPlan: user.premiumPlan,
-        premiumExpiresAt: user.premiumExpiresAt,
-      }
-    });
+    return reply.send({ user: await compteDe(user) });
   } catch (err) {
     req.log.error(err);
     return reply.code(500).send({ error: "Erreur serveur" });
@@ -1066,13 +1111,25 @@ app.patch("/auth/profile", async (req, reply) => {
   try {
     const user = await getAuthenticatedUser(req);
     if (!user) return reply.code(401).send({ error: "Non authentifié" });
-    const body = req.body as any;
-    const displayName = body.displayName !== undefined ? String(body.displayName || "").trim().slice(0, 80) : null;
-    const avatar = body.avatar !== undefined ? String(body.avatar || "").trim().slice(0, 50) : null;
-    if (displayName !== null) await pool.query("UPDATE users SET display_name = ? WHERE id = ?", [displayName || null, user.id]);
+    const body = (req.body || {}) as any;
+    // vérifié avant d'écrire : un pseudo trop court ou un avatar inconnu ne change rien, et le site dit pourquoi
+    const displayName = body.displayName !== undefined ? String(body.displayName || "").trim().replace(/\s+/g, " ") : null;
+    const avatar = body.avatar !== undefined ? String(body.avatar || "").trim() : null;
+    if (displayName !== null && displayName.length < 2) return reply.code(400).send({ error: "Ton pseudo doit faire au moins 2 caractères." });
+    if (displayName !== null && displayName.length > 80) return reply.code(400).send({ error: "Ton pseudo doit faire 80 caractères au plus." });
+    // un animal (avatar_01…), ou la photo d'un compte lié (« google », « discord » : 5 novembre 2026) si l'API la garde
+    if (avatar !== null && !/^avatar_\d{2}$/.test(avatar) && avatar !== "google" && avatar !== "discord") return reply.code(400).send({ error: "Avatar inconnu." });
+    if ((avatar === "google" || avatar === "discord") && !(await photoDe(pool, user.id, avatar))) return reply.code(400).send({ error: `Ta photo ${avatar === "google" ? "Google" : "Discord"} n'est plus disponible.` });
+    // le pseudo ne s'écrit que si cette session existe encore (une reprise du compte par Google ou Discord l'a peut-être
+    // fermée entre-temps)
+    if (displayName !== null) {
+      const maj: any = await pool.query("UPDATE users SET display_name = ? WHERE id = ? AND EXISTS (SELECT 1 FROM user_sessions s WHERE s.id = ? AND s.user_id = users.id)", [displayName, user.id, user.sessionId]);
+      if (!maj.affectedRows && !(await getAuthenticatedUser(req))) return reply.code(401).send({ error: "Non authentifié" });
+    }
     if (avatar !== null) await pool.query("UPDATE users SET avatar = ? WHERE id = ?", [avatar, user.id]);
-    const rows: any = await pool.query("SELECT id, email, display_name AS displayName, avatar, notifications_enabled AS notificationsEnabled, email_notifications_enabled AS emailNotificationsEnabled FROM users WHERE id = ?", [user.id]);
-    return reply.send({ ok: true, user: rows[0] });
+    // le compte complet, relu (avant : sans emailVerified ni isPremium, d'où un « Vérifié » affiché à tort)
+    const frais = await getAuthenticatedUser(req);
+    return reply.send({ ok: true, user: await compteDe(frais || user) });
   } catch (err) { req.log.error(err); return reply.code(500).send({ error: "Erreur serveur" }); }
 });
 
@@ -1083,11 +1140,19 @@ app.patch("/auth/password", async (req, reply) => {
     const body = req.body as any;
     if (!body.currentPassword || !body.newPassword) return reply.code(400).send({ error: "Mots de passe requis" });
     if (String(body.newPassword).length < 8) return reply.code(400).send({ error: "8 caractères minimum" });
+    if (String(body.newPassword).length > 100) return reply.code(400).send({ error: "100 caractères au plus" });
     const rows: any = await pool.query("SELECT password_hash FROM users WHERE id = ?", [user.id]);
+    // compte créé avec Google ou Discord : pas encore de mot de passe, il se crée par le lien envoyé par e-mail
+    if (!String(rows[0]?.password_hash || "")) return reply.code(409).send({ error: "Pas encore de mot de passe : demande le lien par e-mail." });
+    if (!checkRateLimit(`pwchange:${user.id}`, 10, 15 * 60 * 1000)) return reply.code(429).send({ error: "Trop de tentatives. Réessaie dans 15 minutes." });
     const ok = await bcrypt.compare(body.currentPassword, rows[0].password_hash);
-    if (!ok) return reply.code(401).send({ error: "Mot de passe actuel incorrect" });
+    if (!ok) return reply.code(401).send({ error: "Mot de passe actuel incorrect." });
     const hash = await bcrypt.hash(body.newPassword, 12);
-    await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, user.id]);
+    // écrit seulement si le mot de passe vérifié est toujours celui du compte (sinon il a changé pendant la vérification)
+    const maj: any = await pool.query("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?", [hash, user.id, rows[0].password_hash]);
+    if (!maj.affectedRows) return reply.code(401).send({ error: "Mot de passe actuel incorrect." });
+    // les autres sessions sont fermées (celle-ci reste ouverte) : un mot de passe changé ferme les autres appareils
+    await pool.query("DELETE FROM user_sessions WHERE user_id = ? AND id <> ?", [user.id, user.sessionId]);
     return reply.send({ ok: true });
   } catch (err) { req.log.error(err); return reply.code(500).send({ error: "Erreur serveur" }); }
 });
@@ -1097,11 +1162,29 @@ app.post("/auth/reset-password-legacy", async (req, reply) => {
     const body = req.body as any;
     if (!body.email || !body.displayName || !body.newPassword) return reply.code(400).send({ error: "Tous les champs sont requis" });
     if (String(body.newPassword).length < 8) return reply.code(400).send({ error: "8 caractères minimum" });
-    const rows: any = await pool.query("SELECT id, display_name FROM users WHERE email = ?", [normalizeEmail(body.email)]);
+    // 4 novembre 2026 : 10 essais par visiteur en 15 minutes
+    if (!checkRateLimit(`legacy:${ipClient(req)}`, 10, 15 * 60 * 1000)) return reply.code(429).send({ error: "Trop de tentatives. Réessaie dans 15 minutes." });
+    const rows: any = await pool.query("SELECT id, display_name, password_hash FROM users WHERE email = ?", [normalizeEmail(body.email)]);
     if (!rows.length) return reply.code(404).send({ error: "Compte introuvable" });
+    // un compte qui se connecte avec Google ou Discord (pas de mot de passe, ou un compte lié) ne passe jamais par cette
+    // ancienne route : son pseudo vient souvent du prénom Google, facile à deviner
+    if (!String(rows[0].password_hash || "")) return reply.code(403).send({ error: "Pseudo incorrect" });
+    const lies: any = await pool.query("SELECT COUNT(*) AS n FROM user_identites WHERE user_id = ?", [rows[0].id]).catch(() => [{ n: 0 }]);
+    if (Number(lies[0]?.n || 0) > 0) return reply.code(403).send({ error: "Pseudo incorrect" });
+    // un compte sans pseudo ne passe jamais (avant : un espace suffisait)
+    if (!String(rows[0].display_name || "").trim()) return reply.code(403).send({ error: "Pseudo incorrect" });
     if (String(rows[0].display_name || "").toLowerCase() !== String(body.displayName).toLowerCase().trim()) return reply.code(403).send({ error: "Pseudo incorrect" });
     const hash = await bcrypt.hash(body.newPassword, 12);
-    await pool.query("UPDATE users SET password_hash = ? WHERE id = ?", [hash, rows[0].id]);
+    // écrit seulement si rien n'a changé depuis la lecture (même mot de passe, toujours aucun compte lié : une reprise par
+    // Google ou Discord pendant ce calcul l'emporte). Cette route ne prouve pas l'adresse : le compte repasse « à
+    // confirmer » (pas de liaison possible ; « Continuer avec Google » le reprendra), et ses sessions sont fermées.
+    const maj: any = await pool.query(
+      "UPDATE users SET password_hash = ?, email_verified = 0, email_verified_at = NULL WHERE id = ? AND password_hash = ? AND NOT EXISTS (SELECT 1 FROM user_identites WHERE user_id = ?)",
+      [hash, rows[0].id, rows[0].password_hash, rows[0].id]
+    );
+    if (!maj.affectedRows) return reply.code(403).send({ error: "Pseudo incorrect" });
+    await pool.query("DELETE FROM user_sessions WHERE user_id = ?", [rows[0].id]);
+    void oublierAppareils(pool, rows[0].id);
     return reply.send({ ok: true });
   } catch (err) { req.log.error(err); return reply.code(500).send({ error: "Erreur serveur" }); }
 });
@@ -1207,7 +1290,9 @@ app.get("/me/calendar-token", async (req, reply) => {
     let token = rows?.[0]?.calendar_token || null;
     if (!token) {
       token = randomBytes(32).toString("hex");
-      await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ?`, [token, user.id]);
+      // seulement si cette session existe encore au moment d'écrire (une reprise du compte l'a peut-être fermée)
+      const maj: any = await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ? AND EXISTS (SELECT 1 FROM user_sessions s WHERE s.id = ? AND s.user_id = users.id)`, [token, user.id, user.sessionId]);
+      if (!maj.affectedRows) return reply.code(401).send({ error: "Non authentifié" });
     }
     const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
     const host = base.replace(/^https?:\/\//, "");
@@ -1228,7 +1313,9 @@ app.post("/me/calendar-token/regenerate", async (req, reply) => {
     const user = await getAuthenticatedUser(req);
     if (!user) return reply.code(401).send({ error: "Non authentifié" });
     const token = randomBytes(32).toString("hex");
-    await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ?`, [token, user.id]);
+    // seulement si cette session existe encore au moment d'écrire (une reprise du compte l'a peut-être fermée)
+    const maj: any = await pool.query(`UPDATE users SET calendar_token = ? WHERE id = ? AND EXISTS (SELECT 1 FROM user_sessions s WHERE s.id = ? AND s.user_id = users.id)`, [token, user.id, user.sessionId]);
+    if (!maj.affectedRows) return reply.code(401).send({ error: "Non authentifié" });
     const base = process.env.PUBLIC_SITE_URL || "https://gamenime.fr";
     const host = base.replace(/^https?:\/\//, "");
     return reply.send({
@@ -1380,8 +1467,15 @@ app.get("/notifications/stream", async (req, reply) => {
   };
   notifBus.on(channel, listener);
 
+  // la session relue à chaque battement (30 s) : fermée ailleurs (déconnexion, mot de passe changé, compte repris par
+  // Google ou Discord), le flux s'arrête (4 novembre 2026)
   const keepalive = setInterval(() => {
-    try { reply.raw.write(`: ping\n\n`); } catch (e) {}
+    pool.query("SELECT 1 FROM user_sessions WHERE id = ? LIMIT 1", [user.sessionId]).then((r: any) => {
+      if (r && r.length) { try { reply.raw.write(`: ping\n\n`); } catch (e) {} return; }
+      clearInterval(keepalive);
+      notifBus.off(channel, listener);
+      try { reply.raw.end(); } catch (e) {}
+    }).catch(() => { try { reply.raw.write(`: ping\n\n`); } catch (e) {} });
   }, 30000);
 
   req.raw.on("close", () => {
@@ -3039,6 +3133,33 @@ startHealthCheckCron(app, pool);
 // Synopsis v9.5 : bloc de relecture du dashboard (routes /admin/synopsis*), enregistré avant l'écoute ; le cycle
 // (startSynopsisCron, plus bas) est planifié par le Pilotage
 registerSynopsisBloc(app, pool);
+// Épisodes et dates des favoris (suivi-favoris.ts, 30 octobre 2026) : la route de l'essai à blanc, avant l'écoute ;
+// les deux lignes du Pilotage (relevé, envoi aux abonnés coupé au départ) sont planifiées plus bas
+registerSuiviFavoris(app, {
+  pool,
+  log: app.log,
+  rafraichirSemaine: async () => {
+    await app.inject({ method: "GET", url: "/feed/week" });
+  },
+  notifier: createNotificationEventAndFanout,
+});
+// Notifications sur l'appareil (push.ts, 31 octobre 2026) : les routes /push/* (compte connecté), avant l'écoute ;
+// la ligne du Pilotage « Notifications sur l'appareil » est planifiée plus bas
+registerPush(app, { pool, log: app.log, utilisateur: getAuthenticatedUser });
+// Se connecter avec Google ou Discord (4 novembre 2026) : départ, retour, comptes liés, délier (oauth.ts)
+await registerOauth(app, {
+  pool,
+  log: app.log,
+  utilisateur: getAuthenticatedUser,
+  ouvrirSession,
+  fermerSessions: async (userId: number) => {
+    await pool.query(`DELETE FROM user_sessions WHERE user_id = ?`, [userId]);
+    void oublierAppareils(pool, userId);
+  },
+  bienvenue: (email: string, displayName: string | null) => sendWelcomeEmail({ email, displayName }),
+  limite: checkRateLimit,
+  cookieSecure: COOKIE_SECURE,
+});
 await app.listen({ port: Number(process.env.PORT ?? 3000), host: "0.0.0.0" });
 
 startRefetchCron(app);
@@ -3099,4 +3220,12 @@ startIgdbJeuxCron({
     return r.statusCode === 200 ? { ok: true, total: Number(d?.total) || 0 } : { ok: false, erreur: `HTTP ${r.statusCode}` };
   },
 });
+
+// Épisodes et dates des favoris : « Épisodes et dates des favoris » relève à blanc (toutes les 10 min) ; « Envoi aux
+// abonnés », coupé à la première mise en route, envoie à la cloche quand Rey l'allume dans le Pilotage
+startSuiviFavoris();
+
+// Notifications sur l'appareil : la cloche des favoris envoyée aux appareils activés (toutes les minutes, à toute
+// heure) ; seuls les appareils activés depuis le site reçoivent (le staging d'abord)
+startPush();
 

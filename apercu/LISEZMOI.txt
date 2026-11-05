@@ -1,0 +1,69 @@
+GameNime - la vitre animee de l'apercu du lien dans Discord (tache gn-apercu)
+Pose par le patch apercu-discord du 29 octobre 2026.
+
+A quoi ca sert
+  Quand on colle https://gamenime.fr dans Discord, l'apercu montre un GIF : le
+  logo dans la vitre, puis l'accueil du site qui defile derriere le verre, en
+  boucle (8 s environ, 800 x 420). C'est une petite pub, a part du site : le
+  site lui-meme ne change pas. Partout ailleurs (WhatsApp, Snap, Messages...),
+  l'apercu garde l'image fixe du site (B Braise).
+  Le GIF est fait a partir de l'accueil tel qu'il est en ligne, avec les vraies
+  jaquettes : apres chaque publication, et une fois par jour (Cette semaine).
+  Seul le lien de l'accueil est concerne : un lien de fiche garde sa jaquette.
+
+Comment ca marche
+  - nginx (site.conf, blocs APERCU-DISCORD) : quand le robot de Discord demande
+    l'accueil (il s'annonce Discordbot), il recoit
+    nginx/static/apercu/discord.html, une copie exacte de l'accueil en ligne
+    dont seules les balises de l'image de partage citent le GIF. Si ce fichier
+    manque, il recoit l'accueil normal. Tous les autres visiteurs recoivent
+    l'accueil normal. De ce dossier, nginx ne sert que les GIF.
+  - Les GIF sont dans nginx/static/apercu, sous un nom tire de leur contenu
+    (vitre-<empreinte>.gif) : un nouveau GIF a une nouvelle adresse, aucun cache
+    ne garde l'ancien. Un GIF reste en ligne 30 jours apres son dernier usage
+    (les anciens messages de Discord le citent encore).
+  - La tache (crontab de rey, toutes les 10 minutes) ne fait rien tant que
+    l'accueil en ligne n'a pas change. Apres une publication (et une fois la
+    publication finie), elle attend deux minutes de calme, puis photographie
+    l'accueil dans un conteneur jetable (Chromium sans ecran, sur ce serveur,
+    sans passer par Cloudflare ; ce passage n'est pas compte comme une visite)
+    et fabrique le GIF. Le conteneur n'ecrit rien sur le serveur : il rend le
+    GIF sur sa sortie (10 Mo au plus). Hors du conteneur, la tache verifie le
+    GIF, le met en service avec la page du robot (faite a partir de l'accueil
+    en ligne), puis verifie ce que nginx sert au robot de Discord.
+  - Apres une publication, la page du robot d'avant est retiree au premier
+    passage de la crontab (10 minutes au plus) : Discord a l'image fixe jusqu'au
+    nouveau GIF. Sans les blocs APERCU-DISCORD dans site.conf, la tache ne fait
+    rien.
+  - Si quelque chose manque (jaquettes, Cette semaine) ou echoue : le GIF d'avant
+    reste en service si l'accueil n'a pas change ; apres une publication,
+    Discord a l'image fixe jusqu'au GIF suivant. La tache reessaie 30 minutes
+    plus tard, puis de plus en plus tard (6 heures au plus) ; une nouvelle
+    publication la fait reessayer tout de suite.
+  - L'image gn-apercu:1 n'est jamais reconstruite par la tache. Si un nettoyage
+    de docker la supprime, la tache s'arrete et le dit (apercu.sh etat) :
+    relancer le patch apercu-discord la reconstruit.
+
+Ce qu'il y a ici
+  apercu.sh         le lanceur (crontab de rey)
+  tache.py          la tache, cote serveur : quand refaire le GIF, verification,
+                    mise en service, page du robot de Discord
+  app/apercu.py     le travail, dans le conteneur : photo, images, GIF
+  app/calques/      le logo dans la vitre (les calques de la maquette validee)
+  image/Dockerfile  l'image gn-apercu:1 (Python 3.12, Chromium sans ecran, ffmpeg,
+                    gifsicle)
+  etat.json         l'etat de la tache
+  journal.txt       ce que fait chaque passage
+
+Commandes utiles
+  /opt/stack/apercu/apercu.sh etat         ce qui est en service
+  tail -n 30 /opt/stack/apercu/journal.txt ce qui s'est passe
+  /opt/stack/apercu/apercu.sh essai        un apercu d'essai, a regarder sur
+                                           https://staging.gamenime.fr/apercu-essai/essai.html
+  /opt/stack/apercu/apercu.sh maintenant   refaire le GIF de Discord tout de suite
+  /opt/stack/apercu/apercu.sh arret        Discord revient a l'image fixe, la tache
+                                           ne fait plus rien
+  /opt/stack/apercu/apercu.sh marche       remettre la tache en marche (refait le GIF)
+
+Discord garde un apercu en memoire quelques heures : un lien deja partage peut
+garder l'ancienne image un moment ; un nouveau partage prend la nouvelle.

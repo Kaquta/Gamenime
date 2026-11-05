@@ -24,8 +24,32 @@ if (!TOKEN) {
 // GuildMembers est un intent PRIVILEGIE : il faut aussi l'activer sur
 // discord.com/developers > Bot > Privileged Gateway Intents, sinon Discord
 // n'envoie jamais guildMemberAdd et le bot ne verra aucune arrivee.
+// Un bot qui le demande alors qu'il est coupe sur le portail voit sa connexion
+// refusee ("Used disallowed intents") : il plantait en boucle, et les sorties de
+// 8h30 s'arretaient aussi. On lit donc d'abord l'application : intent coupe ->
+// connexion sans les arrivees, et le reste du bot continue. Reponse illisible ->
+// connexion avec les arrivees, comme avant (28 octobre 2026).
+async function intentMembresAccorde() {
+  try {
+    const res = await fetch("https://discord.com/api/v10/applications/@me", {
+      headers: { Authorization: `Bot ${TOKEN}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const app = await res.json();
+    if (app?.flags == null) return null;
+    const flags = BigInt(app.flags);
+    // GATEWAY_GUILD_MEMBERS (bot verifie) ou GATEWAY_GUILD_MEMBERS_LIMITED (moins de 100 serveurs)
+    return (flags & ((1n << 14n) | (1n << 15n))) !== 0n;
+  } catch {
+    return null;
+  }
+}
+const ARRIVEES = (await intentMembresAccorde()) !== false;
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
+  intents: ARRIVEES
+    ? [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
+    : [GatewayIntentBits.Guilds],
 });
 
 function dateFr() {
@@ -258,7 +282,10 @@ client.on("guildMemberAdd", async (member) => {
 
 client.once("clientReady", () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
-  console.log(`📅 Sorties : 8h30/jour | Sondages : mer. & dim. 18h`);
+  console.log(`📅 Sorties : 8h30/jour | Sondages : mer. 18h`);
+  console.log(ARRIVEES
+    ? "Arrivees : annoncees dans le salon des arrivees"
+    : "Arrivees : NON annoncees, l'intent des membres est coupe sur le portail Discord (Bot > Server Members Intent)");
 
   cron.schedule("30 8 * * *", () => {
     console.log("⏰ 8h30 — sorties du jour");
@@ -267,11 +294,6 @@ client.once("clientReady", () => {
 
   cron.schedule("0 18 * * 3", () => {
     console.log("⏰ Mercredi 18h — sondages");
-    postPolls();
-  }, { timezone: "Europe/Paris" });
-
-  cron.schedule("0 18 * * 0", () => {
-    console.log("⏰ Dimanche 18h — sondages");
     postPolls();
   }, { timezone: "Europe/Paris" });
 

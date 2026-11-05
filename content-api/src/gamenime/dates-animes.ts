@@ -34,10 +34,10 @@
  *    encore sorti mais daté du passé, ou sorti mais daté de l'avenir, ou un animé sorti sur le site qu'AniList dit pas
  *    encore sorti et sans date). Ces cas sont nommés dans le bilan du Pilotage ;
  *  - n'écrit que ce qui change, sans toucher updated_at ; vide le cache des flux s'il a changé quelque chose.
- * AniList est partagé : toutes les requêtes AniList de la Phase B, du contrôle J-7 et de ce module attendent leur tour
- * (tourAniList : 2,1 s entre deux, moins de 30 par minute, la limite annoncée par AniList). Un refus (429) suspend ces
- * requêtes le temps demandé par AniList.
- * Variables, pour les essais seulement : ANILIST_URL (faux AniList), ANILIST_PAS_MS (pas entre deux requêtes),
+ * AniList est partagé : les requêtes AniList de ce module attendent leur tour dans la file commune de l'API
+ * (file-anilist.ts : 2,5 s entre deux requêtes, tous modules confondus, sous la limite annoncée par AniList). Un refus
+ * (429) suspend toute la file le temps demandé par AniList.
+ * Variables, pour les essais seulement : ANILIST_URL (faux AniList), ANILIST_PAS_MS (pas de la file, file-anilist.ts),
  * ANIMESCHEDULE_API_URL (faux AnimeSchedule, comme refetch-cron.ts), DATES_CONFIRMATION_MS (écart minimal entre les deux
  * lectures sans date).
  */
@@ -46,35 +46,13 @@ import { pushActivity } from "./dashboard.js";
 import { planifier } from "./pilotage.js";
 import { clearFeedCache } from "./routes.js";
 import type { Journal, SqlPool } from "./presse.js";
+import { aniListRefuse, tourAniList } from "./file-anilist.js";
 
 // ─────────────────────────────────────────────────────────────── AniList, partagé
 
-const PAS_ANILIST_MS = process.env.ANILIST_PAS_MS ? Math.max(0, Number(process.env.ANILIST_PAS_MS) || 0) : 2100;
-let prochainTour = 0;
-let suspenduJusqua = 0;
+// la file AniList commune est dans file-anilist.ts (toute l'API y passe) ; gardée ici pour les modules qui l'importent
+export { aniListRefuse, tourAniList };
 const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/** Attend son tour avant une requête AniList : 2,1 s entre deux requêtes de l'API (Phase B, contrôle J-7, dates), et
- * rien pendant une suspension demandée par AniList (relue après chaque attente). */
-export async function tourAniList(): Promise<void> {
-  for (;;) {
-    const t = Date.now();
-    const depart = Math.max(prochainTour, suspenduJusqua);
-    if (depart <= t) {
-      prochainTour = t + PAS_ANILIST_MS;
-      return;
-    }
-    await dormir(depart - t);
-  }
-}
-
-/** AniList refuse (429) : plus de requête avant la fin de l'attente demandée (Retry-After, 90 s au plus ; 60 s sans). */
-export function aniListRefuse(retryAfter: string | null): number {
-  const s = Number(retryAfter);
-  const attente = Number.isFinite(s) && s > 0 ? Math.min(s, 90) * 1000 : 60000;
-  suspenduJusqua = Math.max(suspenduJusqua, Date.now() + attente);
-  return attente;
-}
 
 // ─────────────────────────────────────────────────────────────── la règle
 

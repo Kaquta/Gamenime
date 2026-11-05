@@ -259,6 +259,109 @@
   .hist-empty { font-size: 12px; color: #6a655f; font-style: italic; }
 
 </style>
+<style>
+/* === PUBLICATION : staging -> production (refonte d'après la maquette B · Frise validée le 28 octobre 2026) ===
+   Classes pb-* seulement ; mêmes couleurs que Pilotage : fond #0d0d0f, bords #1d1d22 / #242429, texte #f5f2ee,
+   gris #8c8c92 / #6b6b74, or #d9a978 / #ffe8c0, vert #30d16c, ambre #ff9f0a, rouge #ff453a. Aucun flou. */
+
+/* bandeau : une phrase qui dit où on en est */
+.pb-band{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:12px 18px;padding:16px 20px;border-radius:18px;margin-bottom:14px;
+  border:1px solid #242429;background:linear-gradient(180deg,rgba(20,20,24,.92),rgba(11,11,14,.88))}
+.pb-band.ok{border-color:rgba(48,209,108,.32)}
+.pb-band.att,.pb-band.run{border-color:rgba(217,169,120,.42)}
+.pb-band.ko{border-color:rgba(255,69,58,.45);background:#140a0b}
+.pb-band-t{min-width:0;grid-column:1}
+.pb-band-t b{display:block;font-size:1rem;font-weight:700;color:#f5f2ee;line-height:1.35}
+.pb-band.ok .pb-band-t b{color:#5fe08f}
+.pb-band.ko .pb-band-t b{color:#ff9696}
+.pb-band-t span{display:block;margin-top:4px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.7rem;color:#6b6b74;line-height:1.55}
+.pb-cpt{display:flex;gap:6px;flex-wrap:wrap;grid-column:1}
+.pb-cpt:empty{display:none}
+
+/* boutons (mêmes valeurs que .pil-bt) */
+.pb-bt{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;cursor:pointer;font-weight:700;font-size:.77rem;font-family:inherit;
+  border:1px solid transparent;transition:.16s;white-space:nowrap;text-decoration:none}
+.pb-bt:focus-visible,.pb-det summary:focus-visible,.pb-onglet:focus-visible{outline:2px solid #d9a978;outline-offset:2px}
+.pb-bt-or{background:linear-gradient(135deg,#ffe8c0,#d9a978);color:#160d04;border-color:#ffe8c0}
+.pb-bt-neutre{background:#1a1a1f;color:#d9a978;border-color:#232328}
+.pb-bt-neutre:hover{border-color:#3a3a42}
+.pb-bt:hover:not(:disabled){filter:brightness(1.07)}
+.pb-bt:disabled{background:transparent;border-color:#242429;color:#6b6b74;cursor:not-allowed;filter:none}
+.pb-act{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.pb-note{font-size:.74rem;color:#ffba4d;margin-top:8px;padding:0 4px;line-height:1.45}
+
+/* la frise : de la base au site en ligne */
+.pb-frise{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,4fr);gap:10px;padding:16px 18px 14px;border-radius:14px;background:#0d0d0f;border:1px solid #1d1d22}
+.pb-groupe{min-width:0}
+.pb-groupe-t{display:flex;align-items:center;gap:8px;font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#73737a;margin-bottom:12px}
+.pb-groupe-t a,.pb-groupe-t span.lieu{font-family:ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:0;text-transform:none;font-weight:600;color:#6b6b74;text-decoration:none}
+.pb-groupe-t a:hover{color:#ffe8c0}
+.pb-pas{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:0}
+.pb-p{position:relative;min-width:0;padding-right:10px}
+.pb-p::after{content:"";position:absolute;top:13px;left:30px;right:2px;height:2px;border-radius:1px;background:#23232a}
+.pb-p:last-child::after{display:none}
+.pb-p.ok::after{background:rgba(48,209,108,.45)}
+.pb-rond{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:.74rem;font-weight:800;
+  border:2px solid #2c2c34;background:#0d0d0f;color:#6b6b74}
+.pb-p.ok .pb-rond{border-color:#30d16c;background:#0d1a12;color:#30d16c}
+.pb-p.cours .pb-rond{border-color:#d9a978;color:#ffe8c0;animation:gnbat 1.1s ease-in-out infinite}
+.pb-p.ko .pb-rond{border-color:#ff453a;background:#1a0c0d;color:#ff453a}
+.pb-p b{display:block;margin-top:8px;font-size:.8rem;font-weight:700;color:#f5f2ee;line-height:1.3}
+.pb-p.attente b{color:#8c8c92}
+.pb-p small{display:block;margin-top:3px;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:.66rem;color:#6b6b74;line-height:1.45}
+.pb-p.ko small{color:#ff9696}
+.pb-groupe .pb-act{justify-content:flex-start;margin-top:14px;flex-wrap:wrap}
+
+/* ce que la publication changera */
+.pb-chg{margin-top:12px;padding:12px 16px;border-radius:14px;background:#0b0b0e;border:1px solid #1d1d22}
+.pb-chg-t{font-size:.66rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#73737a;margin-bottom:8px}
+.pb-mes{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto 3.4rem;align-items:baseline;gap:4px 10px;padding:5px 0;border-bottom:1px solid #141418;font-size:.8rem}
+.pb-mes:last-child{border-bottom:none}
+.pb-mes span{color:#9b9ba3}
+.pb-mes .av{font-family:ui-monospace,Menlo,monospace;color:#6b6b74;text-align:right}
+.pb-mes .fl{color:#2f2f37;font-size:.7rem}
+.pb-mes .ap{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#f5f2ee;text-align:right}
+.pb-mes .dt{font-family:ui-monospace,Menlo,monospace;font-size:.73rem;text-align:right;color:#47474f}
+.pb-mes .dt.p{color:#30d16c}
+.pb-mes .dt.m{color:#ff9f0a}
+
+/* détails : contrôles et journaux */
+.pb-det{margin-top:12px;border-radius:14px;border:1px solid #1d1d22;background:#0b0b0e;overflow:hidden}
+.pb-det summary{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;list-style:none;font-size:.74rem;font-weight:700;color:#9b9ba3}
+.pb-det summary::-webkit-details-marker{display:none}
+.pb-det summary::before{content:"";width:6px;height:6px;border-right:1.5px solid #6b6b74;border-bottom:1.5px solid #6b6b74;transform:rotate(-45deg);transition:transform .18s}
+.pb-det[open] summary::before{transform:rotate(45deg)}
+.pb-det summary em{font-style:normal;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-weight:400;color:#47474f}
+.pb-det-c{padding:4px 16px 16px;border-top:1px solid #141418}
+.pb-ctl{display:grid;grid-template-columns:1.1rem minmax(0,1fr) auto;align-items:baseline;gap:8px;padding:6px 0;border-bottom:1px solid #141418;font-size:.8rem}
+.pb-ctl:last-of-type{border-bottom:none}
+.pb-ctl i{font-style:normal;font-family:ui-monospace,Menlo,monospace;font-weight:700;color:#30d16c}
+.pb-ctl.ko i{color:#ff453a}
+.pb-ctl span{color:#b8b3ad}
+.pb-ctl.ko span{color:#ff9696}
+.pb-ctl b{font-family:ui-monospace,Menlo,monospace;font-weight:400;font-size:.72rem;color:#6b6b74;text-align:right}
+.pb-ong{display:flex;gap:6px;margin:14px 0 8px}
+.pb-onglet{font-size:.72rem;font-weight:600;padding:6px 12px;border-radius:9px;border:1px solid #23232a;background:#121216;color:#8c8c92;cursor:pointer;font-family:inherit}
+.pb-onglet[aria-selected="true"]{border-color:rgba(217,169,120,.5);color:#ffe8c0;background:#1a1610}
+.pb-log{margin:0;padding:10px 12px;max-height:230px;overflow:auto;border-radius:10px;background:#040405;border:1px solid #141418;
+  font:500 .7rem/1.6 ui-monospace,"SF Mono",Menlo,monospace;color:#9b9ba3;white-space:pre-wrap;word-break:break-word}
+.pb-log .t{color:#47474f}
+.pb-log .v{color:#5fe08f}
+.pb-log .x{color:#ff7a70}
+
+@media (max-width:760px){
+  .pb-band{grid-template-columns:1fr;padding:14px 16px}
+  .pb-act{justify-content:flex-start}
+  .pb-frise{grid-template-columns:1fr;gap:18px;padding:14px 14px 12px}
+  .pb-pas{grid-auto-flow:row;grid-auto-columns:auto;gap:0}
+  .pb-p{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;padding:0 0 14px}
+  .pb-p::after{top:30px;bottom:2px;left:13px;right:auto;width:2px;height:auto}
+  .pb-p b{margin-top:4px}
+  .pb-p b,.pb-p small{grid-column:2}
+  .pb-rond{grid-row:1/span 2}
+  .pb-mes{grid-template-columns:minmax(0,1fr) auto auto auto 2.8rem;gap:4px 8px}
+}
+</style>
 </head>
 <style>
   /* Mini stats trafic */
@@ -1140,6 +1243,66 @@ html{scroll-behavior:smooth}
   .syn-pied .pub-bt{flex:1;padding:11px 12px}
   .syn-plus{margin:2px 12px 14px;width:calc(100% - 24px)}
 }
+/* ═══ COMPTES (patch du 30 octobre 2026, copie de la maquette validee) : valeurs reprises des tuiles .mini-card, des puces .gc-chip et de la fiche .bi-modal ═══ */
+.cpt-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 12px; }
+.cpt-tile { text-align: left; font-family: inherit; color: inherit; cursor: pointer; transition: border-color .18s ease, background .18s ease; }
+.cpt-tile:hover { border-color: rgba(217,169,120,.35); }
+.cpt-tile.on { background: linear-gradient(135deg,rgba(217,169,120,.12),rgba(217,169,120,.02)), #0d0d0f; border-color: rgba(217,169,120,.55); }
+.cpt-tile .cpt-f { font-size: .62rem; font-weight: 700; color: #47474f; margin-top: 9px; letter-spacing: .3px; }
+.cpt-tile.on .cpt-f { color: #d9a978; }
+.cpt-meta { font-size: 0.68rem; color: #6a6560; display: flex; align-items: center; gap: 8px; margin: 0 2px 12px; }
+.cpt-meta .dot { width: 7px; height: 7px; border-radius: 50%; background: #30d16c; }
+.cpt-meta .gc-reload { margin-left: auto; }
+.cpt-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.cpt-list { border-radius: 16px; background: #0d0d0f; border: 1px solid #232328; padding: 6px 12px; }
+.cpt-row { display: grid; grid-template-columns: 3px minmax(0,1fr) auto 214px; gap: 14px; align-items: center; padding: 12px 6px; border-radius: 10px; cursor: pointer; transition: background .15s ease; }
+.cpt-row + .cpt-row { border-top: 1px solid rgba(255,255,255,.045); }
+.cpt-row:hover, .cpt-row.sel { background: rgba(217,169,120,.07); }
+.cpt-row .gc-bar { height: 34px; }
+.cpt-nom { font-weight: 700; color: #e8e0d8; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cpt-nom span { color: #6a6560; font-family: ui-monospace, monospace; font-size: .7rem; font-weight: 600; margin-left: 7px; }
+.cpt-mail { font-size: .74rem; color: #8a8078; font-family: ui-monospace, monospace; margin-top: 2px; }
+.cpt-bds { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.cpt-bd { font-size: .64rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+.cpt-bd.ok { color: #4ade80; background: rgba(48,209,108,.08); border-color: rgba(48,209,108,.25); }
+.cpt-bd.w { color: #ff9f0a; background: rgba(255,159,10,.10); border-color: rgba(255,159,10,.33); }
+.cpt-bd.c { color: #ff6b6b; background: rgba(255,69,58,.10); border-color: rgba(255,69,58,.30); }
+.cpt-bd.n { color: #8a8580; background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); }
+.cpt-dates { font-size: .72rem; color: #8a8580; text-align: right; white-space: nowrap; line-height: 1.55; }
+.cpt-dates b { color: #b8ada0; font-weight: 600; }
+.cpt-act { justify-self: end; padding: 7px 12px; border-radius: 9px; font-size: .72rem; font-weight: 800; border: 1px solid rgba(217,169,120,.3); background: linear-gradient(160deg,rgba(217,169,120,.14),rgba(217,169,120,.04)); color: #d9a978; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.cpt-act.vide { visibility: hidden; }
+.cpt-pied { display: flex; align-items: center; justify-content: space-between; padding: 12px 6px 8px; border-top: 1px solid rgba(255,255,255,.045); font-size: .7rem; color: #6a6560; }
+.cpt-pied .tool-btn { width: auto; padding: 8px 16px; }
+.cpt-err { display: flex; gap: 10px; align-items: center; border: 1px solid rgba(255,69,58,.3); background: rgba(255,69,58,.06); color: #ff8b82; border-radius: 12px; padding: 10px 14px; font-size: .74rem; margin-bottom: 12px; }
+.cpt-err b { color: #ffb8b0; }
+/* fiche du compte : la fiche « bot auditeur » (.bi-modal), avec l'initiale du pseudo a la place de l'oeil */
+.cpt-av { width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; z-index: 2;
+  background: linear-gradient(155deg,#2e2a34,#141219 60%); border: 1px solid rgba(217,169,120,.45);
+  box-shadow: inset 0 1px 0 rgba(255,232,192,.22), inset 0 -8px 16px rgba(0,0,0,.6), 0 5px 18px rgba(0,0,0,.6); }
+.cpt-ini { font-size: 21px; font-weight: 800; color: #ffe8c0; }
+.cpt-fiche .bi-actions { backdrop-filter: none; -webkit-backdrop-filter: none; background: #09080c; }
+.cpt-fiche .bi-fstate:empty { display: none; }
+.cpt-kv { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; color: #8a8074; padding: 4px 0; }
+.cpt-kv b { color: #e8e0d8; font-weight: 600; text-align: right; }
+.cpt-kv b.w { color: #ff9f0a; } .cpt-kv b.ok { color: #4ade80; } .cpt-kv b.c { color: #ff6b6b; }
+.cpt-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cpt-actions .bi-btn { padding: 11px 8px; }
+.cpt-actions .bi-btn.del { padding: 11px 8px; }
+.cpt-conf { margin: 11px 13px; border-radius: 14px; border: 1px solid rgba(255,69,58,.32); background: linear-gradient(168deg,rgba(255,69,58,.07),rgba(255,69,58,.02)); padding: 13px; }
+.cpt-conf p { font-size: 11.5px; color: #c9bdb2; line-height: 1.55; margin: 0 0 10px; }
+.cpt-conf p b { color: #ffb8b0; }
+.cpt-conf input { width: 100%; background: rgba(0,0,0,.42); border: 1px solid rgba(255,69,58,.35); border-radius: 8px; padding: 9px 11px; color: #f5f2ee; font-size: 11px; font-family: ui-monospace, monospace; outline: none; box-shadow: inset 0 2px 5px rgba(0,0,0,.4); }
+.cpt-conf .cpt-actions { margin-top: 10px; }
+.cpt-conf .bi-btn.del.plein { background: linear-gradient(165deg,#ff5a4e,#c9271d); color: #fff; border: none; }
+@media (max-width: 760px) {
+  .cpt-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cpt-row { grid-template-columns: 3px minmax(0,1fr); gap: 4px 12px; }
+  .cpt-row .gc-bar { grid-row: span 3; height: 100%; min-height: 40px; }
+  .cpt-dates { grid-column: 2; text-align: left; }
+  .cpt-act { grid-column: 2; justify-self: start; margin-top: 4px; }
+  .cpt-act.vide { display: none; }
+}
 </style>
 <body>
 <div class="wrap">
@@ -1282,32 +1445,39 @@ html{scroll-behavior:smooth}
   <!-- ═══ PAGE ADMINISTRATION ═══ -->
   <div class="page" id="page-admin">
     <div class="sec-title">Comptes utilisateurs</div>
-    <div class="mini-traffic">
-      <div class="mini-card">
-        <div class="mini-label">COMPTES</div>
+    <div id="cpt-err"></div>
+    <div class="cpt-grid" id="cpt-grid">
+      <button type="button" class="mini-card cpt-tile on" data-f="tous">
+        <div class="mini-label">Comptes</div>
         <div class="mini-value" id="cpt-total">—</div>
         <div class="mini-sub" id="cpt-total-sub">—</div>
-      </div>
-      <div class="mini-card">
-        <div class="mini-label">ACTIFS · 30 J</div>
+        <div class="cpt-f">Tous les comptes</div>
+      </button>
+      <button type="button" class="mini-card cpt-tile" data-f="actifs">
+        <div class="mini-label">Actifs · 30 j</div>
         <div class="mini-value" id="cpt-actifs" style="color:#30d16c">—</div>
         <div class="mini-sub" id="cpt-actifs-sub">—</div>
-      </div>
-      <div class="mini-card">
-        <div class="mini-label">EMAIL NON VERIFIE</div>
+        <div class="cpt-f">Filtrer la liste</div>
+      </button>
+      <button type="button" class="mini-card cpt-tile" data-f="nonverif">
+        <div class="mini-label">E-mail non vérifié</div>
         <div class="mini-value" id="cpt-nonverif" style="color:#ff9f0a">—</div>
         <div class="mini-sub" id="cpt-nonverif-sub">—</div>
-      </div>
-      <div class="mini-card">
-        <div class="mini-label">REINIT. BLOQUEES</div>
-        <div class="mini-value" id="cpt-resets" style="color:#e24b4a">—</div>
-        <div class="mini-sub" id="cpt-resets-sub">—</div>
-      </div>
+        <div class="cpt-f">Filtrer la liste</div>
+      </button>
+      <button type="button" class="mini-card cpt-tile" data-f="reinit">
+        <div class="mini-label">Réinit. en attente</div>
+        <div class="mini-value" id="cpt-reinit" style="color:#e24b4a">—</div>
+        <div class="mini-sub" id="cpt-reinit-sub">—</div>
+        <div class="cpt-f">Filtrer la liste</div>
+      </button>
     </div>
-    <div class="sec-title">Comptes n\u00e9cessitant une action</div>
-    <div class="panel-box">
-      <div id="cpt-attention"><div class="empty">Chargement...</div></div>
+    <div class="cpt-meta"><span class="dot" id="cpt-dot"></span><span id="cpt-etat">Chargement…</span><span class="gc-reload" id="cpt-reload" role="button" tabindex="0">↻ Actualiser</span></div>
+    <div class="cpt-tools">
+      <input class="gc-input" id="cpt-q" placeholder="Rechercher un pseudo ou une adresse e-mail…" autocomplete="off" spellcheck="false">
+      <div class="gc-types" id="cpt-tris"><button type="button" class="gc-type on" data-t="inscription">Inscription récente</button><button type="button" class="gc-type" data-t="visite">Dernière visite</button><button type="button" class="gc-type" data-t="anciens">Plus anciens</button></div>
     </div>
+    <div class="cpt-list" id="cpt-list"><div class="empty">Chargement...</div></div>
 
 
     <!-- SECTION 1 : PROCESS -->
@@ -1420,34 +1590,25 @@ html{scroll-behavior:smooth}
 
   <!-- ═══ CONSOLE FLOTTANTE (admin) ═══ -->
   
-    <!-- ═══ PUBLICATION ═══ -->
+    <!-- ═══ PUBLICATION : staging -> production (refonte du 28 octobre 2026) ═══ -->
     <section class="gn-anc" id="page-publication">
       <div class="gn-st"><h2>Publication</h2><em>staging &rarr; production</em>
-        <span class="gn-sp"></span><span class="gn-bg" id="pub-bg">&mdash;</span></div>
-
-      <div class="pub">
-        <div class="pub-tete">
-          <div class="pub-etat" id="pub-etat">Lecture du rapport&hellip;</div>
-          <div class="pub-boutons">
-            <button class="pub-bt pub-bt-b" id="pub-build">Lancer un build</button>
-            <button class="pub-bt pub-bt-p" id="pub-promo" disabled>Publier en production</button>
+        <span class="gn-sp"></span><span class="gn-bg" id="pb-bg">&mdash;</span></div>
+      <div id="pb-zone" aria-live="polite">
+        <div class="pb-band" id="pb-band"><div class="pb-band-t"><b>Lecture de l'état&hellip;</b></div></div>
+        <div id="pb-corps"></div>
+        <div id="pb-chg"></div>
+        <details class="pb-det" id="pb-det">
+          <summary>Contrôles et journaux <em id="pb-det-r"></em></summary>
+          <div class="pb-det-c">
+            <div id="pb-ctl"></div>
+            <div class="pb-ong" role="tablist" aria-label="Journaux">
+              <button type="button" class="pb-onglet" role="tab" id="pb-o-build" aria-selected="true" aria-controls="pb-log">Journal du build</button>
+              <button type="button" class="pb-onglet" role="tab" id="pb-o-pub" aria-selected="false" aria-controls="pb-log">Journal de la publication</button>
+            </div>
+            <pre class="pb-log" id="pb-log" role="tabpanel"></pre>
           </div>
-        </div>
-        <div class="pub-msg" id="pub-msg"></div>
-
-        <div class="pub-duo">
-          <div class="pub-pan">
-            <div class="pub-pan-t">Compteurs, avant et apr&egrave;s</div>
-            <div id="pub-mes"></div>
-          </div>
-          <div class="pub-pan">
-            <div class="pub-pan-t">Contr&ocirc;les avant publication</div>
-            <div id="pub-ctl"></div>
-          </div>
-        </div>
-
-        <div class="pub-log-bar">journal du build <span id="pub-log-t"></span></div>
-        <pre class="pub-log" id="pub-log"></pre>
+        </details>
       </div>
     </section>
 
@@ -1562,7 +1723,9 @@ html{scroll-behavior:smooth}
       var rows = (d.sources || []).filter(function(s) { return s.source === key; });
       if (rows.length && card) {
         var r = rows[0];
-        var lvl = r.status === "UP" ? (r.response_ms > 3000 ? "warn" : "ok") : (r.status === "DOWN" ? "crit" : "warn");
+        // AniList qui limite les requêtes (429) : « limité », pas une panne (comme la carte du flux)
+        var limite = r.status === "DOWN" && r.source === "anilist" && Number(r.http_code) === 429;
+        var lvl = r.status === "UP" ? (r.response_ms > 3000 ? "warn" : "ok") : (limite ? "warn" : (r.status === "DOWN" ? "crit" : "warn"));
         card.className = "hcard " + lvl + (lvl !== "ok" ? " alert" : "");
         var nameEl = card.querySelector(".hcard-name");
         var lbl = nameEl ? nameEl.textContent.replace("Source ", "") : key;
@@ -1570,6 +1733,7 @@ html{scroll-behavior:smooth}
         var bdg = card.querySelector(".hcard-badge");
         if (det) det.textContent = r.status === "UP"
           ? (lbl + " : UP (" + (r.response_ms || "?") + "ms) - verifie a l'instant")
+          : limite ? (lbl + " : limité (HTTP 429, trop de requêtes) - vérifié à l'instant")
           : (lbl + " : " + r.status + " (HTTP " + (r.http_code || "?") + ") - verifie a l'instant");
         if (bdg) bdg.textContent = lvl === "ok" ? "OK" : (lvl === "warn" ? "ATTENTION" : "CRITIQUE");
       }
@@ -2109,7 +2273,18 @@ html{scroll-behavior:smooth}
       var label = srcLabels[s.source] || s.source;
       var checkAge = s.lastCheck ? (Date.now() - s.lastCheck) / 3600000 : null;
       var ageStr = checkAge === null ? "jamais vérifié" : (checkAge < 1 ? "vérifié il y a <1h" : "vérifié il y a " + checkAge.toFixed(0) + "h");
-      if (s.status === "DOWN") {
+      if (s.status === "DOWN" && s.httpCode === 429 && s.source === "anilist") {
+        // AniList limite le nombre de requêtes par minute (429) : il répond, ce n'est pas une panne. Rouge seulement si
+        // aucun contrôle n'a réussi depuis plus de 24 h.
+        var limVieux = !s.lastOk || Date.now() - s.lastOk > 24 * 3600000;
+        checks.push({ srcKey: s.source, name: "Source " + label, level: limVieux ? "crit" : "warn",
+          detail: label + " : limité (HTTP 429, trop de requêtes)"
+            + (s.lastOk ? " · dernier OK il y a " + gnDuree(Date.now() - s.lastOk) : " · jamais vue répondre")
+            + " · " + ageStr,
+          cause: label + " a refusé le contrôle (429) : il limite le nombre de requêtes par minute. Ce n'est pas une panne : " + label + " répond, et les fiches gardent leurs données."
+            + (limVieux ? " Mais aucun contrôle n'a réussi depuis plus de 24 h." : ""),
+          fix: "Toutes les requêtes " + label + " de l'API passent par une seule file, sous la limite, et le contrôle planifié réessaie après l'attente demandée. Si ça dure, regarder les modules " + label + " dans le Pilotage et le workflow " + label + " de n8n (hors de cette file)." });
+      } else if (s.status === "DOWN") {
         checks.push({ srcKey: s.source, name: "Source " + label, level: "crit",
           detail: label + " : DOWN (HTTP " + (s.httpCode || "?") + ")"
             + (s.lastOk ? " · en panne depuis " + gnDuree(Date.now() - s.lastOk) : " · jamais vue répondre")
@@ -2256,48 +2431,399 @@ html{scroll-behavior:smooth}
     renderComptes(m.comptes);
   }
 
-  // ═══ Comptes utilisateurs (session 33) ═══
-  // Les emails arrivent deja masques du serveur : le dashboard n'a jamais
-  // l'adresse en clair. On repond a "qui est bloque", pas "qui est qui".
+  // ═══ Comptes utilisateurs (session 33 ; 30 octobre 2026 : toute la liste, la fiche et les quatre gestes) ═══
+  // Chiffres et liste : POST /dashboard/admin/comptes/liste (nginx ajoute la clé ; la recherche part dans le corps, pas
+  // dans l'adresse), relus toutes les 30 s tant que l'onglet est affiché, au clic sur « Actualiser » et après chaque
+  // geste. Le flux du dashboard ne nomme plus aucun compte.
+  // Les adresses arrivent masquées du serveur : le dashboard n'a jamais l'adresse en clair.
+  var CPT = { filtre: "tous", tri: "inscription", q: "", nombre: 25, d: null, lu: 0, essai: 0, err: null, enCours: false, encore: false,
+              sel: null, fiche: null, conf: false, occupe: false };
+  var CPT_MOIS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
   function cptSet(id, v) {
     var e = document.getElementById(id);
     if (e) e.textContent = String(v);
   }
-  function renderComptes(c) {
-    if (!c || c.error) return;
-    cptSet("cpt-total", c.total);
-    cptSet("cpt-total-sub", (c.nouveaux_30j > 0 ? "+" + c.nouveaux_30j : "aucun") + " ce mois");
-    cptSet("cpt-actifs", c.actifs_30j);
-    cptSet("cpt-actifs-sub", c.total ? Math.round(c.actifs_30j / c.total * 100) + " % du total" : "—");
-    cptSet("cpt-nonverif", c.non_verifies);
-    cptSet("cpt-nonverif-sub", c.non_verifies_vieux + " depuis + de 7 j");
-    cptSet("cpt-resets", c.resets_bloques);
-    cptSet("cpt-resets-sub", c.resets_comptes + " compte(s) concern\u00e9(s)");
+  // le flux du dashboard (toutes les 2 s) : la section lit sa propre route, rien à faire ici
+  function renderComptes() {}
+  // « 2026-04-10 14:02 » (heure de la base) → « 10 avr. 2026 », ou « 10 avr. 2026, 14:02 »
+  function cptDate(s, heure) {
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(String(s || ""));
+    if (!m) return "—";
+    return Number(m[3]) + " " + CPT_MOIS[Number(m[2]) - 1] + " " + m[1] + (heure ? ", " + m[4] + ":" + m[5] : "");
+  }
+  function cptHeure(s) {
+    var m = /(\d{2}):(\d{2})$/.exec(String(s || ""));
+    return m ? m[1] + ":" + m[2] : "";
+  }
+  function cptVu(u) {
+    if (u.vu_jours == null) return "aucune visite connue";
+    return u.vu_jours <= 0 ? "vu aujourd’hui" : u.vu_jours === 1 ? "vu hier" : "vu il y a " + u.vu_jours + " j";
+  }
+  function cptNom(u) { return u.nom || "Sans pseudo"; }
+  // ce qu'il faut taper pour supprimer : le pseudo exact (donné par l'API), sinon #id ; #id marche toujours
+  function cptAttendu(u) { return u.confirmation || "#" + u.id; }
+  function cptConfirme(u, v) { return v === cptAttendu(u) || v === "#" + u.id; }
+  // un appel à l'API, abandonné s'il ne répond pas à temps (ms)
+  async function cptAppel(url, opts, ms) {
+    var ac = typeof AbortController === "function" ? new AbortController() : null;
+    var t = ac ? setTimeout(function () { ac.abort(); }, ms) : null;
+    if (ac) opts.signal = ac.signal;
+    try {
+      var r = await fetch(url, opts);
+      var d = await r.json().catch(function (e) { if (e && e.name === "AbortError") throw e; return null; });
+      return { r: r, d: d };
+    } catch (e) {
+      if (e && e.name === "AbortError") { var x = new Error("pas de réponse en " + Math.round(ms / 1000) + " s"); x.delai = true; throw x; }
+      throw e;
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  function cptRaison(e) { return e && e.name === "TypeError" ? "API injoignable" : String((e && e.message) || "erreur"); }
+  function cptHorloge(t) {
+    var d = new Date(t);
+    return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
 
-    var box = document.getElementById("cpt-attention");
-    if (!box) return;
-    var list = c.attention || [];
-    if (!list.length) {
-      box.innerHTML = '<div class="empty">Aucun compte bloqu\u00e9</div>';
+  function cptMeta() {
+    var e = document.getElementById("cpt-etat"), dot = document.getElementById("cpt-dot");
+    if (!e || !dot) return;
+    var c = CPT.d && CPT.d.chiffres;
+    var n = c ? c.total + (c.total > 1 ? " comptes" : " compte") + " · " : "";
+    if (CPT.err) {
+      dot.style.background = "#ff453a";
+      e.textContent = CPT.lu ? n + "chiffres de " + cptHorloge(CPT.lu) + ", pas à jour" : "lecture impossible";
+    } else if (CPT.lu) {
+      dot.style.background = "";
+      var s = Math.max(0, Math.round((Date.now() - CPT.lu) / 1000));
+      e.textContent = n + "à jour il y a " + (s < 60 ? s + " s" : Math.floor(s / 60) + " min");
+    } else {
+      dot.style.background = "";
+      e.textContent = "Chargement…";
+    }
+  }
+
+  function cptLigne(u) {
+    var bar = u.reinit ? "c" : !u.verifie ? "w" : "o";
+    var bds = (u.verifie ? '<span class="cpt-bd ok">Vérifié</span>' : '<span class="cpt-bd w">E-mail non vérifié</span>')
+      + (u.reinit ? '<span class="cpt-bd c">Réinit. en attente</span>' : '')
+      + (u.actif ? '<span class="cpt-bd n">Actif</span>' : '');
+    var act = !u.verifie ? '<button type="button" class="cpt-act" data-a="renvoyer-confirmation">Renvoyer la confirmation</button>'
+      : u.reinit ? '<button type="button" class="cpt-act" data-a="lien-mot-de-passe">Envoyer un lien</button>'
+      : '<button type="button" class="cpt-act vide" tabindex="-1" aria-hidden="true">-</button>';
+    return '<div class="cpt-row' + (CPT.sel === u.id ? ' sel' : '') + '" data-id="' + u.id + '" tabindex="0"><span class="gc-bar ' + bar + '"></span>'
+      + '<div><div class="cpt-nom">' + gcEsc(cptNom(u)) + '<span>#' + u.id + '</span></div>'
+      + '<div class="cpt-mail">' + gcEsc(u.email_masque) + '</div><div class="cpt-bds">' + bds + '</div></div>'
+      + '<div class="cpt-dates">inscrit <b>le ' + cptDate(u.inscrit) + '</b><br>' + cptVu(u) + '</div>' + act + '</div>';
+  }
+
+  function cptRendre() {
+    var b = document.getElementById("cpt-err");
+    if (b) b.innerHTML = !CPT.err ? "" : '<div class="cpt-err"><span class="bi-diag-i">!</span><div>Lecture des comptes impossible (<b>'
+      + gcEsc(CPT.err) + '</b>)' + (CPT.lu ? ' : les chiffres affichés datent de <b>' + cptHorloge(CPT.lu) + '</b>' : '')
+      + '. Nouvel essai dans 30 s.</div></div>';
+    cptMeta();
+    var d = CPT.d, c = d && d.chiffres;
+    if (c) {
+      cptSet("cpt-total", c.total);
+      cptSet("cpt-total-sub", c.nouveaux_mois > 0 ? "+" + c.nouveaux_mois + " ce mois" : "aucun ce mois");
+      cptSet("cpt-actifs", c.actifs);
+      cptSet("cpt-actifs-sub", c.total ? Math.round(c.actifs / c.total * 100) + " % du total" : "—");
+      cptSet("cpt-nonverif", c.non_verifies);
+      cptSet("cpt-nonverif-sub", c.non_verifies_vieux + " depuis plus de 7 j");
+      cptSet("cpt-reinit", c.reinit);
+      cptSet("cpt-reinit-sub", c.reinit ? c.reinit + (c.reinit > 1 ? " comptes concernés" : " compte concerné") : "aucune demande");
+    }
+    var L = document.getElementById("cpt-list");
+    if (!L) return;
+    if (!d) {
+      L.innerHTML = '<div class="empty">' + (CPT.err ? "Liste indisponible" : "Chargement...") + '</div>';
       return;
     }
-    box.innerHTML = list.map(function (u) {
-      var reset = u.souci === "reset";
-      var lib = reset ? "R\u00e9init. bloqu\u00e9e" : "Email non v\u00e9rifi\u00e9";
-      var col = reset ? "#e24b4a" : "#ff9f0a";
-      var det = reset
-        ? u.tentatives + " tentative(s) \u00b7 " + u.depuis_j + " j"
-        : "inscrit il y a " + u.depuis_j + " j";
-      return '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06)">'
-        + '<div style="flex:1;min-width:0">'
-        + '<div style="font-weight:700;color:#e8e0d8;font-size:.9rem">' + gcEsc(u.nom) + '</div>'
-        + '<div style="font-size:.75rem;color:#8a8078;font-family:monospace">' + gcEsc(u.email_masque) + ' \u00b7 #' + u.id + '</div>'
-        + '</div>'
-        + '<div style="flex:none;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;color:' + col + ';background:' + col + '22;border:1px solid ' + col + '55">' + lib + '</div>'
-        + '<div style="flex:none;font-size:.75rem;color:#8a8078;min-width:120px;text-align:right">' + det + '</div>'
-        + '</div>';
-    }).join("");
+    var vide = CPT.q ? "Aucun compte ne correspond à cette recherche" : d.filtre === "tous" ? "Aucun compte" : "Aucun compte dans ce filtre";
+    var reste = d.total - d.comptes.length, max = d.nombre_max || 500, place = Math.max(0, max - d.comptes.length);
+    L.innerHTML = (d.comptes.length ? d.comptes.map(cptLigne).join("") : '<div class="empty">' + vide + '</div>')
+      + '<div class="cpt-pied"><span>' + d.comptes.length + ' sur ' + d.total + '</span>'
+      + (reste > 0 && place > 0 ? '<button type="button" class="tool-btn" data-a="plus">Afficher ' + Math.min(25, reste, place) + ' de plus</button>'
+        : reste > 0 ? '<span>' + max + ' au plus : affine avec la recherche ou un filtre</span>' : '')
+      + '</div>';
   }
+
+  async function cptCharger() {
+    if (CPT.enCours) { CPT.encore = true; return; }
+    CPT.enCours = true;
+    CPT.essai = Date.now();
+    try {
+      var x = await cptAppel("/dashboard/admin/comptes/liste", { method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filtre: CPT.filtre, tri: CPT.tri, nombre: CPT.nombre, q: CPT.q }) }, 20000);
+      var r = x.r, d = x.d;
+      if (!r.ok || !d || !d.ok) throw new Error(d && d.msg ? d.msg : r.status >= 500 ? "API injoignable (HTTP " + r.status + ")" : "HTTP " + r.status);
+      CPT.d = d; CPT.lu = Date.now(); CPT.err = null;
+    } catch (e) {
+      CPT.err = cptRaison(e);
+    }
+    CPT.enCours = false;
+    cptRendre();
+    if (CPT.encore) { CPT.encore = false; cptCharger(); }
+  }
+
+  // ── la fiche d'un compte (la fiche des items, .bi-modal, avec l'initiale du pseudo) ──
+  function cptFicheEl() {
+    var F = document.getElementById("cptFiche");
+    if (!F) {
+      F = document.createElement("div");
+      F.className = "bi-modal cpt-fiche";
+      F.id = "cptFiche";
+      // sous la fiche d'un item (#biModal, 1003, même place) : un item ouvert pendant ce temps passe devant
+      F.style.zIndex = "1002";
+      document.body.appendChild(F);
+      F.addEventListener("click", cptFicheClic);
+      F.addEventListener("input", cptFicheSaisie);
+    }
+    return F;
+  }
+  function cptMarquer() {
+    Array.prototype.forEach.call(document.querySelectorAll("#cpt-list .cpt-row"), function (r) {
+      r.classList.toggle("sel", Number(r.getAttribute("data-id")) === CPT.sel);
+    });
+  }
+  function cptTete(u, led) {
+    var ini = (Array.from(String(u.nom || "#"))[0] || "#").toUpperCase();
+    return '<div class="bi-head"><span class="bi-br tl"></span><span class="bi-br tr"></span>'
+      + '<div class="cpt-av"><span class="cpt-ini">' + gcEsc(ini) + '</span></div>'
+      + '<div class="bi-htx"><div class="bi-title">' + gcEsc(u.nom || "Sans pseudo") + '</div><div class="bi-meta"><span class="bi-led"'
+      + (led ? ' style="background:' + led + ';box-shadow:0 0 8px ' + led + '"' : '') + '></span>#' + u.id
+      + (u.email_masque ? ' · ' + gcEsc(u.email_masque) : '') + '</div></div>'
+      + '<button type="button" class="bi-close" data-a="fermer" aria-label="Fermer">✕</button></div><div class="bi-sep"></div>';
+  }
+  function cptChamp(nom, etat, cls, lignes) {
+    return '<div class="bi-field ' + cls + '"><div class="bi-fhead"><span class="bi-fname">' + nom + '</span><span class="bi-fline"></span>'
+      + '<span class="bi-fstate ' + cls + '">' + etat + '</span></div><div class="bi-fbody">'
+      + lignes.map(function (l) { return '<div class="cpt-kv">' + l[0] + '<b class="' + (l[2] || "") + '">' + l[1] + '</b></div>'; }).join("")
+      + '</div></div>';
+  }
+  function cptFicheRendre() {
+    var c = CPT.fiche, F = cptFicheEl();
+    if (!c) return;
+    var led = c.reinit ? "#ff453a" : !c.verifie ? "#ff9f0a" : "";
+    var lien = !c.lien ? "Aucun lien de confirmation n’a été créé."
+      : c.lien.etat === "expire" ? "Le dernier lien de confirmation a expiré."
+      : c.lien.etat === "valable" ? "Le dernier lien de confirmation est encore valable."
+      : "Le dernier lien de confirmation a déjà servi.";
+    var diag, ok = false, j = c.inscrit_jours || 0;
+    if (!c.verifie) {
+      diag = '<b>E-mail jamais confirmé</b> depuis l’inscription' + (j > 1 ? ", il y a " + j + " jours" : j === 1 ? ", hier" : ", aujourd’hui") + ". " + lien
+        + (c.reinit ? " Un nouveau mot de passe a aussi été demandé." : "");
+    } else if (c.reinit) {
+      diag = '<b>Nouveau mot de passe demandé</b> le ' + cptDate(c.reinit_demandee, true) + ", pas choisi, et aucune visite depuis : "
+        + (c.reinit_expiree ? "le lien a expiré." : "le lien est encore valable.");
+    } else {
+      ok = true;
+      diag = "Compte en ordre : e-mail confirmé, aucune réinitialisation en attente.";
+    }
+    var vu = c.vu_jours == null ? "aucune visite connue" : c.vu_jours <= 0 ? "aujourd’hui, " + cptHeure(c.vu)
+      : c.vu_jours === 1 ? "hier, " + cptHeure(c.vu) : cptDate(c.vu, true);
+    var etatLien = c.lien ? (c.lien.etat === "expire" ? "expiré" : c.lien.etat === "valable" ? "valable" : "utilisé") : "";
+    var mail = [["Adresse", gcEsc(c.email_masque)]];
+    if (c.verifie) mail.push(["Vérifié le", c.verifie_le ? cptDate(c.verifie_le, true) : "date inconnue"]);
+    mail.push(["Dernier lien créé", c.lien ? cptDate(c.lien.cree) + " (" + etatLien + ")" : "aucun", !c.verifie && c.lien && c.lien.etat === "expire" ? "w" : ""]);
+    var lcompte = [["Inscription", cptDate(c.inscrit, true)], ["Dernière visite", vu], ["Sessions ouvertes", String(c.sessions)]];
+    if (c.premium || c.stripe) lcompte.push(["Premium", (c.premium ? "oui" : "non") + (c.stripe ? ", abonnement Stripe" : ""), c.stripe ? "w" : ""]);
+    var corps = cptChamp("Compte", "OUVERT", "ok", lcompte)
+      + cptChamp("E-mail", c.verifie ? "VÉRIFIÉ" : "NON VÉRIFIÉ", c.verifie ? "ok" : "pend", mail)
+      + cptChamp("Mot de passe", c.reinit ? "EN ATTENTE" : "OK", c.reinit ? "miss" : "ok",
+          [["Réinitialisation en attente", c.reinit ? "demandée le " + cptDate(c.reinit_demandee, true) + (c.reinit_expiree ? " (lien expiré)" : "") : "aucune", c.reinit ? "c" : ""]])
+      + cptChamp("Activité", "", "ok", [["Favoris", String(c.favoris)], ["Alertes par e-mail", c.alertes_email ? "oui" : "non"],
+          ["Rappels de sortie", c.rappels ? c.rappels + (c.rappels > 1 ? " envoyés" : " envoyé") + (c.rappels_email ? " (dont " + c.rappels_email + " par e-mail)" : "") : "aucun"]]);
+    var bas;
+    if (CPT.conf) {
+      bas = '<div class="cpt-conf"><p>Supprimer le compte <b>' + gcEsc(cptAttendu(c)) + '</b> ? C’est définitif : ses favoris, alertes, rappels et sessions '
+        + 'partent avec lui. L’action est notée dans le journal du Pilotage.</p>'
+        + '<input id="cpt-conf-in" autocomplete="off" spellcheck="false" placeholder="' + gcEsc(c.confirmation ? "Tape le pseudo pour confirmer" : "Tape " + cptAttendu(c) + " pour confirmer")
+        + '" aria-label="Tape le pseudo pour confirmer"><div class="cpt-actions">'
+        + '<button type="button" class="bi-btn rep" data-a="annuler">Annuler</button><button type="button" class="bi-btn del plein" data-a="supprimer" disabled>Supprimer définitivement</button></div></div>';
+    } else {
+      var dejaV = c.verifie ? ' disabled title="E-mail déjà vérifié"' : "";
+      bas = '<div class="bi-actions"><div class="cpt-actions" style="flex:1">'
+        + '<button type="button" class="bi-btn save" data-a="renvoyer-confirmation"' + dejaV + '>Renvoyer la confirmation</button>'
+        + '<button type="button" class="bi-btn rep" data-a="valider-email"' + dejaV + '>Valider l’e-mail à la main</button>'
+        + '<button type="button" class="bi-btn rep" data-a="lien-mot-de-passe">Lien de mot de passe</button>'
+        + '<button type="button" class="bi-btn del" data-a="confirmer"' + (c.stripe ? ' disabled title="Abonnement Stripe : à régler d’abord dans Stripe"' : '') + '>Supprimer le compte</button></div></div>';
+    }
+    F.innerHTML = cptTete(c, led) + '<div class="bi-diag"><span class="bi-diag-i' + (ok ? " ok" : "") + '">' + (ok ? "✓" : "!") + '</span><div class="bi-diag-t">'
+      + diag + '</div></div>' + corps + bas;
+    if (CPT.conf) {
+      var i = document.getElementById("cpt-conf-in");
+      if (i) i.focus();
+    }
+  }
+  async function cptLire(id) {
+    var x = await cptAppel("/dashboard/admin/comptes/" + id, { cache: "no-store" }, 20000);
+    var r = x.r, d = x.d;
+    if (!r.ok || !d || !d.ok) {
+      var e = new Error(d && d.msg ? d.msg : r.status >= 500 ? "API injoignable (HTTP " + r.status + ")" : "HTTP " + r.status);
+      e.statut = r.status;
+      throw e;
+    }
+    return d.compte;
+  }
+  async function cptOuvrir(id) {
+    var F = cptFicheEl();
+    CPT.sel = id; CPT.fiche = null; CPT.conf = false;
+    cptMarquer();
+    var bi = document.getElementById("biModal");
+    if (bi && bi.classList.contains("open") && typeof closeBotItem === "function") closeBotItem();
+    F.innerHTML = cptTete({ id: id, nom: "Chargement…", email_masque: "" }, "")
+      + '<div class="bi-loading"><div class="bi-spin"></div><div class="bi-loadtxt">Lecture du compte…</div></div>';
+    F.classList.add("open");
+    try {
+      var c = await cptLire(id);
+      if (CPT.sel !== id) return;
+      CPT.fiche = c;
+      cptFicheRendre();
+    } catch (e) {
+      if (CPT.sel !== id) return;
+      F.innerHTML = cptTete({ id: id, nom: "#" + id, email_masque: "" }, "") + '<div class="bi-empty">Fiche illisible : '
+        + gcEsc(cptRaison(e)) + '</div>';
+    }
+  }
+  // après un geste : la fiche relue sans écran de chargement (un compte supprimé ailleurs la ferme)
+  async function cptRelire(id) {
+    try {
+      var c = await cptLire(id);
+      if (CPT.sel === id) CPT.fiche = c;
+    } catch (e) {
+      if (e && e.statut === 404 && CPT.sel === id) { cptFermer(); return; }
+    }
+    if (CPT.sel === id) cptFicheRendre();
+  }
+  function cptFermer() {
+    var F = document.getElementById("cptFiche");
+    if (F) F.classList.remove("open");
+    CPT.sel = null; CPT.fiche = null; CPT.conf = false;
+    cptMarquer();
+  }
+  async function cptGeste(id, geste, corps) {
+    if (CPT.occupe) return;
+    CPT.occupe = true;
+    var F = document.getElementById("cptFiche");
+    if (F && CPT.sel === id) Array.prototype.forEach.call(F.querySelectorAll("button[data-a]"), function (x) { if (x.getAttribute("data-a") !== "fermer") x.disabled = true; });
+    var reussi = false, incertain = false;
+    try {
+      var x = await cptAppel("/dashboard/admin/comptes/" + id + "/" + geste, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corps || {}) }, 30000);
+      var r = x.r, d = x.d;
+      if (r.ok && d && d.ok) { reussi = true; biToast(d.msg || "Fait"); }
+      else biToast("Refusé : " + (d && d.msg ? d.msg : r.status >= 500 ? "API injoignable (HTTP " + r.status + ")" : "HTTP " + r.status), true);
+    } catch (e) {
+      // sans réponse, le geste a pu se faire quand même : la fiche est relue (un compte supprimé la ferme)
+      incertain = !!(e && e.delai);
+      biToast(incertain ? "Pas de réponse en 30 s : le geste a peut-être eu lieu, la fiche est relue" : "Erreur : " + (e && e.name === "TypeError" ? "API injoignable" : (e && e.message) || "réseau"), true);
+    }
+    CPT.occupe = false;
+    if (reussi && geste === "supprimer") {
+      if (CPT.sel === id) cptFermer();
+    } else if (CPT.sel === id) {
+      if (CPT.conf && !reussi && !incertain) {
+        // la confirmation reste ouverte, avec ce qui est tapé
+        Array.prototype.forEach.call(F.querySelectorAll("button[data-a]"), function (x) { x.disabled = false; });
+        cptFicheSaisie({ target: document.getElementById("cpt-conf-in") });
+      } else {
+        CPT.conf = false;
+        cptRelire(id);
+      }
+    }
+    cptCharger();
+  }
+  function cptFicheClic(e) {
+    var b = e.target.closest("button[data-a]");
+    if (!b || b.disabled) return;
+    var a = b.getAttribute("data-a"), c = CPT.fiche;
+    if (a === "fermer") { cptFermer(); return; }
+    if (!c) return;
+    if (a === "confirmer") { CPT.conf = true; cptFicheRendre(); return; }
+    if (a === "annuler") { CPT.conf = false; cptFicheRendre(); return; }
+    if (a === "supprimer") {
+      var i = document.getElementById("cpt-conf-in");
+      cptGeste(c.id, "supprimer", { confirmation: i ? i.value.trim() : "" });
+      return;
+    }
+    cptGeste(c.id, a, {});
+  }
+  function cptFicheSaisie(e) {
+    if (!e.target || e.target.id !== "cpt-conf-in" || !CPT.fiche) return;
+    var b = cptFicheEl().querySelector('button[data-a="supprimer"]');
+    if (b) b.disabled = !cptConfirme(CPT.fiche, e.target.value.trim());
+  }
+
+  (function () {
+    var grille = document.getElementById("cpt-grid"), tris = document.getElementById("cpt-tris"), q = document.getElementById("cpt-q");
+    var liste = document.getElementById("cpt-list"), relire = document.getElementById("cpt-reload");
+    if (!grille || !tris || !q || !liste || !relire) return;
+    grille.addEventListener("click", function (e) {
+      var t = e.target.closest(".cpt-tile");
+      if (!t) return;
+      CPT.filtre = t.getAttribute("data-f");
+      Array.prototype.forEach.call(grille.querySelectorAll(".cpt-tile"), function (o) { o.classList.toggle("on", o === t); });
+      CPT.nombre = 25;
+      cptCharger();
+    });
+    function majTri() {
+      Array.prototype.forEach.call(tris.querySelectorAll(".gc-type"), function (o) { o.classList.toggle("on", o.getAttribute("data-t") === CPT.tri); });
+    }
+    tris.addEventListener("click", function (e) {
+      var t = e.target.closest(".gc-type");
+      if (!t) return;
+      CPT.tri = t.getAttribute("data-t");
+      majTri();
+      cptCharger();
+    });
+    // les pastilles d'« Items incomplets » (gcType) retirent « on » de toutes les .gc-type de la page : le tri des
+    // comptes retrouve son état juste après
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest ? e.target.closest(".gc-chip, .gc-type") : null;
+      if (t && !t.closest("#cpt-tris")) setTimeout(majTri, 0);
+    });
+    var qT = null;
+    q.addEventListener("input", function () {
+      clearTimeout(qT);
+      qT = setTimeout(function () { CPT.q = q.value.trim(); CPT.nombre = 25; cptCharger(); }, 320);
+    });
+    relire.addEventListener("click", function () { cptCharger(); });
+    relire.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cptCharger(); } });
+    liste.addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (b && b.getAttribute("data-a") === "plus") { CPT.nombre += 25; cptCharger(); return; }
+      var r = e.target.closest(".cpt-row");
+      if (!r) return;
+      var id = Number(r.getAttribute("data-id"));
+      if (b && b.classList.contains("cpt-act")) {
+        if (!b.classList.contains("vide") && !b.disabled && !CPT.occupe) { b.disabled = true; cptGeste(id, b.getAttribute("data-a"), {}); }
+        return;
+      }
+      cptOuvrir(id);
+    });
+    liste.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter" || !e.target.classList || !e.target.classList.contains("cpt-row")) return;
+      e.preventDefault();
+      cptOuvrir(Number(e.target.getAttribute("data-id")));
+    });
+    // Échap ferme la fiche ; pas quand la fiche d'un item est ouverte devant elle
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape" || CPT.sel === null) return;
+      var bi = document.getElementById("biModal");
+      if (bi && bi.classList.contains("open")) return;
+      cptFermer();
+    });
+    // toutes les secondes : « à jour il y a … » ; toutes les 30 s (onglet affiché) : relecture
+    setInterval(function () {
+      cptMeta();
+      if (!document.hidden && !CPT.enCours && Date.now() - CPT.essai >= 30000) cptCharger();
+    }, 1000);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && !CPT.enCours && Date.now() - CPT.essai >= 30000) cptCharger();
+    });
+    cptCharger();
+  })();
 
   function renderTraffic() {
     if (!lastMetrics) return;
@@ -2916,158 +3442,348 @@ window.addEventListener("load", function () {
 });
 </script>
 <script>
-/* ═══ Section Publication ═══
-   Deux sources, deux rythmes : le rapport dit l'etat et les compteurs, le
-   journal se lit par morceaux avec un decalage pour ne jamais relire ce qui
-   est deja affiche. Tant qu'un build tourne on suit de pres ; sinon on se
-   contente d'un coup d'oeil de temps en temps. */
+/* ═══ PUBLICATION : staging -> production (refonte d'après la maquette B · Frise validée le 28 octobre 2026) ═══
+   Une lecture : PB_SOURCE.lire() rend {maintenant, build, publication, a_jour, journaux} (GET /dashboard/admin/build/etat) ;
+   deux gestes : PB_SOURCE.build() et PB_SOURCE.publier(), qui rendent {ok, msg}. Publier = la commande habituelle :
+   copie, redémarrage de l'API, rechargement de nginx, vérification en ligne ; chaque étape est suivie ici.
+   Heures montrées à l'heure de Paris. */
 (function () {
   var E = function (id) { return document.getElementById(id); };
-  var decalage = 0, minuteur = null, dernierEtat = null;
+  var PHRASES = { copie: "copie vers la production", api: "redémarrage de l'API", nginx: "rechargement de nginx", verif: "vérification en ligne" };
+  var ARRET = { copie: "à la copie", api: "au redémarrage de l'API", nginx: "au rechargement de nginx", verif: "à la vérification en ligne" };
+  var FRISE = { copie: "Copie", api: "Redémarrage de l'API", nginx: "Rechargement de nginx", verif: "Vérification" };
+  var dernier = null, reel = null, rendu = "", onglet = "build", minuteur = null, refus = null, echecs = 0, vise = null, decalage = 0;
 
-  function duree(ms) {
-    var s = Math.round(ms / 1000);
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+  function nb(n) { return n == null ? "?" : Number(n).toLocaleString("fr-FR"); }
+  var FMT = null;
+  try { FMT = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) {}
+  function heure(ms, maintenant) {
+    if (!ms) return "?";
+    var p = {};
+    (FMT ? FMT.formatToParts(new Date(ms)) : []).forEach(function (x) { p[x.type] = x.value; });
+    var hm = (p.hour || "??") + ":" + (p.minute || "??");
+    var jour = (p.day || "??") + "/" + (p.month || "??");
+    if (maintenant) {
+      var a = {};
+      (FMT ? FMT.formatToParts(new Date(maintenant)) : []).forEach(function (x) { a[x.type] = x.value; });
+      var h = {};
+      (FMT ? FMT.formatToParts(new Date(maintenant - 86400000)) : []).forEach(function (x) { h[x.type] = x.value; });
+      if (a.day === p.day && a.month === p.month) return "aujourd'hui à " + hm;
+      if (h.day === p.day && h.month === p.month) return "hier à " + hm;
+    }
+    return "le " + jour + " à " + hm;
+  }
+  function duree(s) {
+    s = Math.round(s || 0);
     if (s < 60) return s + " s";
     var m = Math.round(s / 60);
-    if (m < 60) return m + " min";
-    var h = m / 60;
-    return (h < 48 ? Math.round(h) + " h" : Math.round(h / 24) + " jours");
+    return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + String(m % 60).padStart(2, "0");
   }
-
   function badges(cl, txt) {
-    ["pub-bg", "pub-bg-idx"].forEach(function (id) {
-      var b = E(id); if (!b) return;
-      b.className = "gn-bg " + cl; b.textContent = txt;
-    });
+    ["pb-bg", "pub-bg-idx"].forEach(function (id) { var b = E(id); if (b) { b.className = "gn-bg " + cl; b.textContent = txt; } });
   }
-
-  function mesure(nom, av, ap) {
+  function delta(av, ap) {
     if (av == null || ap == null) return "";
     var d = ap - av;
-    var cl = d > 0 ? "dt p" : (d < 0 ? "dt m" : "dt");
-    var txt = d === 0 ? "\u2014" : (d > 0 ? "+" + d : String(d));
-    return '<div class="pub-mes"><span>' + nom + '</span>'
-      + '<em class="av">' + av + '</em><em class="fl">\u2192</em>'
-      + '<em class="ap">' + ap + '</em><em class="' + cl + '">' + txt + '</em></div>';
+    return d === 0 ? "=" : (d > 0 ? "+" + nb(d) : "\u2212" + nb(-d));
   }
 
-  function controle(cl, nom, val) {
-    var ic = cl === "ok" ? "\u2713" : (cl === "ko" ? "\u2717" : "\u00b7");
-    return '<div class="pub-ctl ' + cl + '"><i>' + ic + '</i><span>' + nom + '</span>'
-      + '<b>' + (val == null ? "" : val) + '</b></div>';
+  // L'état d'ensemble, du plus urgent au plus calme : une seule phrase.
+  function etat(d) {
+    var b = d.build || {}, p = d.publication || {};
+    var pubApresBuild = p.debut && (!b.fini || p.debut >= b.fini);
+    if (p.etat === "en_cours") return "publie";
+    if (b.etat === "en_cours") return "construit";
+    if (b.etat === "interrompu") return "build_coupe";
+    if ((p.etat === "echec" || p.etat === "refusee") && pubApresBuild) return "pub_ko";
+    if (b.etat === "jamais" || !b.fini) return "rien";
+    if (b.ok === false) return "build_ko";
+    if (b.promouvable !== true) return "bloque";
+    if (d.a_jour) return "a_jour";
+    return "attend";
   }
 
-  function rendreRapport(j) {
-    var r = j.rapport, e = j.etat;
-    dernierEtat = e;
+  function etapeEnCours(p) {
+    var l = p.etapes || [];
+    for (var i = 0; i < l.length; i++) if (l[i].etat === "cours") return { n: i + 1, e: l[i], total: l.length };
+    return { n: 0, e: null, total: l.length };
+  }
+  function etapeKo(p) {
+    var l = p.etapes || [];
+    for (var i = 0; i < l.length; i++) if (l[i].etat === "ko") return l[i];
+    return null;
+  }
+  function parQui(p) { return p.par === "dashboard" ? "depuis le dashboard" : (p.par === "main" ? "à la main" : ""); }
 
-    if (e === "en_cours") {
+  function bandeau(d, st) {
+    var b = d.build || {}, p = d.publication || {}, m = d.maintenant, s = b.staging || {}, pr = b.prod || {};
+    var o = { cl: "", t: "", sous: "", cpt: [] };
+    if (st === "publie") {
+      var c = etapeEnCours(p);
+      o.cl = "run"; o.t = "Publication en cours" + (c.e ? " : étape " + c.n + " sur " + c.total + ", " + (PHRASES[c.e.id] || "") + "\u2026" : "\u2026");
+      o.sous = "lancée " + heure(p.debut, m) + " " + parQui(p) + " \u00b7 pendant le redémarrage de l'API, le dashboard se coupe quelques secondes";
+      badges("run", "en cours");
+    } else if (st === "construit") {
+      o.cl = "run"; o.t = "Build du staging en cours\u2026";
+      o.sous = "dernière ligne du journal il y a " + duree(b.silence_s) + " \u00b7 un build dure une dizaine de secondes";
       badges("run", "build");
-      E("pub-etat").innerHTML = "<b>Build en cours.</b>"
-        + '<span class="q">le journal ci-dessous avance en direct</span>';
-    } else if (e === "interrompu") {
+    } else if (st === "pub_ko") {
+      var k = etapeKo(p) || {};
+      o.cl = "ko"; o.t = "La publication lancée " + heure(p.debut, m) + " s'est arrêtée " + (ARRET[k.id] || "en route") + ".";
+      o.sous = (k.detail ? esc(k.detail) : "voir le journal de la publication") + (p.message ? " \u00b7 " + esc(p.message) : "");
+      badges("ko", "échec");
+    } else if (st === "build_coupe") {
+      o.cl = "ko";
+      if (b.cause) {
+        o.t = "Le build demandé n'a pas démarré.";
+        o.sous = esc(b.cause);
+      } else {
+        o.t = "Le dernier build s'est arrêté en route.";
+        o.sous = "journal muet depuis " + duree(b.silence_s) + ", sans rapport \u00b7 relance un build";
+      }
       badges("ko", "interrompu");
-      E("pub-etat").innerHTML = "<b>Le build s'est arr\u00eat\u00e9 en route.</b>"
-        + '<span class="q">journal muet depuis ' + duree((j.silence_s || 0) * 1000)
-        + ", et aucun rapport \u00e9crit</span>";
-    } else if (!r) {
+    } else if (st === "rien") {
+      o.t = "Aucun build depuis la mise en place.";
+      o.sous = "lance un build : le staging sera construit, puis tu pourras le regarder avant de publier";
       badges("", "jamais");
-      E("pub-etat").innerHTML = "<b>Aucun build depuis la mise en place.</b>"
-        + '<span class="q">rien \u00e0 publier pour l\'instant</span>';
-    } else if (r.promouvable === true) {
-      badges("ok", "pr\u00eat");
-      E("pub-etat").innerHTML = "<b>Pr\u00eat \u00e0 publier.</b>"
-        + '<span class="q">build de ' + (r.fini || "?").replace("T", " \u00e0 ").slice(0, 19)
-        + " \u00b7 " + (r.duree_s == null ? "?" : r.duree_s + " s") + "</span>";
+    } else if (st === "build_ko") {
+      o.cl = "ko"; o.t = "Le dernier build a échoué (" + heure(b.fini, m) + ").";
+      o.sous = (b.cause ? "cause : " + esc(b.cause) + " \u00b7 " : "") + "la production n'a pas changé \u00b7 relance un build après correction";
+      badges("ko", "échec");
+    } else if (st === "bloque") {
+      o.cl = "ko"; o.t = "Ce staging ne peut pas être publié : " + ((b.alertes || []).join(", ") || "un contrôle a échoué") + ".";
+      o.sous = "build " + heure(b.fini, m) + " \u00b7 la production n'a pas changé \u00b7 relance un build après correction";
+      badges("ko", "bloqué");
+    } else if (st === "a_jour") {
+      o.cl = "ok"; o.t = "La production est à jour.";
+      o.sous = "elle est identique au staging construit " + heure(b.fini, m) +
+        (d.derniere_copie ? " \u00b7 publiée " + heure(d.derniere_copie, m) + (p.etat === "reussie" ? " " + parQui(p) : "") : "");
+      o.cpt = ['<span class="gn-bg ok">à jour</span>', '<span class="gn-bg">' + nb((s.anime || 0) + (s.jeux || 0)) + " fiches</span>"];
+      badges("ok", "à jour");
     } else {
-      badges("ko", "refus\u00e9");
-      E("pub-etat").innerHTML = "<b>Publication bloqu\u00e9e.</b>"
-        + '<span class="q">' + ((r.alertes || []).join(" \u00b7 ") || "un contr\u00f4le a \u00e9chou\u00e9")
-        + "</span>";
+      o.cl = "att"; o.t = "Un staging plus récent attend d'être publié.";
+      o.sous = "construit " + heure(b.fini, m) + " en " + duree(b.duree_s) + " \u00b7 contrôles " + d.controles_ok + " sur " + d.controles_n +
+        (d.derniere_copie ? " \u00b7 production publiée " + heure(d.derniere_copie, m) : "");
+      var dA = (s.anime || 0) - (pr.anime || 0), dJ = (s.jeux || 0) - (pr.jeux || 0);
+      o.cpt = ['<span class="gn-bg run">à publier</span>'];
+      if (dA) o.cpt.push('<span class="gn-bg">' + (dA > 0 ? "+" : "\u2212") + nb(Math.abs(dA)) + " fiche" + (Math.abs(dA) > 1 ? "s" : "") + " anime</span>");
+      if (dJ) o.cpt.push('<span class="gn-bg">' + (dJ > 0 ? "+" : "\u2212") + nb(Math.abs(dJ)) + " fiche" + (Math.abs(dJ) > 1 ? "s" : "") + " jeux</span>");
+      badges("run", "à publier");
     }
+    E("pb-band").className = "pb-band " + o.cl;
+    E("pb-band").innerHTML = '<div class="pb-band-t"><b>' + esc(o.t) + "</b><span>" + o.sous + "</span></div>" +
+      '<div class="pb-cpt">' + o.cpt.join("") + "</div>";
+  }
 
-    var s = (r && r.staging) || {}, p = (r && r.prod) || {};
-    E("pub-mes").innerHTML = r
-      ? mesure("Fiches anime", p.anime, s.anime)
-        + mesure("Fiches jeux", p.jeux, s.jeux)
-        + mesure("URLs au sitemap", p.sitemap, s.sitemap)
-        + mesure("Liens vers les fiches", p.liens, s.liens)
-      : '<div class="pub-ctl na"><i>\u00b7</i><span>aucun rapport</span><b></b></div>';
+  // Les étapes de la dernière publication (ou celles à venir).
+  function etapes(p) {
+    var l = (p.etapes && p.etapes.length) ? p.etapes : ["copie", "api", "nginx", "verif"].map(function (id) { return { id: id, etat: "attente" }; });
+    return l;
+  }
 
-    // Les quatre controles sont exactement ceux que build-staging.sh evalue :
-    // on les deduit de ses alertes, on n'en invente pas.
-    if (!r) {
-      E("pub-ctl").innerHTML = '<div class="pub-ctl na"><i>\u00b7</i><span>aucun rapport</span><b></b></div>';
+  function frise(d, st) {
+    var b = d.build || {}, p = d.publication || {}, m = d.maintenant, s = b.staging || {};
+    function pas(cl, n, titre, sous) {
+      return '<div class="pb-p ' + cl + '"><div class="pb-rond">' + (cl === "ok" ? "\u2713" : (cl === "ko" ? "\u2717" : n)) + "</div><b>" + titre + "</b><small>" + sous + "</small></div>";
+    }
+    var clB = st === "construit" ? "cours" : (st === "build_ko" || st === "build_coupe" ? "ko" : (b.fini ? "ok" : "attente"));
+    var sousB = st === "construit" ? "en cours\u2026" : (b.fini ? heure(b.fini, m).replace(/^le /, "") + " \u00b7 " + duree(b.duree_s) : "jamais");
+    if (st === "build_ko") sousB = "échec " + heure(b.fini, m);
+    var clC = !b.fini || st === "construit" || st === "build_ko" || st === "build_coupe" ? "attente" : (st === "bloque" ? "ko" : "ok");
+    var sousC = st === "build_ko" ? "non faits" : (clC === "attente" ? "après le build" : (st === "bloque" ? esc((b.alertes || []).join(", ")) : d.controles_ok + " sur " + d.controles_n + " \u00b7 " + nb((s.anime || 0) + (s.jeux || 0)) + " fiches"));
+    var l = etapes(p);
+    var ouSuis = p.etat === "en_cours" || p.etat === "echec" || p.etat === "refusee" || st === "a_jour";
+    var pasP = l.map(function (e, i) {
+      var cl = ouSuis || p.etat === "reussie" ? e.etat : "attente";
+      if (st === "attend") cl = "attente";
+      // une étape pas encore faite garde sa note quand elle en a une (copie faite hors du bouton : « non suivi »)
+      var sous = cl === "attente" ? (st === "attend" ? (i === 0 ? "au clic sur Publier" : "") : (e.etat === "attente" && e.detail ? esc(e.detail) : "")) : (e.detail ? esc(e.detail) : "");
+      return pas(cl, i + 3, FRISE[e.id], sous);
+    }).join("");
+    var dis = (st === "publie" || st === "construit") ? " disabled" : "";
+    var peutPub = (st === "attend" || st === "pub_ko") && !(d.demandes && d.demandes.publication);
+    var bPub = '<button type="button" class="pb-bt ' + (peutPub ? "pb-bt-or" : "pb-bt-neutre") + '" data-pb="publier"' + (peutPub && !dis ? "" : " disabled") + ">" +
+      (st === "a_jour" ? "Rien à publier" : (st === "pub_ko" ? "Réessayer la publication" : "Publier en production")) + "</button>";
+    var bBuild = '<button type="button" class="pb-bt pb-bt-neutre" data-pb="build"' + dis + ">" + (st === "construit" ? "Build en cours\u2026" : "Lancer un build") + "</button>";
+    var quandP = p.debut ? (p.etat === "en_cours" ? "lancée " : "dernière : ") + heure(p.etat === "en_cours" ? p.debut : (p.fin || p.debut), m) + " " + parQui(p) : "jamais publiée";
+    return '<div class="pb-frise">' +
+      '<div class="pb-groupe"><div class="pb-groupe-t">Staging <a href="https://staging.gamenime.fr/" target="_blank" rel="noopener">staging.gamenime.fr \u2197</a></div>' +
+      '<div class="pb-pas">' + pas(clB, 1, "Build", sousB) + pas(clC, 2, "Contrôles", sousC) + "</div>" +
+      '<div class="pb-act">' + bBuild + "</div></div>" +
+      '<div class="pb-groupe"><div class="pb-groupe-t">Publication <span class="lieu">' + esc(quandP) + "</span></div>" +
+      '<div class="pb-pas">' + pasP + "</div>" +
+      '<div class="pb-act">' + bPub + "</div></div></div>";
+  }
+
+  // Un geste refusé par l'API : sa raison, sous la frise, une demi-minute.
+  function note() {
+    return refus && Date.now() - refus.t < 30000 ? '<div class="pb-note" role="status">' + esc(refus.msg) + "</div>" : "";
+  }
+
+  function changements(d, st) {
+    var b = d.build || {}, s = b.staging || {}, p = b.prod || {};
+    if (st !== "attend") { E("pb-chg").innerHTML = ""; return; }
+    function l(nom, k) {
+      var dd = delta(p[k], s[k]);
+      var cl = dd.charAt(0) === "+" ? "p" : (dd === "=" ? "" : "m");
+      return '<div class="pb-mes"><span>' + nom + '</span><em class="av">' + nb(p[k]) + '</em><em class="fl">\u2192</em><em class="ap">' + nb(s[k]) +
+        '</em><em class="dt ' + cl + '">' + (dd === "=" ? "\u2014" : dd) + "</em></div>";
+    }
+    E("pb-chg").innerHTML = '<div class="pb-chg"><div class="pb-chg-t">Ce que la publication changera en ligne</div>' +
+      l("Fiches anime", "anime") + l("Fiches jeux", "jeux") + l("Adresses du sitemap", "sitemap") + l("Liens vers les fiches", "liens") + "</div>";
+  }
+
+  function controles(d) {
+    var b = d.build || {}, s = b.staging || {}, p = b.prod || {}, al = (b.alertes || []).join(" | ");
+    var l = [
+      [al.indexOf("aucun lien") === -1, "Des pages mènent aux fiches", nb(s.liens) + " liens"],
+      [al.indexOf("anime en forte baisse") === -1, "Pas de chute des fiches anime", nb(s.anime) + " (en ligne : " + nb(p.anime) + ")"],
+      [al.indexOf("jeux en forte baisse") === -1, "Pas de chute des fiches jeux", nb(s.jeux) + " (en ligne : " + nb(p.jeux) + ")"],
+      [al.indexOf("sitemap en forte baisse") === -1, "Pas de chute du sitemap", nb(s.sitemap) + " adresses"],
+      [!s.orphelines, "Chaque fiche est reliée par une page", s.orphelines ? nb(s.orphelines) + " sans lien" : "toutes reliées"]
+    ];
+    d.controles_n = l.length;
+    d.controles_ok = l.filter(function (x) { return x[0]; }).length;
+    // les controles sont ceux du dernier rapport : pas pendant un build (en cours ou mort en route, son rapport n'est
+    // pas encore la), et pas faits pour un build en echec (il n'a rien mesure)
+    var pendant = b.etat === "en_cours" || b.etat === "interrompu";
+    var faits = b.fini && b.ok === true && !pendant;
+    E("pb-ctl").innerHTML = faits ? l.map(function (x) {
+      return '<div class="pb-ctl' + (x[0] ? "" : " ko") + '"><i>' + (x[0] ? "\u2713" : "\u2717") + "</i><span>" + x[1] + "</span><b>" + x[2] + "</b></div>";
+    }).join("") : '<div class="pb-ctl"><i>\u00b7</i><span>' + (pendant ? "contrôles à la fin du build" : (b.fini ? "contrôles non faits : le dernier build a échoué" : "aucun build pour l\u2019instant")) + "</span><b></b></div>";
+    E("pb-det-r").textContent = faits ? d.controles_ok + " contrôles sur " + d.controles_n : (pendant ? "" : (b.fini ? "contrôles non faits" : ""));
+  }
+
+  function journal(d) {
+    var j = (d.journaux || {})[onglet] || "";
+    E("pb-log").innerHTML = j ? esc(j).split("\n").map(function (l) {
+      var m = /^(\d\d:\d\d:\d\d) (.*)$/.exec(l);
+      var t = m ? '<span class="t">' + m[1] + "</span> " : "";
+      var x = m ? m[2] : l;
+      var cl = /^(\u2713|v |OK)/.test(x) ? "v" : (/^(\u2717|x |KO)/.test(x) ? "x" : "");
+      return t + (cl ? '<span class="' + cl + '">' + x + "</span>" : x);
+    }).join("\n") : '<span class="t">aucun journal</span>';
+    E("pb-o-build").setAttribute("aria-selected", onglet === "build" ? "true" : "false");
+    E("pb-o-pub").setAttribute("aria-selected", onglet === "publication" ? "true" : "false");
+  }
+
+  function rendre(d) {
+    dernier = d;
+    controles(d);
+    var st = etat(d);
+    bandeau(d, st);
+    E("pb-corps").innerHTML = frise(d, st) + note();
+    changements(d, st);
+    journal(d);
+    rendu = st;
+    return st;
+  }
+  window.pbRendre = rendre;
+
+  // Un geste accepté que la lecture ne montre pas encore (systemd le prend dans la seconde) : montré tout de suite.
+  function avecGeste(d) {
+    if (!vise || Date.now() + decalage - vise.t > 30000) { vise = null; return d; }
+    var p = d.publication || {}, b = d.build || {};
+    if (vise.quoi === "publier" ? (p.etat === "en_cours" || (p.debut && p.debut >= vise.t - 2000)) : (b.etat === "en_cours" || (b.fini && b.fini >= vise.t - 2000))) {
+      vise = null;
+      return d;
+    }
+    var c = JSON.parse(JSON.stringify(d));
+    if (vise.quoi === "publier") {
+      c.publication = { etat: "en_cours", par: "dashboard", debut: vise.t, fin: null, message: "",
+        etapes: [{ id: "copie", etat: "cours", detail: "demandée…" }, { id: "api", etat: "attente", detail: "" },
+          { id: "nginx", etat: "attente", detail: "" }, { id: "verif", etat: "attente", detail: "" }] };
     } else {
-      var al = (r.alertes || []).join(" | ");
-      var ko = function (mot) { return al.indexOf(mot) !== -1 ? "ko" : "ok"; };
-      E("pub-ctl").innerHTML =
-          controle(ko("aucun lien"), "Des liens m\u00e8nent aux fiches", s.liens)
-        + controle(ko("anime en forte baisse"), "Volume anime coh\u00e9rent", s.anime)
-        + controle(ko("jeux en forte baisse"), "Volume jeux coh\u00e9rent", s.jeux)
-        + controle(ko("sitemap en forte baisse"), "Sitemap coh\u00e9rent", s.sitemap)
-        + controle("na", "Fiches sans lien, arbitrage en attente", s.orphelines);
+      c.build = c.build || {};
+      c.build.etat = "en_cours";
+      c.build.silence_s = 0;
     }
+    return c;
+  }
 
-    E("pub-promo").disabled = !(e === "termine" && r && r.promouvable === true);
-    E("pub-build").disabled = (e === "en_cours");
-    E("pub-build").textContent = e === "en_cours" ? "Build en cours\u2026" : "Lancer un build";
+  // Pendant une publication, l'API redémarre (étape 2) : la lecture échoue quelques secondes. La vue reste celle de la
+  // dernière lecture (publier.sh laisse le temps de lire l'étape 2 avant la coupure) ; si elle ne montrait pas ce
+  // redémarrage, le bandeau dit seulement que la lecture est coupée.
+  function coupure() {
+    var p = (reel && reel.publication) || {}, api = null;
+    if (p.etat === "en_cours") (p.etapes || []).forEach(function (e) { if (e.id === "api") api = e; });
+    if (api && api.etat === "cours") return;
+    var s = E("pb-band").querySelector(".pb-band-t span");
+    if (s && s.textContent.indexOf("lecture coupée") === -1) s.textContent += " \u00b7 lecture coupée, nouvel essai\u2026";
+  }
+
+  // L'état n'a pas pu être lu : dit tout de suite au premier chargement, sinon après une demi-minute d'échecs
+  // (le redémarrage de l'API pendant une publication coupe la lecture quelques secondes).
+  function illisible(e) {
+    if (dernier && echecs < 10) return;
+    E("pb-band").className = "pb-band ko";
+    E("pb-band").innerHTML = '<div class="pb-band-t"><b>Lecture de l\u2019état impossible.</b><span>' + esc(e && e.message ? e.message : e) +
+      " \u00b7 nouvel essai dans quelques secondes</span></div>";
+    badges("ko", "illisible");
   }
 
   async function maj() {
+    var st = rendu;
     try {
-      var rr = await fetch("/dashboard/admin/build/rapport");
-      if (rr.ok) rendreRapport(await rr.json());
-
-      var rj = await fetch("/dashboard/admin/build/journal?depuis=" + decalage);
-      if (rj.ok) {
-        var j = await rj.json();
-        if (j.depuis === 0 && decalage !== 0) E("pub-log").textContent = "";
-        if (j.texte) {
-          var log = E("pub-log");
-          var enBas = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
-          log.textContent += j.texte;
-          if (enBas) log.scrollTop = log.scrollHeight;
-        }
-        decalage = j.taille;
-        E("pub-log-t").textContent = j.taille + " octets";
-      }
+      var d = await window.PB_SOURCE.lire();
+      echecs = 0;
+      if (d.maintenant) decalage = d.maintenant - Date.now();
+      reel = d;
+      st = rendre(avecGeste(d));
     } catch (e) {
+      echecs++;
       if (window.console) console.warn("publication :", e);
+      if (st === "publie" && echecs < 40) coupure(); else illisible(e);
     }
     clearTimeout(minuteur);
-    minuteur = setTimeout(maj, dernierEtat === "en_cours" ? 1500 : 20000);
+    minuteur = setTimeout(maj, st === "publie" || st === "construit" || vise ? 1500 : (echecs ? 3000 : 20000));
   }
+  window.pbMaj = maj;
 
-  async function demander(url, bouton) {
-    var m = E("pub-msg");
-    bouton.disabled = true;
-    m.className = "pub-msg"; m.textContent = "Demande en cours\u2026";
+  async function poster(url) {
     try {
       var r = await fetch(url, { method: "POST" });
-      var d = await r.json();
-      m.className = "pub-msg " + (r.ok ? "ok" : "ko");
-      m.textContent = d.msg || (r.ok ? "Demande accept\u00e9e." : "Refus\u00e9 (HTTP " + r.status + ")");
-      if (r.ok && url.indexOf("demande") !== -1) {
-        // Nouveau build : le journal est remis a zero cote serveur, donc le
-        // decalage doit repartir de zero ici aussi.
-        decalage = 0; E("pub-log").textContent = ""; dernierEtat = "en_cours";
-      }
+      var j = {};
+      try { j = await r.json(); } catch (e) {}
+      return { ok: r.ok && j.ok !== false, msg: j.msg || (r.ok ? "" : "refusé (HTTP " + r.status + ")") };
     } catch (e) {
-      m.className = "pub-msg ko"; m.textContent = "Erreur r\u00e9seau : " + e.message;
+      return { ok: false, msg: "erreur réseau : " + e.message };
     }
-    clearTimeout(minuteur);
-    minuteur = setTimeout(maj, 1200);
   }
+  if (!window.PB_SOURCE) window.PB_SOURCE = {
+    lire: async function () {
+      var r = await fetch("/dashboard/admin/build/etat", { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    },
+    build: function () { return poster("/dashboard/admin/build/demande"); },
+    publier: function () { return poster("/dashboard/admin/build/publier"); }
+  };
+
+  document.addEventListener("click", async function (ev) {
+    var b = ev.target.closest("[data-pb]");
+    if (b && !b.disabled && E("pb-zone").contains(b)) {
+      b.disabled = true;
+      var quoi = b.getAttribute("data-pb") === "build" ? "build" : "publier";
+      var r = await (quoi === "build" ? window.PB_SOURCE.build() : window.PB_SOURCE.publier());
+      refus = r && !r.ok ? { t: Date.now(), msg: r.msg || "demande refusée" } : null;
+      vise = refus ? null : { quoi: quoi, t: Date.now() + decalage };
+      if (reel) rendre(avecGeste(reel));
+      clearTimeout(minuteur);
+      minuteur = setTimeout(maj, 600);
+      return;
+    }
+    var o = ev.target.closest(".pb-onglet");
+    if (o && dernier) { onglet = o.id === "pb-o-pub" ? "publication" : "build"; journal(dernier); }
+  });
 
   window.addEventListener("load", function () {
-    var b = E("pub-build"), p = E("pub-promo");
-    if (!b || !p) return;
-    b.onclick = function () { demander("/dashboard/admin/build/demande", b); };
-    p.onclick = function () { demander("/dashboard/admin/build/promouvoir", p); };
-
-    // La section est ecrite en dur, donc le script de la piste B ne l'observe
-    // pas : il lui faut son propre observateur pour allumer l'index.
+    if (!E("pb-zone")) return;
+    // La section est écrite en dur, donc le script de la piste B ne l'observe pas : elle a son propre observateur
+    // pour allumer l'index.
     var sec = E("page-publication");
     if (sec && window.IntersectionObserver) {
       new IntersectionObserver(function (es) {
@@ -3079,7 +3795,7 @@ window.addEventListener("load", function () {
         });
       }, { rootMargin: "-14% 0px -74% 0px", threshold: 0 }).observe(sec);
     }
-    setTimeout(maj, 1000);
+    setTimeout(maj, 300);
   });
 })();
 </script>
